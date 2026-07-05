@@ -207,7 +207,12 @@ export function validateRegister(input: RegisterInput): FieldErrors {
   const pw = validatePassword(input.password);
   if (pw) errors.password = pw;
   const dob = validateDateOfBirth(input.dateOfBirth);
-  if (dob) errors.dateOfBirth = dob;
+  if (dob) {
+    errors.dateOfBirth =
+      dob === "Doğum tarihi zorunludur."
+        ? "Doğum tarihi için gün, ay ve yıl seçiniz."
+        : dob;
+  }
   if (input.gender !== 1 && input.gender !== 2)
     errors.gender = "Cinsiyet 1 (Erkek) veya 2 (Kadın) olmalıdır.";
   return errors;

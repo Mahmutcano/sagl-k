@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { InputHTMLAttributes, ReactNode } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
@@ -48,11 +49,20 @@ type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   fieldClassName?: string;
 };
 
-export function TextInput({ id, label, hint, error, fieldClassName, ...rest }: InputProps) {
+export function TextInput({
+  id,
+  label,
+  hint,
+  error,
+  fieldClassName,
+  className,
+  ...rest
+}: InputProps & { className?: string }) {
   return (
     <FormField id={id} label={label} hint={hint} error={error} className={fieldClassName}>
       <Input
         id={id}
+        className={cn("min-w-0", className)}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
         {...rest}
@@ -62,6 +72,144 @@ export function TextInput({ id, label, hint, error, fieldClassName, ...rest }: I
 }
 
 export { TextInput as DateField };
+
+const TR_MONTHS = [
+  { value: "01", label: "Ocak" },
+  { value: "02", label: "Şubat" },
+  { value: "03", label: "Mart" },
+  { value: "04", label: "Nisan" },
+  { value: "05", label: "Mayıs" },
+  { value: "06", label: "Haziran" },
+  { value: "07", label: "Temmuz" },
+  { value: "08", label: "Ağustos" },
+  { value: "09", label: "Eylül" },
+  { value: "10", label: "Ekim" },
+  { value: "11", label: "Kasım" },
+  { value: "12", label: "Aralık" },
+] as const;
+
+function daysInMonth(month: string, year: string): number {
+  const m = parseInt(month, 10);
+  const y = parseInt(year, 10);
+  if (!m || !y) return 31;
+  return new Date(y, m, 0).getDate();
+}
+
+function parseBirthDate(iso: string): { day: string; month: string; year: string } {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
+    return { day: "", month: "", year: "" };
+  }
+  const [year, month, day] = iso.split("-");
+  return { day, month, year };
+}
+
+function composeBirthDate(day: string, month: string, year: string): string {
+  if (!day || !month || !year) return "";
+  return `${year}-${month}-${day}`;
+}
+
+type BirthDateSelectProps = {
+  id?: string;
+  label?: string;
+  hint?: string;
+  error?: string;
+  fieldClassName?: string;
+  value: string;
+  onChange: (isoDate: string) => void;
+};
+
+export function BirthDateSelect({
+  id = "dateOfBirth",
+  label = "Doğum tarihi",
+  hint,
+  error,
+  fieldClassName,
+  value,
+  onChange,
+}: BirthDateSelectProps) {
+  const [parts, setParts] = useState(() => parseBirthDate(value));
+
+  useEffect(() => {
+    if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      setParts(parseBirthDate(value));
+    }
+  }, [value]);
+
+  const { day, month, year } = parts;
+  const maxDay = daysInMonth(month, year);
+  const dayOptions = Array.from({ length: maxDay }, (_, i) => {
+    const d = String(i + 1).padStart(2, "0");
+    return { value: d, label: d };
+  });
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 100 }, (_, i) => {
+    const y = String(currentYear - i);
+    return { value: y, label: y };
+  });
+
+  function update(part: "day" | "month" | "year", next: string) {
+    let d = part === "day" ? next : parts.day;
+    let m = part === "month" ? next : parts.month;
+    let y = part === "year" ? next : parts.year;
+    if (d && m && y) {
+      const max = daysInMonth(m, y);
+      if (parseInt(d, 10) > max) d = String(max).padStart(2, "0");
+    }
+    const nextParts = { day: d, month: m, year: y };
+    setParts(nextParts);
+    if (d && m && y) {
+      const iso = composeBirthDate(d, m, y);
+      if (iso !== value) onChange(iso);
+    } else if (value) {
+      onChange("");
+    }
+  }
+
+  const subSelect = (
+    part: "day" | "month" | "year",
+    partValue: string,
+    placeholder: string,
+    options: { value: string; label: string }[]
+  ) => (
+    <Select value={partValue || undefined} onValueChange={(v) => update(part, v)}>
+      <SelectTrigger
+        id={part === "day" ? id : undefined}
+        aria-invalid={error ? true : undefined}
+        className="min-w-0 w-full"
+      >
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map((o) => (
+          <SelectItem key={o.value} value={o.value}>
+            {o.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+
+  return (
+    <FormField id={id} label={label} hint={hint} error={error} className={fieldClassName}>
+      <div className="grid grid-cols-3 gap-2 min-w-0">
+        {subSelect("day", day, "Gün", dayOptions)}
+        <Select value={month || undefined} onValueChange={(v) => update("month", v)}>
+          <SelectTrigger className="min-w-0 w-full">
+            <SelectValue placeholder="Ay" />
+          </SelectTrigger>
+          <SelectContent>
+            {TR_MONTHS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {subSelect("year", year, "Yıl", yearOptions)}
+      </div>
+    </FormField>
+  );
+}
 
 type SelectOption = { value: string; label: string };
 
@@ -104,7 +252,7 @@ export function FormSelect({
           onChange?.({ target: { value: v, name: name ?? id } })
         }
       >
-        <SelectTrigger id={id} aria-invalid={error ? true : undefined}>
+        <SelectTrigger id={id} aria-invalid={error ? true : undefined} className="min-w-0 w-full">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
         <SelectContent>

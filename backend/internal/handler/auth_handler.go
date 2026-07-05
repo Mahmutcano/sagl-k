@@ -87,8 +87,7 @@ func (h *AuthHandler) InitiateRegister(w http.ResponseWriter, r *http.Request) {
 }
 
 type completeRegisterBody struct {
-	PhoneNumber string `json:"phoneNumber"`
-	Code        string `json:"code"`
+	Code string `json:"code"`
 	authsvc.RegisterInitRequest
 }
 
@@ -98,15 +97,14 @@ func (h *AuthHandler) CompleteRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	errs := validateRegister(&body.RegisterInitRequest)
-	validate.PhoneTR(&errs, "phoneNumber", body.PhoneNumber)
 	validate.OTP(&errs, "code", body.Code)
 	if errs.Has() {
 		validate.Fail(w, errs)
 		return
 	}
-	body.PhoneNumber = validate.NormalizePhoneTR(body.PhoneNumber)
-	body.RegisterInitRequest.PhoneNumber = body.PhoneNumber
-	res, err := h.svc.CompleteRegister(r.Context(), body.PhoneNumber, body.Code, body.RegisterInitRequest)
+	body.Code = strings.TrimSpace(body.Code)
+	body.RegisterInitRequest.PhoneNumber = validate.NormalizePhoneTR(body.RegisterInitRequest.PhoneNumber)
+	res, err := h.svc.CompleteRegister(r.Context(), body.RegisterInitRequest.PhoneNumber, body.Code, body.RegisterInitRequest)
 	if err != nil {
 		response.Fail(w, http.StatusBadRequest, "AUTH031", response.SafeMessage(err, "Kayıt tamamlanamadı. Kod geçersiz veya süresi dolmuş olabilir."))
 		return

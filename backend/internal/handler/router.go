@@ -42,6 +42,7 @@ func NewRouter(d Deps) http.Handler {
 		d.Cfg.DoctorURL,
 		d.Cfg.AdminURL,
 		"http://localhost:3000",
+		"http://127.0.0.1:3000",
 	}
 	seen := make(map[string]struct{}, len(origins))
 	unique := make([]string, 0, len(origins))

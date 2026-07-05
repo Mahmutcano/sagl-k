@@ -1,7 +1,7 @@
 import { errorsToMap, type FieldError, type FieldErrors } from "./validation";
 import { API } from "./endpoints";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export type ApiEnvelope<T> = {
   hasError: boolean;

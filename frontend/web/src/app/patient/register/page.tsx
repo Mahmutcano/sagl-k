@@ -15,7 +15,7 @@ import {
   type FieldErrors,
 } from "@/lib/validation";
 import { AuthShell } from "@/components/AuthShell";
-import { FormAlert, FormSelect, TextInput } from "@/components/FormField";
+import { BirthDateSelect, FormAlert, FormSelect, TextInput } from "@/components/FormField";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -39,6 +39,14 @@ type Agreement = {
   isRequired: boolean;
 };
 
+function formatPhoneInput(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 4) return digits;
+  if (digits.length <= 7) return `${digits.slice(0, 4)} ${digits.slice(4)}`;
+  if (digits.length <= 9) return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
+  return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7, 9)} ${digits.slice(9)}`;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [step, setStep] = useState<"form" | "otp">("form");
@@ -50,7 +58,7 @@ export default function RegisterPage() {
     email: "",
     password: "",
     dateOfBirth: "",
-    gender: 1,
+    gender: 0,
   });
   const [code, setCode] = useState("");
   const [agreements, setAgreements] = useState<Agreement[]>([]);
@@ -74,6 +82,20 @@ export default function RegisterPage() {
       .catch(() => {});
   }, []);
 
+  function scrollToFirstError(errs: FieldErrors) {
+    const firstKey = Object.keys(errs)[0];
+    if (!firstKey) return;
+    const id = firstKey.startsWith("agreement_") ? "agreements" : firstKey;
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function summarizeErrors(errs: FieldErrors): string {
+    const msgs = Object.values(errs);
+    if (msgs.length === 0) return "Lütfen işaretli alanları düzeltin.";
+    if (msgs.length === 1) return msgs[0];
+    return `Lütfen ${msgs.length} alanı düzeltin: ${msgs.slice(0, 3).join(" · ")}`;
+  }
+
   async function handleInitiate(e: React.FormEvent) {
     e.preventDefault();
     setFormError("");
@@ -84,7 +106,11 @@ export default function RegisterPage() {
       }
     }
     setFields(local);
-    if (hasErrors(local)) return;
+    if (hasErrors(local)) {
+      setFormError(summarizeErrors(local));
+      scrollToFirstError(local);
+      return;
+    }
 
     setLoading(true);
     try {
@@ -92,6 +118,7 @@ export default function RegisterPage() {
         method: "POST",
         body: JSON.stringify({
           ...form,
+          gender: form.gender,
           phoneNumber: normalizePhoneTR(form.phoneNumber),
           nationalIdentifier: form.nationalIdentifier.trim(),
           nationality: "TR",
@@ -100,10 +127,15 @@ export default function RegisterPage() {
       setStep("otp");
     } catch (err) {
       if (err instanceof ApiError) {
-        if (Object.keys(err.fields).length) setFields(err.fields);
-        setFormError(err.message);
+        if (Object.keys(err.fields).length) {
+          setFields(err.fields);
+          setFormError(summarizeErrors(err.fields));
+          scrollToFirstError(err.fields);
+        } else {
+          setFormError(err.message);
+        }
       } else {
-        setFormError("Kayıt başlatılamadı.");
+        setFormError("Sunucuya bağlanılamadı. Backend çalışıyor mu? (port 8080)");
       }
     } finally {
       setLoading(false);
@@ -128,15 +160,19 @@ export default function RegisterPage() {
           phoneNumber: phone,
           nationalIdentifier: form.nationalIdentifier.trim(),
           nationality: "TR",
-          code,
+          code: code.trim(),
         }),
       });
       persistAuth(result);
       router.push(ROUTES.patient.home);
     } catch (err) {
       if (err instanceof ApiError) {
-        if (Object.keys(err.fields).length) setFields(err.fields);
-        setFormError(err.message);
+        if (Object.keys(err.fields).length) {
+          setFields(err.fields);
+          setFormError(summarizeErrors(err.fields));
+        } else {
+          setFormError(err.message);
+        }
       } else {
         setFormError("Kayıt tamamlanamadı.");
       }
@@ -152,8 +188,12 @@ export default function RegisterPage() {
           <CardHeader>
             <CardTitle>SMS doğrulama</CardTitle>
             <CardDescription>
-              <span className="font-medium">{normalizePhoneTR(form.phoneNumber)}</span> numarasına
-              gönderilen kodu girin.
+              <span className="font-medium">{formatPhoneInput(normalizePhoneTR(form.phoneNumber))}</span>{" "}
+              numarasına gönderilen kodu girin.
+              <span className="mt-2 block text-xs text-muted-foreground">
+                Geliştirme modunda SMS simüle edilir; kod backend terminal logunda{" "}
+                <code className="rounded bg-muted px-1">[SMS MOCK]</code> satırında görünür.
+              </span>
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -188,17 +228,18 @@ export default function RegisterPage() {
 
   return (
     <AuthShell badge="Hasta">
-      <Card className="w-full max-w-lg mx-auto">
+      <Card className="w-full max-w-xl mx-auto">
         <CardHeader>
           <CardTitle>Hesap oluştur</CardTitle>
           <CardDescription>Tüm alanlar doğrulanır; SMS ile telefonunuzu onaylarsınız.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleInitiate} className="flex flex-col gap-4" noValidate>
+          <form onSubmit={handleInitiate} className="flex flex-col gap-5" noValidate>
             {formError ? <FormAlert title="Kayıt hatası" message={formError} /> : null}
+
             <fieldset className="space-y-4">
-              <legend className="text-sm font-medium">Kimlik bilgileri</legend>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <legend className="text-sm font-medium mb-1">Kimlik bilgileri</legend>
+              <div className="grid gap-4 grid-cols-2 min-w-0">
                 <TextInput
                   id="firstName"
                   label="Ad"
@@ -215,29 +256,28 @@ export default function RegisterPage() {
                   onChange={(e) => update("lastName", e.target.value)}
                   error={fields.lastName}
                 />
-                <TextInput
-                  id="nationalIdentifier"
-                  label="TC Kimlik No"
-                  hint="11 haneli, algoritma kontrollü"
-                  inputMode="numeric"
-                  maxLength={11}
-                  fieldClassName="sm:col-span-2"
-                  value={form.nationalIdentifier}
-                  onChange={(e) => update("nationalIdentifier", e.target.value)}
-                  error={fields.nationalIdentifier}
-                />
-                <TextInput
-                  id="dateOfBirth"
-                  label="Doğum tarihi"
-                  type="date"
-                  value={form.dateOfBirth}
-                  onChange={(e) => update("dateOfBirth", e.target.value)}
-                  error={fields.dateOfBirth}
-                />
+              </div>
+              <TextInput
+                id="nationalIdentifier"
+                label="TC Kimlik No"
+                hint="11 haneli, algoritma kontrollü"
+                inputMode="numeric"
+                maxLength={11}
+                value={form.nationalIdentifier}
+                onChange={(e) => update("nationalIdentifier", e.target.value)}
+                error={fields.nationalIdentifier}
+              />
+              <BirthDateSelect
+                value={form.dateOfBirth}
+                onChange={(iso) => update("dateOfBirth", iso)}
+                error={fields.dateOfBirth}
+              />
+              <div className="max-w-xs">
                 <FormSelect
                   id="gender"
                   label="Cinsiyet"
-                  value={String(form.gender)}
+                  placeholder="Seçiniz"
+                  value={form.gender ? String(form.gender) : undefined}
                   onChange={(e) => update("gender", Number(e.target.value))}
                   error={fields.gender}
                   options={[
@@ -248,56 +288,58 @@ export default function RegisterPage() {
               </div>
             </fieldset>
 
-            <div className="relative">
+            <div className="relative py-1">
               <Separator />
-              <span className="bg-background text-muted-foreground absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-2 text-xs">
+              <span className="bg-background text-muted-foreground absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-2 text-xs whitespace-nowrap">
                 İletişim ve güvenlik
               </span>
             </div>
 
             <fieldset className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 grid-cols-2 min-w-0">
                 <TextInput
                   id="phoneNumber"
                   label="Telefon"
-                  hint="5XX XXX XX XX"
                   inputMode="tel"
-                  placeholder="5xxxxxxxxx"
+                  autoComplete="tel"
+                  placeholder="0538 443 97 01"
                   value={form.phoneNumber}
-                  onChange={(e) => update("phoneNumber", e.target.value)}
+                  onChange={(e) => update("phoneNumber", formatPhoneInput(e.target.value))}
                   error={fields.phoneNumber}
+                  fieldClassName="min-w-0"
                 />
                 <TextInput
                   id="email"
                   label="E-posta"
                   type="email"
                   autoComplete="email"
+                  placeholder="ornek@mail.com"
                   value={form.email}
                   onChange={(e) => update("email", e.target.value)}
                   error={fields.email}
-                />
-                <TextInput
-                  id="password"
-                  label="Şifre"
-                  type="password"
-                  hint="En az 8 karakter, büyük/küçük harf ve rakam"
-                  autoComplete="new-password"
-                  fieldClassName="sm:col-span-2"
-                  value={form.password}
-                  onChange={(e) => update("password", e.target.value)}
-                  error={fields.password}
+                  fieldClassName="min-w-0"
                 />
               </div>
+              <TextInput
+                id="password"
+                label="Şifre"
+                type="password"
+                hint="En az 8 karakter, büyük/küçük harf ve rakam"
+                autoComplete="new-password"
+                value={form.password}
+                onChange={(e) => update("password", e.target.value)}
+                error={fields.password}
+              />
             </fieldset>
 
             {agreements.length > 0 ? (
-              <fieldset className="space-y-3 rounded-lg border p-4">
+              <fieldset id="agreements" className="space-y-3 rounded-lg border p-4">
                 <legend className="px-1 text-sm font-medium">Sözleşmeler</legend>
                 {agreements.map((a) => (
                   <label key={a.id} className="flex items-start gap-2 text-sm">
                     <input
                       type="checkbox"
-                      className="mt-1"
+                      className="mt-1 shrink-0"
                       checked={acceptedAgreements[a.id] ?? false}
                       onChange={(e) =>
                         setAcceptedAgreements((prev) => ({ ...prev, [a.id]: e.target.checked }))
@@ -327,7 +369,7 @@ export default function RegisterPage() {
         <CardFooter className="border-t flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-muted-foreground text-sm">Zaten hesabınız var mı?</p>
           <Button variant="outline" size="sm" asChild>
-            <Link href="/login">Hasta girişi</Link>
+            <Link href={ROUTES.patient.login}>Hasta girişi</Link>
           </Button>
         </CardFooter>
       </Card>

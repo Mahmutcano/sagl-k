@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"medical-consultation-platform/backend/internal/config"
 	jwtmgr "medical-consultation-platform/backend/internal/pkg/jwt"
 	"medical-consultation-platform/backend/internal/pkg/password"
@@ -108,6 +109,8 @@ func (s *Service) InitiateRegister(ctx context.Context, req RegisterInitRequest)
 }
 
 func (s *Service) CompleteRegister(ctx context.Context, phone, code string, req RegisterInitRequest) (*LoginResult, error) {
+	phone = strings.TrimSpace(phone)
+	code = strings.TrimSpace(code)
 	var expires time.Time
 	var used *time.Time
 	err := s.db.Pool.QueryRow(ctx, `
@@ -116,7 +119,7 @@ func (s *Service) CompleteRegister(ctx context.Context, phone, code string, req 
 		ORDER BY created_at DESC LIMIT 1
 	`, phone, code).Scan(&expires, &used)
 	if err != nil || used != nil || time.Now().After(expires) {
-		return nil, errors.New("invalid or expired code")
+		return nil, errors.New("Doğrulama kodu geçersiz veya süresi dolmuş. Yeni kod isteyin.")
 	}
 	hash, _ := password.Hash(req.Password)
 	dob, _ := time.Parse("2006-01-02", req.DateOfBirth)
@@ -127,7 +130,7 @@ func (s *Service) CompleteRegister(ctx context.Context, phone, code string, req 
 		RETURNING id
 	`, req.Email, phone, hash, req.FirstName, req.LastName, req.NationalIdentifier, dob, req.Gender, req.Nationality).Scan(&userID)
 	if err != nil {
-		return nil, err
+		return nil, registerInsertErr(err)
 	}
 	_, _ = s.db.Pool.Exec(ctx, `UPDATE verification_tokens SET used_at = now() WHERE phone_number = $1 AND token = $2`, phone, code)
 	s.notify.SendWelcomeEmail(ctx, userID, req.Email, req.FirstName)
@@ -208,4 +211,20 @@ func (s *Service) CompleteForgotPassword(ctx context.Context, phone, code, newPa
 	}
 	_, _ = s.db.Pool.Exec(ctx, `UPDATE verification_tokens SET used_at = now() WHERE phone_number = $1 AND token = $2`, phone, code)
 	return nil
+}
+
+func registerInsertErr(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		c := strings.ToLower(pgErr.ConstraintName)
+		switch {
+		case strings.Contains(c, "email"):
+			return errors.New("Bu e-posta adresi zaten kayıtlı. Giriş yapmayı deneyin.")
+		case strings.Contains(c, "phone"):
+			return errors.New("Bu telefon numarası zaten kayıtlı. Giriş yapmayı deneyin.")
+		default:
+			return errors.New("Bu bilgilerle zaten bir hesap var. Giriş yapmayı deneyin.")
+		}
+	}
+	return err
 }
