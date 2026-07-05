@@ -93,7 +93,7 @@ func (h *ApplicationHandler) ListCareProviders(w http.ResponseWriter, r *http.Re
 	rows, err := h.db.Pool.Query(r.Context(), `
 		SELECT id::text, full_name, COALESCE(title,''), profession_code
 		FROM care_providers
-		WHERE target_institution = $1 AND is_active = true
+		WHERE target_institution = $1 AND is_active = true AND user_id IS NOT NULL
 		  AND ($2 = '' OR profession_code = $2)
 		ORDER BY full_name
 	`, target, code)
@@ -128,14 +128,13 @@ func (h *ApplicationHandler) StartApplication(w http.ResponseWriter, r *http.Req
 	validate.TargetInstitution(&errs, "targetInstitution", req.TargetInstitution)
 	validate.ProfessionCode(&errs, "professionCode", req.ProfessionCode)
 	if req.ProfessionName == "" {
-		errs.Add("professionName", "required", "Branş adı zorunludur.")
+		errs.Add("professionName", "required", "Bölüm adı zorunludur.")
 	}
-	if req.CareProviderID == "" {
-		errs.Add("careProviderId", "required", "Doktor seçimi zorunludur.")
-	} else {
+	if req.CareProviderID != "" {
 		validate.UUID(&errs, "careProviderId", req.CareProviderID, "Doktor kimliği")
 	}
 	validate.SurveyData(&errs, "surveyData.data", req.SurveyData.Data)
+	validate.ApplicationSurveyAnswers(&errs, req.SurveyData.Data)
 	if req.IsForRelative {
 		if req.RepresentedPerson == nil {
 			errs.Add("representedPerson", "required", "Yakın adına başvuru için temsil edilen kişi bilgileri zorunludur.")
@@ -262,9 +261,7 @@ func (h *ApplicationHandler) UpdateApplication(w http.ResponseWriter, r *http.Re
 	}
 	var errs validate.Errors
 	validate.SurveyData(&errs, "surveyData.data", req.SurveyData.Data)
-	if req.SurveyData.Data == "" {
-		errs.Add("surveyData.data", "required", "Anket verisi zorunludur.")
-	}
+	validate.ApplicationSurveyAnswers(&errs, req.SurveyData.Data)
 	if errs.Has() {
 		validate.Fail(w, errs)
 		return

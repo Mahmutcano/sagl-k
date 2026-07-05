@@ -107,6 +107,10 @@ func NewRouter(d Deps) http.Handler {
 			ar.Patch("/{id}", appH.UpdateApplication)
 			ar.Post("/{id}/payment", appH.UpdatePayment)
 			ar.Get("/{id}/report", appH.GetFinalReport)
+			ar.Get("/{id}/attachments", appH.ListAttachments)
+			ar.Post("/{id}/attachments", appH.UploadAttachment)
+			ar.Get("/{id}/attachments/{attachmentId}", appH.DownloadAttachment)
+			ar.Delete("/{id}/attachments/{attachmentId}", appH.DeleteAttachment)
 
 			ar.With(authmw.RequireRole("nurse", "doctor", "admin", "developer")).Post("/{id}/notes", appH.AddNote)
 			ar.With(authmw.RequireRole("nurse", "doctor", "admin", "developer")).Get("/{id}/notes", appH.NoteHistory)

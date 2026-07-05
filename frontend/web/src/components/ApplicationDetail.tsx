@@ -11,12 +11,18 @@ import {
   statusVariant,
   applicationDisplayNumber,
   isConcludedStatus,
+  type ApplicationAttachment,
   type ApplicationDetail,
   type ApplicationNote,
   type FinalReport,
   type PaymentRequest,
   type PaymentResult,
 } from "@/lib/application";
+import {
+  SURVEY_FIELDS,
+  downloadApplicationAttachment,
+  parseSurveyData,
+} from "@/lib/applicationSurvey";
 import { FormAlert, FormField } from "@/components/FormField";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,6 +51,7 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
   const searchParams = useSearchParams();
   const [app, setApp] = useState<ApplicationDetail | null>(null);
   const [notes, setNotes] = useState<ApplicationNote[]>([]);
+  const [attachments, setAttachments] = useState<ApplicationAttachment[]>([]);
   const [report, setReport] = useState<FinalReport | null>(null);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
@@ -66,9 +73,11 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
     return Promise.all([
       api<ApplicationDetail>(API.applications.detail(id), {}, token),
       api<ApplicationNote[]>(API.applications.notes(id), {}, token).catch(() => []),
-    ]).then(async ([detail, noteList]) => {
+      api<ApplicationAttachment[]>(API.applications.attachments(id), {}, token).catch(() => []),
+    ]).then(async ([detail, noteList, attachmentList]) => {
       setApp(detail);
       setNotes(noteList ?? []);
+      setAttachments(attachmentList ?? []);
       if (isConcludedStatus(detail.statusCode)) {
         try {
           const rep = await api<FinalReport>(API.applications.report(id), {}, token);
@@ -200,10 +209,8 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
     return <FormAlert title="Hata" message={error || "Başvuru bulunamadı."} />;
   }
 
-  const survey =
-    typeof app.surveyData === "string"
-      ? app.surveyData
-      : JSON.stringify(app.surveyData ?? {}, null, 2);
+  const surveyAnswers = parseSurveyData(app.surveyData);
+  const hasSurveyContent = SURVEY_FIELDS.some((f) => surveyAnswers[f.key]?.trim());
 
   return (
     <div className="grid gap-6">
@@ -373,14 +380,52 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Başvuru özeti</CardTitle>
+          <CardTitle className="text-base">Başvuru bilgileri</CardTitle>
         </CardHeader>
-        <CardContent>
-          <pre className="text-xs overflow-auto rounded-lg border bg-muted/30 p-3 max-h-64">
-            {survey}
-          </pre>
+        <CardContent className="grid gap-4 text-sm">
+          {hasSurveyContent ? (
+            SURVEY_FIELDS.map((field) =>
+              surveyAnswers[field.key]?.trim() ? (
+                <div key={field.key}>
+                  <p className="text-muted-foreground">{field.label}</p>
+                  <p className="whitespace-pre-wrap">{surveyAnswers[field.key]}</p>
+                </div>
+              ) : null
+            )
+          ) : (
+            <p className="text-muted-foreground">Anket yanıtı bulunmuyor.</p>
+          )}
         </CardContent>
       </Card>
+
+      {attachments.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Yüklenen belgeler</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="grid gap-2">
+              {attachments.map((a) => (
+                <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm">
+                  <span className="truncate">{a.fileName}</span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      downloadApplicationAttachment(id, a.id, a.fileName, token).catch(() =>
+                        setError("Dosya indirilemedi.")
+                      )
+                    }
+                  >
+                    İndir
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

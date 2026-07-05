@@ -15,7 +15,19 @@ import {
   type RepresentedPersonInput,
 } from "@/lib/validation";
 import { PatientAppShell } from "@/components/PatientAppShell";
+import { ApplicationSurveyForm } from "@/components/ApplicationSurveyForm";
+import { FileUploadField } from "@/components/FileUploadField";
 import { FormAlert, FormField, FormSelect, DateField } from "@/components/FormField";
+import { useApplicationCatalog } from "@/hooks/useApplicationCatalog";
+import {
+  EMPTY_SURVEY,
+  surveyAnswersToJSON,
+  uploadApplicationAttachments,
+  validateApplicationSurvey,
+  summarizeSurveyErrors,
+  validateSelectedFiles,
+  type ApplicationSurveyAnswers,
+} from "@/lib/applicationSurvey";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -40,16 +52,7 @@ type InpatientResult = {
   source: string;
 };
 
-type Profession = { code: string; name: string };
-
-type CareProvider = {
-  careProviderId: string;
-  fullName: string;
-  title: string;
-  professionCode: string;
-};
-
-type Step = "who" | "relative" | "erciyes" | "blocked" | "details" | "done";
+type Step = "who" | "relative" | "erciyes" | "blocked" | "details" | "survey" | "done";
 
 const emptyRelative: RepresentedPersonInput = {
   firstName: "",
@@ -70,38 +73,24 @@ export default function NewApplicationPage() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const [professions, setProfessions] = useState<Profession[]>([]);
-  const [providers, setProviders] = useState<CareProvider[]>([]);
   const [professionCode, setProfessionCode] = useState("");
   const [careProviderId, setCareProviderId] = useState("");
   const [detailFields, setDetailFields] = useState<FieldErrors>({});
+  const [surveyAnswers, setSurveyAnswers] = useState<ApplicationSurveyAnswers>(EMPTY_SURVEY);
+  const [surveyFields, setSurveyFields] = useState<FieldErrors>({});
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [fileError, setFileError] = useState("");
+  const [surveyFormError, setSurveyFormError] = useState("");
   const [createdId, setCreatedId] = useState("");
 
   const targetInstitution = 1;
+  const catalog = useApplicationCatalog(targetInstitution, professionCode, step === "details");
 
   useEffect(() => {
     if (!requireSession("patient")) {
       router.replace(ROUTES.patient.login);
     }
   }, [router]);
-
-  useEffect(() => {
-    if (step !== "details") return;
-    api<Profession[]>(API.professions(targetInstitution))
-      .then((list) => setProfessions(list ?? []))
-      .catch(() => setProfessions([]));
-  }, [step]);
-
-  useEffect(() => {
-    if (step !== "details" || !professionCode) {
-      setProviders([]);
-      setCareProviderId("");
-      return;
-    }
-    api<CareProvider[]>(API.careProviders(targetInstitution, professionCode))
-      .then((list) => setProviders(list ?? []))
-      .catch(() => setProviders([]));
-  }, [step, professionCode]);
 
   async function runErciyesCheck(isForRelative: boolean, nationalIdentifier?: string) {
     const token = getToken();
@@ -162,15 +151,40 @@ export default function NewApplicationPage() {
     setRelative((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function submitApplication(e: FormEvent) {
+  function continueToSurvey(e: FormEvent) {
     e.preventDefault();
     const fields: FieldErrors = {};
-    if (!professionCode) fields.professionCode = "Branş seçiniz.";
-    if (!careProviderId) fields.careProviderId = "Doktor seçimi zorunludur.";
+    if (!professionCode) fields.professionCode = "Bölüm seçiniz.";
     setDetailFields(fields);
     if (hasErrors(fields)) return;
+    setStep("survey");
+    setError("");
+  }
 
-    const profession = professions.find((p) => p.code === professionCode);
+  function scrollToFirstSurveyError(errs: FieldErrors) {
+    const firstKey = Object.keys(errs)[0];
+    if (!firstKey) return;
+    document.getElementById(firstKey)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  async function submitApplication(e: FormEvent) {
+    e.preventDefault();
+    setSurveyFormError("");
+    const surveyErrs = validateApplicationSurvey(surveyAnswers);
+    setSurveyFields(surveyErrs);
+    const fileErr = validateSelectedFiles(pendingFiles);
+    setFileError(fileErr ?? "");
+    if (hasErrors(surveyErrs)) {
+      setSurveyFormError(summarizeSurveyErrors(surveyErrs));
+      scrollToFirstSurveyError(surveyErrs);
+      return;
+    }
+    if (fileErr) {
+      setSurveyFormError(fileErr);
+      return;
+    }
+
+    const profession = catalog.professions.find((p) => p.code === professionCode);
     const token = getToken();
     if (!token) return;
 
@@ -181,9 +195,12 @@ export default function NewApplicationPage() {
         targetInstitution,
         professionCode,
         professionName: profession?.name ?? professionCode,
-        careProviderId,
+        careProviderId: careProviderId || undefined,
         isForRelative: forRelative,
-        surveyData: { surveyName: "initial", data: "{}" },
+        surveyData: {
+          surveyName: "patient_intake",
+          data: surveyAnswersToJSON(surveyAnswers),
+        },
       };
       if (forRelative) {
         body.representedPerson = {
@@ -199,6 +216,9 @@ export default function NewApplicationPage() {
         { method: "POST", body: JSON.stringify(body) },
         token
       );
+      if (pendingFiles.length > 0) {
+        await uploadApplicationAttachments(res.applicationId, pendingFiles, token);
+      }
       setCreatedId(res.applicationId);
       setStep("done");
     } catch (err) {
@@ -214,15 +234,25 @@ export default function NewApplicationPage() {
           setStep("blocked");
         } else if (Object.keys(err.fields).length) {
           const mapped: FieldErrors = {};
+          const surveyMapped: FieldErrors = {};
           for (const [k, v] of Object.entries(err.fields)) {
-            const short = k.replace(/^representedPerson\./, "");
-            mapped[short] = v;
+            if (k.startsWith("surveyData.")) {
+              surveyMapped[k.replace(/^surveyData\./, "")] = v;
+            } else {
+              mapped[k.replace(/^representedPerson\./, "")] = v;
+            }
           }
           if (mapped.firstName || mapped.lastName || mapped.nationalIdentifier || mapped.birthDate || mapped.gender) {
             setRelativeFields(mapped);
             setStep("relative");
+          } else if (Object.keys(surveyMapped).length) {
+            setSurveyFields(surveyMapped);
+            setSurveyFormError(summarizeSurveyErrors(surveyMapped));
+            setStep("survey");
+            scrollToFirstSurveyError(surveyMapped);
           } else {
             setDetailFields(mapped);
+            setStep("details");
           }
           setError(err.message);
         } else {
@@ -237,12 +267,21 @@ export default function NewApplicationPage() {
   }
 
   const professionOptions = [
-    { value: "", label: "Branş seçiniz" },
-    ...professions.map((p) => ({ value: p.code, label: p.name })),
+    { value: "", label: catalog.loadingProfessions ? "Bölümler yükleniyor..." : "Bölüm seçiniz" },
+    ...catalog.professions.map((p) => ({ value: p.code, label: p.name })),
   ];
   const providerOptions = [
-    { value: "", label: providers.length ? "Doktor seçiniz (isteğe bağlı)" : "Önce branş seçin" },
-    ...providers.map((p) => ({
+    {
+      value: "",
+      label: !professionCode
+        ? "Önce bölüm seçin"
+        : catalog.loadingProviders
+          ? "Doktorlar yükleniyor..."
+          : catalog.providers.length
+            ? "Doktor seçiniz (isteğe bağlı)"
+            : "Bu bölümde atanabilir doktor yok",
+    },
+    ...catalog.providers.map((p) => ({
       value: p.careProviderId,
       label: p.title ? `${p.title} ${p.fullName}` : p.fullName,
     })),
@@ -463,7 +502,7 @@ export default function NewApplicationPage() {
 
       {step === "details" && (
         <Card className="max-w-2xl">
-          <form onSubmit={submitApplication} noValidate>
+          <form onSubmit={continueToSurvey} noValidate>
             <CardHeader>
               <CardTitle>Başvuru detayları</CardTitle>
               <CardDescription>
@@ -496,9 +535,15 @@ export default function NewApplicationPage() {
                   </Button>
                 </div>
               ) : null}
+              {catalog.professionsError ? (
+                <FormAlert title="Bölüm listesi" message={catalog.professionsError} />
+              ) : null}
+              {catalog.providersError ? (
+                <FormAlert title="Doktor listesi" message={catalog.providersError} />
+              ) : null}
               <FormSelect
                 id="professionCode"
-                label="Branş"
+                label="Bölüm"
                 value={professionCode}
                 onChange={(e) => {
                   setProfessionCode(e.target.value);
@@ -506,22 +551,24 @@ export default function NewApplicationPage() {
                 }}
                 error={detailFields.professionCode}
                 options={professionOptions}
-                placeholder="Branş seçiniz"
+                placeholder="Bölüm seçiniz"
+                disabled={catalog.loadingProfessions}
               />
               <FormSelect
                 id="careProviderId"
-                label="Doktor"
+                label="Uzman hekim"
+                hint="İsteğe bağlı — tercih ettiğiniz hekimi seçebilirsiniz"
                 value={careProviderId}
                 onChange={(e) => setCareProviderId(e.target.value)}
                 error={detailFields.careProviderId}
                 options={providerOptions}
                 placeholder="Doktor seçiniz"
-                disabled={!professionCode}
+                disabled={!professionCode || catalog.loadingProviders}
               />
             </CardContent>
             <CardFooter className="border-t flex flex-wrap gap-2">
-              <Button type="submit" disabled={submitting}>
-                {submitting ? "Oluşturuluyor..." : "Başvuruyu oluştur"}
+              <Button type="submit">
+                Devam et — sorular ve belgeler
               </Button>
               <Button
                 type="button"
@@ -531,6 +578,44 @@ export default function NewApplicationPage() {
                   setStatus(null);
                 }}
               >
+                Geri
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+      )}
+
+      {step === "survey" && (
+        <Card className="max-w-2xl">
+          <form onSubmit={submitApplication} noValidate>
+            <CardHeader>
+              <CardTitle>Başvuru soruları ve belgeler</CardTitle>
+              <CardDescription>
+                Tıbbi geçmişinizi ve sorularınızı yazın; tetkik/rapor dosyalarını ekleyin.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-6">
+              {surveyFormError ? (
+                <FormAlert title="Doğrulama hatası" message={surveyFormError} />
+              ) : null}
+              <ApplicationSurveyForm
+                value={surveyAnswers}
+                onChange={setSurveyAnswers}
+                errors={surveyFields}
+              />
+              <FileUploadField
+                files={pendingFiles}
+                onChange={setPendingFiles}
+                onError={setFileError}
+                error={fileError}
+                disabled={submitting}
+              />
+            </CardContent>
+            <CardFooter className="border-t flex flex-wrap gap-2">
+              <Button type="submit" disabled={submitting}>
+                {submitting ? "Oluşturuluyor..." : "Başvuruyu oluştur"}
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setStep("details")}>
                 Geri
               </Button>
             </CardFooter>
@@ -570,6 +655,11 @@ export default function NewApplicationPage() {
                 setStatus(null);
                 setProfessionCode("");
                 setCareProviderId("");
+                setSurveyAnswers(EMPTY_SURVEY);
+                setSurveyFields({});
+                setPendingFiles([]);
+                setFileError("");
+                setSurveyFormError("");
                 setCreatedId("");
                 setError("");
               }}

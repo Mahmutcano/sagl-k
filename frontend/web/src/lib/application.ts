@@ -39,6 +39,14 @@ export function applicationDisplayNumber(item: {
   return item.applicationNumber ?? item.ecommerceNumber ?? "—";
 }
 
+export type ApplicationAttachment = {
+  id: string;
+  fileName: string;
+  mimeType?: string;
+  fileSize?: number;
+  createdAt?: string;
+};
+
 export type ApplicationDetail = {
   applicationId: string;
   applicationNumber?: string | null;

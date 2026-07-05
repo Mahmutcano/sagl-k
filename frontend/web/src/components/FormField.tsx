@@ -149,8 +149,8 @@ export function BirthDateSelect({
 
   function update(part: "day" | "month" | "year", next: string) {
     let d = part === "day" ? next : parts.day;
-    let m = part === "month" ? next : parts.month;
-    let y = part === "year" ? next : parts.year;
+    const m = part === "month" ? next : parts.month;
+    const y = part === "year" ? next : parts.year;
     if (d && m && y) {
       const max = daysInMonth(m, y);
       if (parseInt(d, 10) > max) d = String(max).padStart(2, "0");
