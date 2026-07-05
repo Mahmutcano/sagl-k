@@ -1,0 +1,252 @@
+/**
+ * Client-side validation mirroring backend/internal/pkg/validate.
+ * Every rule returns a Turkish explanation for inline field feedback.
+ */
+
+export type FieldError = {
+  field: string;
+  code: string;
+  message: string;
+};
+
+export type FieldErrors = Record<string, string>;
+
+function charCount(s: string): number {
+  return Array.from(s).length;
+}
+
+export function errorsToMap(fields: FieldError[]): FieldErrors {
+  const map: FieldErrors = {};
+  for (const f of fields) {
+    if (!map[f.field]) map[f.field] = f.message;
+  }
+  return map;
+}
+
+function digitsOnly(s: string) {
+  return /^\d+$/.test(s);
+}
+
+function isValidTCKN(s: string): boolean {
+  if (!digitsOnly(s) || s.length !== 11 || s[0] === "0") return false;
+  const d = s.split("").map(Number);
+  const odd = d[0] + d[2] + d[4] + d[6] + d[8];
+  const even = d[1] + d[3] + d[5] + d[7];
+  let d10 = ((odd * 7) - even) % 10;
+  if (d10 < 0) d10 += 10;
+  if (d10 !== d[9]) return false;
+  const sum = d.slice(0, 10).reduce((a, b) => a + b, 0);
+  return sum % 10 === d[10];
+}
+
+export function validateNationalId(value: string): string | null {
+  const v = value.trim();
+  if (!v) return "TC Kimlik Numarası zorunludur.";
+  if (!digitsOnly(v) || v.length !== 11)
+    return "TC Kimlik Numarası 11 haneli rakamlardan oluşmalıdır.";
+  if (v[0] === "0") return "TC Kimlik Numarası 0 ile başlayamaz.";
+  if (!isValidTCKN(v))
+    return "TC Kimlik Numarası algoritma kontrolünden geçemedi. Lütfen numarayı kontrol edin.";
+  return null;
+}
+
+export function validatePassword(value: string, opts?: { required?: boolean }): string | null {
+  const required = opts?.required !== false;
+  if (!value) return required ? "Şifre zorunludur." : null;
+  if (value.length < 8) return "Şifre en az 8 karakter olmalıdır.";
+  if (value.length > 128) return "Şifre en fazla 128 karakter olabilir.";
+  if (!/[A-Z]/.test(value) || !/[a-z]/.test(value) || !/\d/.test(value))
+    return "Şifre en az bir büyük harf, bir küçük harf ve bir rakam içermelidir.";
+  return null;
+}
+
+/** Login password: required but no complexity (existing accounts may be weaker). */
+export function validateLoginPassword(value: string): string | null {
+  if (!value) return "Şifre zorunludur.";
+  if (value.length > 128) return "Şifre çok uzun.";
+  return null;
+}
+
+export function validateEmail(value: string): string | null {
+  const v = value.trim();
+  if (!v) return "E-posta adresi zorunludur.";
+  if (v.length > 254) return "E-posta adresi en fazla 254 karakter olabilir.";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
+    return "Geçerli bir e-posta adresi girin (ör. ad@ornek.com).";
+  return null;
+}
+
+export function normalizePhoneTR(value: string): string {
+  let v = value.trim().replace(/\s/g, "");
+  if (v.startsWith("+90")) v = v.slice(3);
+  else if (v.startsWith("90") && v.length === 12) v = v.slice(2);
+  if (v.startsWith("0")) v = v.slice(1);
+  return v;
+}
+
+export function validatePhoneTR(value: string): string | null {
+  const v = normalizePhoneTR(value);
+  if (!v) return "Telefon numarası zorunludur.";
+  if (!/^5\d{9}$/.test(v))
+    return "Telefon numarası 5XX XXX XX XX formatında 10 haneli olmalıdır (başında 0 olmadan).";
+  return null;
+}
+
+export function validatePersonName(value: string, label: string): string | null {
+  const v = value.trim();
+  if (!v) return `${label} zorunludur.`;
+  if (charCount(v) < 2) return `${label} en az 2 karakter olmalıdır.`;
+  if (charCount(v) > 80) return `${label} en fazla 80 karakter olabilir.`;
+  // Letters (incl. Turkish), spaces, hyphen, apostrophe.
+  if (!/^[A-Za-zÀ-ÖØ-öø-ÿĞğÜüŞşİıÖöÇç\s'-]+$/.test(v)) {
+    return `${label} yalnızca harf, boşluk, tire veya kesme işareti içerebilir.`;
+  }
+  return null;
+}
+
+
+export function validateBirthDate(value: string, opts?: { minAge?: number }): string | null {
+  const v = value.trim();
+  if (!v) return "Doğum tarihi zorunludur.";
+  const t = new Date(v + "T00:00:00");
+  if (Number.isNaN(t.getTime())) return "Doğum tarihi YYYY-MM-DD formatında olmalıdır.";
+  const now = new Date();
+  if (t > now) return "Doğum tarihi gelecekte olamaz.";
+  let age = now.getFullYear() - t.getFullYear();
+  const m = now.getMonth() - t.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < t.getDate())) age--;
+  if (age > 120) return "Doğum tarihi geçersiz görünüyor.";
+  if (opts?.minAge != null && age < opts.minAge) {
+    return opts.minAge === 18
+      ? "Kayıt için en az 18 yaşında olmalısınız."
+      : `En az ${opts.minAge} yaşında olmalıdır.`;
+  }
+  return null;
+}
+
+/** Kayıt için doğum tarihi (18+). */
+export function validateDateOfBirth(value: string): string | null {
+  return validateBirthDate(value, { minAge: 18 });
+}
+
+export function validateOTP(value: string): string | null {
+  const v = value.trim();
+  if (!v) return "Doğrulama kodu zorunludur.";
+  if (!/^\d{4,8}$/.test(v))
+    return "Doğrulama kodu 4–8 haneli rakamlardan oluşmalıdır.";
+  return null;
+}
+
+export function validateHospitalCode(value: string): string | null {
+  const v = value.trim();
+  if (!v) return "Hastane kodu zorunludur.";
+  if (!/^[A-Za-z0-9_-]{2,32}$/.test(v))
+    return "Hastane kodu 2–32 karakter, harf/rakam/tire/alt çizgi olmalıdır.";
+  return null;
+}
+
+export function validateHospitalName(value: string): string | null {
+  const v = value.trim();
+  if (!v) return "Hastane adı zorunludur.";
+  if (charCount(v) < 2 || charCount(v) > 200)
+    return "Hastane adı 2–200 karakter arasında olmalıdır.";
+  return null;
+}
+
+export function validateRefundAmount(value: number): string | null {
+  if (!(value > 0)) return "İade tutarı 0'dan büyük olmalıdır.";
+  if (value > 1_000_000) return "İade tutarı üst sınırı aşıyor.";
+  return null;
+}
+
+export function validateRefundReason(value: string): string | null {
+  const v = value.trim();
+  if (!v) return "İade nedeni zorunludur.";
+  if (charCount(v) < 5) return "İade nedeni en az 5 karakter olmalıdır.";
+  if (charCount(v) > 500) return "İade nedeni en fazla 500 karakter olabilir.";
+  return null;
+}
+
+export type LoginInput = {
+  nationalIdentifier: string;
+  password: string;
+};
+
+export function validateLogin(input: LoginInput): FieldErrors {
+  const errors: FieldErrors = {};
+  const nid = validateNationalId(input.nationalIdentifier);
+  if (nid) errors.nationalIdentifier = nid;
+  const pw = validateLoginPassword(input.password);
+  if (pw) errors.password = pw;
+  return errors;
+}
+
+export type RegisterInput = {
+  firstName: string;
+  lastName: string;
+  nationalIdentifier: string;
+  phoneNumber: string;
+  email: string;
+  password: string;
+  dateOfBirth: string;
+  gender: number;
+};
+
+export function validateRegister(input: RegisterInput): FieldErrors {
+  const errors: FieldErrors = {};
+  const fn = validatePersonName(input.firstName, "Ad");
+  if (fn) errors.firstName = fn;
+  const ln = validatePersonName(input.lastName, "Soyad");
+  if (ln) errors.lastName = ln;
+  const nid = validateNationalId(input.nationalIdentifier);
+  if (nid) errors.nationalIdentifier = nid;
+  const phone = validatePhoneTR(input.phoneNumber);
+  if (phone) errors.phoneNumber = phone;
+  const email = validateEmail(input.email);
+  if (email) errors.email = email;
+  const pw = validatePassword(input.password);
+  if (pw) errors.password = pw;
+  const dob = validateDateOfBirth(input.dateOfBirth);
+  if (dob) errors.dateOfBirth = dob;
+  if (input.gender !== 1 && input.gender !== 2)
+    errors.gender = "Cinsiyet 1 (Erkek) veya 2 (Kadın) olmalıdır.";
+  return errors;
+}
+
+export function hasErrors(errors: FieldErrors): boolean {
+  return Object.keys(errors).length > 0;
+}
+
+export type RepresentedPersonInput = {
+  firstName: string;
+  lastName: string;
+  nationalIdentifier: string;
+  birthDate: string;
+  gender: number;
+};
+
+/** Yakın (temsil edilen hasta) bilgileri — başvuran ile aynı olamaz. */
+export function validateRepresentedPerson(
+  input: RepresentedPersonInput,
+  applicantNationalId?: string | null
+): FieldErrors {
+  const errors: FieldErrors = {};
+  const fn = validatePersonName(input.firstName, "Yakının adı");
+  if (fn) errors.firstName = fn;
+  const ln = validatePersonName(input.lastName, "Yakının soyadı");
+  if (ln) errors.lastName = ln;
+  const nid = validateNationalId(input.nationalIdentifier);
+  if (nid) errors.nationalIdentifier = nid;
+  else if (
+    applicantNationalId &&
+    input.nationalIdentifier.trim() === applicantNationalId.trim()
+  ) {
+    errors.nationalIdentifier =
+      "Yakının TC Kimlik No başvuranın kimlik numarası ile aynı olamaz.";
+  }
+  const dob = validateBirthDate(input.birthDate);
+  if (dob) errors.birthDate = dob;
+  if (input.gender !== 1 && input.gender !== 2)
+    errors.gender = "Cinsiyet seçiniz (Erkek veya Kadın).";
+  return errors;
+}

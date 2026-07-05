@@ -1,0 +1,88 @@
+@import "tailwindcss";
+@import "basecoat-css";
+
+@source "../**/*.{js,ts,jsx,tsx,mdx}";
+
+/* Date field: use input-group chrome; hide native indicator (opened via showPicker). */
+.input-group > input[type="date"] {
+  color-scheme: light;
+  min-width: 0;
+}
+
+.input-group > input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Select trigger invalid state (field data-invalid). */
+.field[data-invalid] .select > button {
+  border-color: var(--color-destructive);
+}
+
+/* Daha belirgin tipografi */
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body {
+  min-height: 100%;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--color-foreground, #0a0a0a);
+  background-color: var(--color-background, #fafafa);
+}
+
+body {
+  line-height: 1.55;
+}
+
+h1,
+h2,
+h3,
+h4,
+[data-title],
+.card > header > :is(h2, h3),
+.card > header > [data-title] {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--color-foreground, #0a0a0a);
+}
+
+label,
+.field > label,
+.field > section > label {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+p,
+.card > header > p,
+.text-muted-foreground {
+  font-weight: 500;
+}
+
+.btn {
+  font-weight: 600;
+}
+
+.badge {
+  font-weight: 600;
+}
+
+input,
+select,
+textarea,
+.input,
+.field > input,
+.field > select,
+.field > textarea {
+  font-weight: 500;
+  font-size: 1rem;
+}

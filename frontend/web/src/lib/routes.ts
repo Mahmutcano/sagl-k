@@ -1,0 +1,30 @@
+export const ROUTES = {
+  home: "/",
+  patient: {
+    home: "/patient/applications",
+    login: "/patient/login",
+    register: "/patient/register",
+    forgotPassword: "/patient/forgot-password",
+    applications: "/patient/applications",
+    newApplication: "/patient/applications/new",
+    application: (id: string) => `/patient/applications/${id}`,
+  },
+  doctor: {
+    home: "/doctor/dashboard",
+    login: "/doctor/login",
+    dashboard: "/doctor/dashboard",
+    nurse: "/doctor/nurse",
+    applications: "/doctor/applications",
+    newApplication: "/doctor/applications/new",
+    application: (id: string) => `/doctor/applications/${id}`,
+  },
+  admin: {
+    home: "/admin",
+    login: "/admin/login",
+    doctors: "/admin/doctors",
+    payments: "/admin/payments",
+    refunds: "/admin/refunds",
+    notifications: "/admin/notifications",
+    application: (id: string) => `/admin/applications/${id}`,
+  },
+} as const;

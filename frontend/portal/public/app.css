@@ -1,0 +1,111 @@
+/* Basecoat: public/basecoat.css (layout <link>) — burada sadece ince ayar. */
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100%;
+  font-weight: 500;
+}
+
+h1,
+h2,
+h3,
+.card > header > :is(h2, h3) {
+  font-weight: 700;
+}
+
+label,
+.field > label {
+  font-weight: 600;
+}
+
+.btn,
+.badge {
+  font-weight: 600;
+}
+
+.field[data-invalid] .select > button {
+  border-color: var(--color-destructive, #dc2626);
+}
+
+/* Datepicker — Basecoat select + popover üzerine takvim ızgarası */
+.datepicker-cal {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+}
+
+.datepicker-cal-head {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.25rem;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-muted-foreground, #737373);
+}
+
+.datepicker-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.25rem;
+  border: 0;
+  border-radius: var(--radius-md, 0.5rem);
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-foreground, #0a0a0a);
+}
+
+.datepicker-day:hover:not(:disabled) {
+  background: var(--color-accent, #f4f4f5);
+}
+
+.datepicker-day:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.datepicker-day[data-outside="true"] {
+  color: var(--color-muted-foreground, #a3a3a3);
+}
+
+.datepicker-day[data-today="true"]:not([data-selected="true"]) {
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--color-primary, #171717) 40%, transparent);
+  color: var(--color-primary, #171717);
+}
+
+.datepicker-day[data-selected="true"] {
+  background: var(--color-primary, #171717);
+  color: var(--color-primary-foreground, #fafafa);
+}
+
+.datepicker-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.datepicker-nav-title {
+  flex: 1;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.datepicker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border, #e5e5e5);
+}
