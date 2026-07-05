@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	appcfg "medical-consultation-platform/backend/internal/config"
+	"medical-consultation-platform/backend/internal/domain"
 	authmw "medical-consultation-platform/backend/internal/middleware"
 	"medical-consultation-platform/backend/internal/pkg/response"
 	"medical-consultation-platform/backend/internal/pkg/validate"
@@ -199,14 +201,16 @@ func (h *ApplicationHandler) ApplicationDetail(w http.ResponseWriter, r *http.Re
 	var err error
 	var statusCode int
 	var appNumber, ecommerce, professionCode, professionName *string
+	var careProviderID *uuid.UUID
 	var isForRelative bool
 	var surveyData []byte
 	err = h.db.Pool.QueryRow(r.Context(), `
-		SELECT a.status_code, a.application_number, a.ecommerce_number, a.profession_code, a.profession_name, a.is_for_relative, COALESCE(s.data, '{}')
+		SELECT a.status_code, a.application_number, a.ecommerce_number, a.profession_code, a.profession_name,
+		       a.care_provider_id, a.is_for_relative, COALESCE(s.data, '{}')
 		FROM applications a
 		LEFT JOIN application_surveys s ON s.application_id = a.id
 		WHERE a.id = $1
-	`, appID).Scan(&statusCode, &appNumber, &ecommerce, &professionCode, &professionName, &isForRelative, &surveyData)
+	`, appID).Scan(&statusCode, &appNumber, &ecommerce, &professionCode, &professionName, &careProviderID, &isForRelative, &surveyData)
 	if err != nil {
 		response.Fail(w, http.StatusNotFound, "APP021", "Başvuru bulunamadı.")
 		return
@@ -220,6 +224,9 @@ func (h *ApplicationHandler) ApplicationDetail(w http.ResponseWriter, r *http.Re
 		"professionName":    professionName,
 		"isForRelative":     isForRelative,
 		"surveyData":        json.RawMessage(surveyData),
+	}
+	if careProviderID != nil {
+		payload["careProviderId"] = careProviderID.String()
 	}
 	if isForRelative {
 		var fn, ln string
@@ -246,37 +253,111 @@ func (h *ApplicationHandler) ApplicationDetail(w http.ResponseWriter, r *http.Re
 	response.OK(w, payload)
 }
 
+func paymentResultPayload(result *paysvc.CheckoutResult) map[string]interface{} {
+	if result == nil {
+		return map[string]interface{}{"status": "paid"}
+	}
+	out := map[string]interface{}{
+		"transactionId": result.TransactionID,
+		"orderId":       result.OrderID,
+		"status":        result.Status,
+		"paymentId":     result.PaymentID,
+	}
+	if result.RedirectURL != nil {
+		out["redirectUrl"] = *result.RedirectURL
+	}
+	if result.RedirectHTML != nil {
+		out["redirectHtml"] = *result.RedirectHTML
+	}
+	return out
+}
+
 func (h *ApplicationHandler) UpdateApplication(w http.ResponseWriter, r *http.Request) {
 	appID, ok := parseAppID(w, r)
 	if !ok {
 		return
 	}
-	var req struct {
-		SurveyData struct {
-			Data string `json:"data"`
-		} `json:"surveyData"`
+	claims := authmw.ClaimsFromContext(r.Context())
+	if claims == nil {
+		response.Fail(w, http.StatusUnauthorized, "AUTH002", "Oturum geçersiz.")
+		return
 	}
+	if !authmw.RequireApplicationAccess(w, r, h.db, appID) {
+		return
+	}
+
+	var req appsvc.UpdateApplicationRequest
 	if !validate.DecodeJSON(w, r, &req) {
 		return
 	}
 	var errs validate.Errors
+	if req.ProfessionCode == "" {
+		errs.Add("professionCode", "required", "Bölüm seçimi zorunludur.")
+	}
+	if req.ProfessionName == "" {
+		errs.Add("professionName", "required", "Bölüm adı zorunludur.")
+	}
+	if req.CareProviderID != "" {
+		validate.UUID(&errs, "careProviderId", req.CareProviderID, "Doktor kimliği")
+	}
 	validate.SurveyData(&errs, "surveyData.data", req.SurveyData.Data)
 	validate.ApplicationSurveyAnswers(&errs, req.SurveyData.Data)
 	if errs.Has() {
 		validate.Fail(w, errs)
 		return
 	}
-	if !authmw.RequireApplicationAccess(w, r, h.db, appID) {
-		return
-	}
-	_, err := h.db.Pool.Exec(r.Context(), `
-		UPDATE application_surveys SET data = $2::jsonb, updated_at = now() WHERE application_id = $1
-	`, appID, req.SurveyData.Data)
-	if err != nil {
-		response.Fail(w, http.StatusBadRequest, "APP032", "Başvuru güncellenemedi.")
+
+	if err := h.app.Update(r.Context(), appID, claims.UserID, req); err != nil {
+		if errors.Is(err, appsvc.ErrNotEditable) {
+			response.Fail(w, http.StatusConflict, "APP033", err.Error())
+			return
+		}
+		response.Fail(w, http.StatusBadRequest, "APP032", response.SafeMessage(err, "Başvuru güncellenemedi."))
 		return
 	}
 	response.OK(w, map[string]bool{"updated": true})
+}
+
+func (h *ApplicationHandler) DeleteApplication(w http.ResponseWriter, r *http.Request) {
+	appID, ok := parseAppID(w, r)
+	if !ok {
+		return
+	}
+	claims := authmw.ClaimsFromContext(r.Context())
+	if claims == nil {
+		response.Fail(w, http.StatusUnauthorized, "AUTH002", "Oturum geçersiz.")
+		return
+	}
+	if !authmw.RequireApplicationAccess(w, r, h.db, appID) {
+		return
+	}
+	if err := h.app.DeleteUnpaid(r.Context(), appID, claims.UserID); err != nil {
+		if errors.Is(err, appsvc.ErrNotCancellable) {
+			response.Fail(w, http.StatusConflict, "APP034", "Ödenmiş başvuru iptal edilemez.")
+			return
+		}
+		response.Fail(w, http.StatusNotFound, "APP021", "Başvuru bulunamadı.")
+		return
+	}
+	response.OK(w, map[string]bool{"deleted": true})
+}
+
+func (h *ApplicationHandler) PreviewApplication(w http.ResponseWriter, r *http.Request) {
+	appID, ok := parseAppID(w, r)
+	if !ok {
+		return
+	}
+	if !authmw.RequireApplicationAccess(w, r, h.db, appID) {
+		return
+	}
+	data, err := h.app.LoadPreview(r.Context(), appID)
+	if err != nil {
+		response.Fail(w, http.StatusNotFound, "APP021", "Başvuru bulunamadı.")
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(appsvc.RenderPreviewHTML(data)))
 }
 
 func (h *ApplicationHandler) AssessApplication(w http.ResponseWriter, r *http.Request) {
@@ -557,6 +638,16 @@ func (h *ApplicationHandler) UpdatePayment(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	if existing, err := h.payment.Store().FindPaidByApplication(r.Context(), appID); err == nil && existing != nil {
+		response.OK(w, map[string]interface{}{
+			"transactionId": existing.ProviderTransactionID,
+			"orderId":       appID.String(),
+			"status":        "paid",
+			"paymentId":     existing.ID.String(),
+		})
+		return
+	}
+
 	var req struct {
 		Provider    string `json:"provider"`
 		CardHolder  string `json:"cardHolder"`
@@ -601,18 +692,15 @@ func (h *ApplicationHandler) UpdatePayment(w http.ResponseWriter, r *http.Reques
 		response.Fail(w, http.StatusNotFound, "APP001", "Başvuru bulunamadı.")
 		return
 	}
-	if statusCode != 0 {
-		response.Fail(w, http.StatusConflict, "APP110", "Bu başvuru için ödeme beklenmiyor.")
-		return
-	}
-
-	if existing, err := h.payment.Store().FindPaidByApplication(r.Context(), appID); err == nil && existing != nil {
-		response.OK(w, map[string]interface{}{
-			"transactionId": existing.ProviderTransactionID,
-			"orderId":       appID.String(),
-			"status":        "paid",
-			"paymentId":     existing.ID.String(),
-		})
+	if statusCode != domain.StatusPaymentPending {
+		if statusCode == domain.StatusPaymentCompleted {
+			response.OK(w, map[string]interface{}{
+				"orderId": appID.String(),
+				"status":  "paid",
+			})
+			return
+		}
+		response.Fail(w, http.StatusConflict, "APP110", "Bu başvuru için ödeme beklenmiyor. Başvuru zaten ödenmiş veya farklı bir aşamada olabilir.")
 		return
 	}
 
@@ -678,7 +766,7 @@ func (h *ApplicationHandler) UpdatePayment(w http.ResponseWriter, r *http.Reques
 	}
 
 	result.PaymentID = paymentID.String()
-	response.OK(w, result)
+	response.OK(w, paymentResultPayload(result))
 }
 
 func (h *ApplicationHandler) AddNote(w http.ResponseWriter, r *http.Request) {

@@ -3,9 +3,9 @@
 import { useRouter } from "next/navigation";
 import { AppShellLayout } from "@/components/AppShellLayout";
 import { AdminNav } from "@/components/AdminNav";
+import { useClientUser } from "@/hooks/useClientUser";
 import { logoutTo, roleLabel } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
-import { getUser } from "@/lib/api";
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -16,7 +16,7 @@ type AppShellProps = {
 
 export function AdminAppShell({ children, title, description, actions }: AppShellProps) {
   const router = useRouter();
-  const user = getUser();
+  const user = useClientUser();
 
   return (
     <AppShellLayout

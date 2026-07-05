@@ -7,6 +7,10 @@ export const ROUTES = {
     forgotPassword: "/patient/forgot-password",
     applications: "/patient/applications",
     newApplication: "/patient/applications/new",
+    editApplication: (id: string, step?: "details" | "survey" | "preview" | "payment") =>
+      step
+        ? `/patient/applications/new?edit=${encodeURIComponent(id)}&step=${step}`
+        : `/patient/applications/new?edit=${encodeURIComponent(id)}`,
     application: (id: string) => `/patient/applications/${id}`,
   },
   doctor: {

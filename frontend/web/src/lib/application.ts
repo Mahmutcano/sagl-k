@@ -54,6 +54,7 @@ export type ApplicationDetail = {
   ecommerceNumber?: string | null;
   professionCode?: string | null;
   professionName?: string | null;
+  careProviderId?: string | null;
   isForRelative?: boolean;
   surveyData?: unknown;
   representedPerson?: {
@@ -76,6 +77,70 @@ export type ApplicationNote = {
   createdAt: string;
 };
 
+export function isPatientEditableStatus(code: number): boolean {
+  return code === 0 || code === 1;
+}
+
+export function isPatientCancellableStatus(code: number): boolean {
+  return code === 0;
+}
+
+/** Hasta listesinde başvuruların gruplandırılması — sıra önemli, karıştırılmamalı. */
+export type PatientApplicationGroup = {
+  id: string;
+  title: string;
+  description: string;
+  stepHint?: string;
+  statusCodes: number[];
+};
+
+export const PATIENT_APPLICATION_GROUPS: PatientApplicationGroup[] = [
+  {
+    id: "pending",
+    title: "Tamamlanmayı bekleyen",
+    description: "Ödeme yapılmadı — kaldığınız adımdan devam edin veya silin.",
+    stepHint: "1 Bölüm → 2 Şikayet → 3 Form önizleme → 4 Ödeme (ayrı adımlar)",
+    statusCodes: [0],
+  },
+  {
+    id: "in_progress",
+    title: "İşlemde",
+    description: "Ödemesi alındı, değerlendirme sürecinde.",
+    statusCodes: [1, 2, 4, 5, 10, 11],
+  },
+  {
+    id: "completed",
+    title: "Sonuçlanan",
+    description: "Doktor raporu hazır.",
+    statusCodes: [6],
+  },
+  {
+    id: "closed",
+    title: "Kapalı",
+    description: "Reddedilen, iptal veya iade edilmiş başvurular.",
+    statusCodes: [3, 7, 8, 9],
+  },
+];
+
+export function groupPatientApplications<T extends { statusCode: number }>(
+  items: T[]
+): { group: PatientApplicationGroup; items: T[] }[] {
+  return PATIENT_APPLICATION_GROUPS.map((group) => ({
+    group,
+    items: items.filter((item) => group.statusCodes.includes(item.statusCode)),
+  })).filter((g) => g.items.length > 0);
+}
+
+export function normalizePaymentResult(raw: Record<string, unknown>): PaymentResult {
+  return {
+    transactionId: String(raw.transactionId ?? raw.TransactionID ?? ""),
+    orderId: String(raw.orderId ?? raw.OrderID ?? ""),
+    status: String(raw.status ?? raw.Status ?? ""),
+    redirectUrl: (raw.redirectUrl ?? raw.RedirectURL ?? null) as string | null,
+    paymentId: String(raw.paymentId ?? raw.PaymentID ?? ""),
+  };
+}
+
 export type PaymentResult = {
   transactionId?: string;
   orderId?: string;
@@ -83,6 +148,55 @@ export type PaymentResult = {
   redirectUrl?: string | null;
   paymentId?: string;
 };
+
+export function isPaymentSuccessful(status: string): boolean {
+  const s = status.toLowerCase();
+  return s === "paid" || s === "success" || s === "completed";
+}
+
+export function isSurveyComplete(surveyData: unknown): boolean {
+  const survey =
+    typeof surveyData === "object" && surveyData !== null
+      ? (surveyData as Record<string, unknown>)
+      : {};
+  const read = (k: string) => (typeof survey[k] === "string" ? (survey[k] as string).trim() : "");
+  return (
+    read("chiefComplaint").length >= 10 &&
+    read("medicalHistory").length >= 10 &&
+    read("questionsForDoctor").length >= 10
+  );
+}
+
+/** Düzenleme modunda kullanıcının kaldığı sihirbaz adımını belirler. */
+export function resumeWizardStep(app: ApplicationDetail): "details" | "survey" | "preview" | "payment" {
+  if (!app.professionCode?.trim()) return "details";
+  if (!isSurveyComplete(app.surveyData)) return "survey";
+  return "preview";
+}
+
+const WIZARD_STEPS = ["details", "survey", "preview", "payment"] as const;
+export type WizardStepId = (typeof WIZARD_STEPS)[number];
+
+/** URL ?step= veya otomatik devam adımı. Ödeme yalnızca önizleme tamamlandıysa ve status 0 ise. */
+export function resolveEditStep(
+  app: ApplicationDetail,
+  stepParam: string | null
+): WizardStepId {
+  const resumed = resumeWizardStep(app);
+  if (!stepParam || !WIZARD_STEPS.includes(stepParam as WizardStepId)) {
+    return resumed;
+  }
+  const requested = stepParam as WizardStepId;
+  if (requested === "payment") {
+    if (app.statusCode !== 0) return "preview";
+    if (resumed === "details" || resumed === "survey") return resumed;
+    return "payment";
+  }
+  const order = WIZARD_STEPS.indexOf(requested);
+  const resumedOrder = WIZARD_STEPS.indexOf(resumed);
+  if (order > resumedOrder) return resumed;
+  return requested;
+}
 
 export type PaymentRequest = {
   provider: "param" | "bizimhesap";

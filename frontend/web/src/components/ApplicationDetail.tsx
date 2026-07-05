@@ -11,12 +11,13 @@ import {
   statusVariant,
   applicationDisplayNumber,
   isConcludedStatus,
+  isPatientEditableStatus,
+  isPatientCancellableStatus,
+  isSurveyComplete,
   type ApplicationAttachment,
   type ApplicationDetail,
   type ApplicationNote,
   type FinalReport,
-  type PaymentRequest,
-  type PaymentResult,
 } from "@/lib/application";
 import {
   SURVEY_FIELDS,
@@ -24,6 +25,9 @@ import {
   parseSurveyData,
 } from "@/lib/applicationSurvey";
 import { FormAlert, FormField } from "@/components/FormField";
+import { ApplicationPreviewPanel } from "@/components/ApplicationPreviewPanel";
+import { ApplicationFlowSteps } from "@/components/ApplicationFlowSteps";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,7 +38,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -43,8 +46,6 @@ type Props = {
   token: string;
   backHref?: string;
 };
-
-const PAYMENT_AMOUNT = 1500;
 
 export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.applications }: Props) {
   const router = useRouter();
@@ -56,18 +57,8 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(true);
-  const [paying, setPaying] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
-  const [provider, setProvider] = useState<"param" | "bizimhesap">("param");
-  const [card, setCard] = useState({
-    cardHolder: "",
-    cardNumber: "",
-    expiryMonth: "",
-    expiryYear: "",
-    cvv: "",
-  });
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const load = useCallback(() => {
     return Promise.all([
@@ -103,75 +94,16 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
       .finally(() => setLoading(false));
   }, [load]);
 
-  function validatePaymentForm(): boolean {
-    const f: Record<string, string> = {};
-    if (!card.cardHolder.trim() || card.cardHolder.trim().length < 3) {
-      f.cardHolder = "Kart üzerindeki isim en az 3 karakter olmalıdır.";
+  async function cancelApplication() {
+    if (!confirm("Başvuru iptal edilecek ve kalıcı olarak silinecek. Devam etmek istiyor musunuz?")) {
+      return;
     }
-    const digits = card.cardNumber.replace(/\D/g, "");
-    if (digits.length < 13 || digits.length > 19) {
-      f.cardNumber = "Geçerli bir kart numarası giriniz.";
-    }
-    const month = parseInt(card.expiryMonth, 10);
-    if (!month || month < 1 || month > 12) {
-      f.expiryMonth = "Ay 1–12 arasında olmalıdır.";
-    }
-    const year = parseInt(card.expiryYear, 10);
-    if (!year || year < new Date().getFullYear() % 100) {
-      f.expiryYear = "Geçerli bir yıl giriniz.";
-    }
-    const cvvDigits = card.cvv.replace(/\D/g, "");
-    if (cvvDigits.length < 3 || cvvDigits.length > 4) {
-      f.cvv = "CVV 3 veya 4 haneli olmalıdır.";
-    }
-    setFieldErrors(f);
-    return Object.keys(f).length === 0;
-  }
-
-  async function pay() {
-    setPaying(true);
-    setMsg("");
     setError("");
-    setFieldErrors({});
-
-    const body: PaymentRequest = { provider };
-    const hasCardInput =
-      card.cardHolder || card.cardNumber || card.expiryMonth || card.expiryYear || card.cvv;
-    if (hasCardInput) {
-      if (!validatePaymentForm()) {
-        setPaying(false);
-        return;
-      }
-      body.cardHolder = card.cardHolder.trim();
-      body.cardNumber = card.cardNumber.replace(/\s/g, "");
-      body.expiryMonth = parseInt(card.expiryMonth, 10);
-      body.expiryYear = parseInt(card.expiryYear, 10);
-      body.cvv = card.cvv.replace(/\D/g, "");
-    }
-
     try {
-      const res = await api<PaymentResult>(
-        API.applications.payment(id),
-        { method: "POST", body: JSON.stringify(body) },
-        token
-      );
-      if (res.redirectUrl) {
-        window.location.href = res.redirectUrl;
-        return;
-      }
-      if (res.status === "paid" || res.status === "success" || res.status === "completed") {
-        setMsg("Ödeme başarıyla tamamlandı.");
-        await load();
-      } else {
-        setMsg(`Ödeme durumu: ${res.status}`);
-      }
+      await api(API.applications.cancel(id), { method: "DELETE" }, token);
+      router.push(backHref);
     } catch (err) {
-      if (err instanceof ApiError && err.fields) {
-        setFieldErrors(err.fields);
-      }
-      setError(err instanceof ApiError ? err.message : "Ödeme başarısız.");
-    } finally {
-      setPaying(false);
+      setError(err instanceof ApiError ? err.message : "Başvuru iptal edilemedi.");
     }
   }
 
@@ -211,6 +143,15 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
 
   const surveyAnswers = parseSurveyData(app.surveyData);
   const hasSurveyContent = SURVEY_FIELDS.some((f) => surveyAnswers[f.key]?.trim());
+  const surveyComplete = isSurveyComplete(app.surveyData);
+  const flowCurrent =
+    app.statusCode === 0
+      ? surveyComplete
+        ? ("preview" as const)
+        : app.professionCode
+          ? ("survey" as const)
+          : ("details" as const)
+      : ("preview" as const);
 
   return (
     <div className="grid gap-6">
@@ -221,6 +162,16 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
         <Badge variant={statusVariant(app.statusCode)}>
           {STATUS_LABELS[app.statusCode] ?? `Durum ${app.statusCode}`}
         </Badge>
+        {isPatientEditableStatus(app.statusCode) ? (
+          <Button variant="outline" size="sm" asChild>
+            <Link href={ROUTES.patient.editApplication(id)}>Başvuruyu düzenle</Link>
+          </Button>
+        ) : null}
+        {isPatientCancellableStatus(app.statusCode) ? (
+          <Button variant="destructive" size="sm" type="button" onClick={cancelApplication}>
+            Başvuruyu iptal et
+          </Button>
+        ) : null}
       </div>
 
       {error ? <FormAlert title="Hata" message={error} /> : null}
@@ -289,114 +240,85 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
       ) : null}
 
       {app.statusCode === 0 ? (
-        <Card>
+        <Card className="border-primary/20">
           <CardHeader>
-            <CardTitle className="text-base">Ödeme</CardTitle>
+            <CardTitle className="text-base">Başvuru adımları</CardTitle>
             <CardDescription>
-              Başvurunuzun işleme alınması için ödeme gereklidir ({PAYMENT_AMOUNT.toLocaleString("tr-TR")} TRY).
-              Test modunda kart bilgisi isteğe bağlıdır; canlı modda zorunludur.
+              Önizleme (Adım 3) ve ödeme (Adım 4) ayrı ekranlardır. Ödeme yalnızca formu
+              onayladıktan sonra yapılır.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant={provider === "param" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setProvider("param")}
-              >
-                Param
-              </Button>
-              <Button
-                type="button"
-                variant={provider === "bizimhesap" ? "default" : "outline"}
-                size="sm"
-                onClick={() => setProvider("bizimhesap")}
-              >
-                Bizim Hesap
-              </Button>
-            </div>
-            <FormField id="cardHolder" label="Kart üzerindeki isim" error={fieldErrors.cardHolder}>
-              <Input
-                id="cardHolder"
-                autoComplete="cc-name"
-                value={card.cardHolder}
-                onChange={(e) => setCard((c) => ({ ...c, cardHolder: e.target.value }))}
-              />
-            </FormField>
-            <FormField id="cardNumber" label="Kart numarası" error={fieldErrors.cardNumber}>
-              <Input
-                id="cardNumber"
-                inputMode="numeric"
-                autoComplete="cc-number"
-                placeholder="0000 0000 0000 0000"
-                value={card.cardNumber}
-                onChange={(e) => setCard((c) => ({ ...c, cardNumber: e.target.value }))}
-              />
-            </FormField>
-            <div className="grid gap-4 sm:grid-cols-3">
-              <FormField id="expiryMonth" label="Ay (MM)" error={fieldErrors.expiryMonth}>
-                <Input
-                  id="expiryMonth"
-                  inputMode="numeric"
-                  autoComplete="cc-exp-month"
-                  placeholder="MM"
-                  maxLength={2}
-                  value={card.expiryMonth}
-                  onChange={(e) => setCard((c) => ({ ...c, expiryMonth: e.target.value }))}
-                />
-              </FormField>
-              <FormField id="expiryYear" label="Yıl (YY)" error={fieldErrors.expiryYear}>
-                <Input
-                  id="expiryYear"
-                  inputMode="numeric"
-                  autoComplete="cc-exp-year"
-                  placeholder="YY"
-                  maxLength={2}
-                  value={card.expiryYear}
-                  onChange={(e) => setCard((c) => ({ ...c, expiryYear: e.target.value }))}
-                />
-              </FormField>
-              <FormField id="cvv" label="CVV" error={fieldErrors.cvv}>
-                <Input
-                  id="cvv"
-                  inputMode="numeric"
-                  autoComplete="cc-csc"
-                  placeholder="***"
-                  maxLength={4}
-                  value={card.cvv}
-                  onChange={(e) => setCard((c) => ({ ...c, cvv: e.target.value }))}
-                />
-              </FormField>
-            </div>
+            <ApplicationFlowSteps current={flowCurrent} compact />
+            {surveyComplete ? (
+              <>
+                <Alert>
+                  <AlertTitle>Adım 3 — Form önizleme</AlertTitle>
+                  <AlertDescription>
+                    Aşağıda başvuru formunuzun özeti var. Ödeme için &quot;Adım 4 — Ödemeye geç&quot;
+                    butonunu kullanın.
+                  </AlertDescription>
+                </Alert>
+                <ApplicationPreviewPanel applicationId={id} token={token} />
+              </>
+            ) : (
+              <Alert>
+                <AlertTitle>Devam edin</AlertTitle>
+                <AlertDescription>
+                  Önce bölüm ve şikayet adımlarını tamamlayın; ardından form önizleme ve ödeme
+                  sırasıyla gelir.
+                </AlertDescription>
+              </Alert>
+            )}
           </CardContent>
-          <CardFooter className="flex flex-wrap gap-2 border-t pt-6">
-            <Button disabled={paying} onClick={pay}>
-              {paying ? "İşleniyor..." : "Ödemeyi tamamla"}
+          <CardFooter className="flex flex-wrap gap-2 border-t">
+            <Button asChild>
+              <Link href={ROUTES.patient.editApplication(id)}>Adımlara devam et</Link>
             </Button>
+            {surveyComplete ? (
+              <Button asChild variant="secondary">
+                <Link href={ROUTES.patient.editApplication(id, "payment")}>
+                  Adım 4 — Ödemeye geç
+                </Link>
+              </Button>
+            ) : null}
           </CardFooter>
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Başvuru bilgileri</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-4 text-sm">
-          {hasSurveyContent ? (
-            SURVEY_FIELDS.map((field) =>
-              surveyAnswers[field.key]?.trim() ? (
-                <div key={field.key}>
-                  <p className="text-muted-foreground">{field.label}</p>
-                  <p className="whitespace-pre-wrap">{surveyAnswers[field.key]}</p>
-                </div>
-              ) : null
-            )
-          ) : (
-            <p className="text-muted-foreground">Anket yanıtı bulunmuyor.</p>
-          )}
-        </CardContent>
-      </Card>
+      {app.statusCode >= 1 && hasSurveyContent ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Form önizleme</CardTitle>
+            <CardDescription>PDF olarak kaydetmek için yazdır butonunu kullanın.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ApplicationPreviewPanel applicationId={id} token={token} />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {!hasSurveyContent || (app.statusCode === 0 && !surveyComplete) ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Başvuru bilgileri</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 text-sm">
+            {hasSurveyContent ? (
+              SURVEY_FIELDS.map((field) =>
+                surveyAnswers[field.key]?.trim() ? (
+                  <div key={field.key}>
+                    <p className="text-muted-foreground">{field.label}</p>
+                    <p className="whitespace-pre-wrap">{surveyAnswers[field.key]}</p>
+                  </div>
+                ) : null
+              )
+            ) : (
+              <p className="text-muted-foreground">Anket yanıtı bulunmuyor.</p>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {attachments.length > 0 ? (
         <Card>

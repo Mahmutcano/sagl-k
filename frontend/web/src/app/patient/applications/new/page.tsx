@@ -4,7 +4,7 @@ import { ROUTES } from "@/lib/routes";
 
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ApiError, api, getToken } from "@/lib/api";
 import { requireSession } from "@/lib/auth";
 import { API } from "@/lib/endpoints";
@@ -16,6 +16,9 @@ import {
 } from "@/lib/validation";
 import { PatientAppShell } from "@/components/PatientAppShell";
 import { ApplicationSurveyForm } from "@/components/ApplicationSurveyForm";
+import { ApplicationPaymentForm, PAYMENT_AMOUNT } from "@/components/ApplicationPaymentForm";
+import { ApplicationFlowSteps, ApplicationFlowHint } from "@/components/ApplicationFlowSteps";
+import { ApplicationPreviewPanel } from "@/components/ApplicationPreviewPanel";
 import { FileUploadField } from "@/components/FileUploadField";
 import { FormAlert, FormField, FormSelect, DateField } from "@/components/FormField";
 import { useApplicationCatalog } from "@/hooks/useApplicationCatalog";
@@ -26,8 +29,10 @@ import {
   validateApplicationSurvey,
   summarizeSurveyErrors,
   validateSelectedFiles,
+  parseSurveyData,
   type ApplicationSurveyAnswers,
 } from "@/lib/applicationSurvey";
+import { type ApplicationDetail, isPatientEditableStatus, resolveEditStep } from "@/lib/application";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,7 +57,16 @@ type InpatientResult = {
   source: string;
 };
 
-type Step = "who" | "relative" | "erciyes" | "blocked" | "details" | "survey" | "done";
+type Step =
+  | "who"
+  | "relative"
+  | "erciyes"
+  | "blocked"
+  | "details"
+  | "survey"
+  | "payment"
+  | "preview"
+  | "done";
 
 const emptyRelative: RepresentedPersonInput = {
   firstName: "",
@@ -64,6 +78,9 @@ const emptyRelative: RepresentedPersonInput = {
 
 export default function NewApplicationPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("edit");
+  const stepParam = searchParams.get("step");
   const [step, setStep] = useState<Step>("who");
   const [forRelative, setForRelative] = useState(false);
   const [relative, setRelative] = useState<RepresentedPersonInput>(emptyRelative);
@@ -74,7 +91,9 @@ export default function NewApplicationPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const [professionCode, setProfessionCode] = useState("");
+  const [professionName, setProfessionName] = useState("");
   const [careProviderId, setCareProviderId] = useState("");
+  const [careProviderLabel, setCareProviderLabel] = useState("");
   const [detailFields, setDetailFields] = useState<FieldErrors>({});
   const [surveyAnswers, setSurveyAnswers] = useState<ApplicationSurveyAnswers>(EMPTY_SURVEY);
   const [surveyFields, setSurveyFields] = useState<FieldErrors>({});
@@ -82,15 +101,67 @@ export default function NewApplicationPage() {
   const [fileError, setFileError] = useState("");
   const [surveyFormError, setSurveyFormError] = useState("");
   const [createdId, setCreatedId] = useState("");
+  const [applicationStatus, setApplicationStatus] = useState<number | null>(null);
+  const [applicationNumber, setApplicationNumber] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
+  const [paymentCompleted, setPaymentCompleted] = useState(false);
 
   const targetInstitution = 1;
-  const catalog = useApplicationCatalog(targetInstitution, professionCode, step === "details");
+  const catalog = useApplicationCatalog(
+    targetInstitution,
+    professionCode,
+    step === "details" || step === "survey"
+  );
 
   useEffect(() => {
     if (!requireSession("patient")) {
       router.replace(ROUTES.patient.login);
     }
   }, [router]);
+
+  useEffect(() => {
+    if (!editId) return;
+    const token = getToken();
+    if (!token) return;
+    setEditLoading(true);
+    void api<ApplicationDetail>(API.applications.detail(editId), {}, token)
+      .then((app) => {
+        if (!isPatientEditableStatus(app.statusCode)) {
+          router.replace(ROUTES.patient.application(editId));
+          return;
+        }
+        setCreatedId(app.applicationId);
+        setApplicationStatus(app.statusCode);
+        setApplicationNumber(app.applicationNumber ?? app.ecommerceNumber ?? "");
+        setProfessionCode(app.professionCode ?? "");
+        setProfessionName(app.professionName ?? "");
+        setCareProviderId(app.careProviderId ?? "");
+        setForRelative(!!app.isForRelative);
+        setSurveyAnswers(parseSurveyData(app.surveyData));
+        if (app.representedPerson) {
+          setRelative({
+            firstName: app.representedPerson.firstName ?? "",
+            lastName: app.representedPerson.lastName ?? "",
+            nationalIdentifier: app.representedPerson.nationalIdentifier ?? "",
+            birthDate: app.representedPerson.birthDate ?? "",
+            gender: app.representedPerson.gender ?? 0,
+          });
+        }
+        setStep(resolveEditStep(app, stepParam));
+      })
+      .catch(() => setError("Başvuru yüklenemedi."))
+      .finally(() => setEditLoading(false));
+  }, [editId, stepParam, router]);
+
+  useEffect(() => {
+    if (!careProviderId || !catalog.providers.length) return;
+    const provider = catalog.providers.find((p) => p.careProviderId === careProviderId);
+    if (provider) {
+      setCareProviderLabel(
+        provider.title ? `${provider.title} ${provider.fullName}` : provider.fullName
+      );
+    }
+  }, [careProviderId, catalog.providers]);
 
   async function runErciyesCheck(isForRelative: boolean, nationalIdentifier?: string) {
     const token = getToken();
@@ -157,6 +228,12 @@ export default function NewApplicationPage() {
     if (!professionCode) fields.professionCode = "Bölüm seçiniz.";
     setDetailFields(fields);
     if (hasErrors(fields)) return;
+    const profession = catalog.professions.find((p) => p.code === professionCode);
+    setProfessionName(profession?.name ?? professionCode);
+    const provider = catalog.providers.find((p) => p.careProviderId === careProviderId);
+    setCareProviderLabel(
+      provider ? (provider.title ? `${provider.title} ${provider.fullName}` : provider.fullName) : ""
+    );
     setStep("survey");
     setError("");
   }
@@ -167,7 +244,7 @@ export default function NewApplicationPage() {
     document.getElementById(firstKey)?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
-  async function submitApplication(e: FormEvent) {
+  async function saveAndGoToPreview(e: FormEvent) {
     e.preventDefault();
     setSurveyFormError("");
     const surveyErrs = validateApplicationSurvey(surveyAnswers);
@@ -191,36 +268,58 @@ export default function NewApplicationPage() {
     setSubmitting(true);
     setError("");
     try {
-      const body: Record<string, unknown> = {
-        targetInstitution,
-        professionCode,
-        professionName: profession?.name ?? professionCode,
-        careProviderId: careProviderId || undefined,
-        isForRelative: forRelative,
+      const surveyPayload = {
         surveyData: {
           surveyName: "patient_intake",
           data: surveyAnswersToJSON(surveyAnswers),
         },
       };
-      if (forRelative) {
-        body.representedPerson = {
-          firstName: relative.firstName.trim(),
-          lastName: relative.lastName.trim(),
-          nationalIdentifier: relative.nationalIdentifier.trim(),
-          birthDate: relative.birthDate,
-          gender: relative.gender,
+      const updateBody = {
+        professionCode,
+        professionName: profession?.name ?? professionName ?? professionCode,
+        careProviderId: careProviderId || undefined,
+        ...surveyPayload,
+        ...(forRelative
+          ? {
+              representedPerson: {
+                firstName: relative.firstName.trim(),
+                lastName: relative.lastName.trim(),
+                nationalIdentifier: relative.nationalIdentifier.trim(),
+                birthDate: relative.birthDate,
+                gender: relative.gender,
+              },
+            }
+          : {}),
+      };
+      let applicationId = createdId;
+
+      if (applicationId) {
+        await api(
+          API.applications.update(applicationId),
+          { method: "PATCH", body: JSON.stringify(updateBody) },
+          token
+        );
+      } else {
+        const body: Record<string, unknown> = {
+          targetInstitution,
+          isForRelative: forRelative,
+          ...updateBody,
         };
+        const res = await api<{ applicationId: string }>(
+          API.applications.create,
+          { method: "POST", body: JSON.stringify(body) },
+          token
+        );
+        applicationId = res.applicationId;
+        setCreatedId(applicationId);
+        setApplicationStatus(0);
       }
-      const res = await api<{ applicationId: string }>(
-        API.applications.create,
-        { method: "POST", body: JSON.stringify(body) },
-        token
-      );
-      if (pendingFiles.length > 0) {
-        await uploadApplicationAttachments(res.applicationId, pendingFiles, token);
+
+      if (pendingFiles.length > 0 && applicationId) {
+        await uploadApplicationAttachments(applicationId, pendingFiles, token);
+        setPendingFiles([]);
       }
-      setCreatedId(res.applicationId);
-      setStep("done");
+      setStep("preview");
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.code === "ERC002") {
@@ -259,7 +358,7 @@ export default function NewApplicationPage() {
           setError(err.message);
         }
       } else {
-        setError("Başvuru oluşturulamadı.");
+        setError("Başvuru kaydedilemedi.");
       }
     } finally {
       setSubmitting(false);
@@ -289,8 +388,12 @@ export default function NewApplicationPage() {
 
   return (
     <PatientAppShell
-      title="Yeni başvuru"
-      description="Erciyes Üniversitesi Tıp Fakültesi — yakın bilgisi ve yatan hasta kontrolü"
+      title={editId ? "Başvuruyu düzenle" : "Yeni başvuru"}
+      description={
+        editId
+          ? "Kaldığınız adımdan devam edin — bölüm, şikayet, önizleme ve ödeme"
+          : "Erciyes Üniversitesi Tıp Fakültesi — yakın bilgisi ve yatan hasta kontrolü"
+      }
       actions={
         <Button variant="outline" size="sm" asChild>
           <Link href={ROUTES.patient.applications}>Geri</Link>
@@ -299,7 +402,27 @@ export default function NewApplicationPage() {
     >
       {error ? <FormAlert title="Hata" message={error} /> : null}
 
-      {step === "who" && (
+      {(step === "details" || step === "survey" || step === "payment" || step === "preview") && (
+        <ApplicationFlowSteps
+          current={
+            step === "details" || step === "survey" || step === "payment" || step === "preview"
+              ? step
+              : "details"
+          }
+          paymentComplete={applicationStatus === 1}
+        />
+      )}
+
+      {editLoading ? (
+        <Card className="max-w-lg">
+          <CardContent className="pt-6">
+            <Skeleton className="h-5 w-1/2" />
+            <p className="text-muted-foreground mt-2 text-sm">Başvuru yükleniyor...</p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {!editLoading && step === "who" && (
         <div className="grid gap-4 sm:grid-cols-2">
           <Card
             className="cursor-pointer text-left transition hover:ring-2 hover:ring-ring"
@@ -504,11 +627,9 @@ export default function NewApplicationPage() {
         <Card className="max-w-2xl">
           <form onSubmit={continueToSurvey} noValidate>
             <CardHeader>
-              <CardTitle>Başvuru detayları</CardTitle>
+              <CardTitle>Adım 1 — Bölüm ve doktor</CardTitle>
               <CardDescription>
-                {forRelative
-                  ? `Yakın: ${relative.firstName} ${relative.lastName} · HIS kontrolü geçti`
-                  : "Kendi adınıza başvuru · HIS kontrolü geçti"}
+                Danışmak istediğiniz bölümü seçin; isteğe bağlı olarak uzman hekim tercih edebilirsiniz.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -568,18 +689,20 @@ export default function NewApplicationPage() {
             </CardContent>
             <CardFooter className="border-t flex flex-wrap gap-2">
               <Button type="submit">
-                Devam et — sorular ve belgeler
+                Devam et — şikayet bilgileri
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setStep(forRelative ? "relative" : "who");
-                  setStatus(null);
-                }}
-              >
-                Geri
-              </Button>
+              {!createdId ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setStep(forRelative ? "relative" : "who");
+                    setStatus(null);
+                  }}
+                >
+                  Geri
+                </Button>
+              ) : null}
             </CardFooter>
           </form>
         </Card>
@@ -587,14 +710,20 @@ export default function NewApplicationPage() {
 
       {step === "survey" && (
         <Card className="max-w-2xl">
-          <form onSubmit={submitApplication} noValidate>
+          <form onSubmit={saveAndGoToPreview} noValidate>
             <CardHeader>
-              <CardTitle>Başvuru soruları ve belgeler</CardTitle>
+              <CardTitle>Adım 2 — Şikayet ve belgeler</CardTitle>
               <CardDescription>
-                Tıbbi geçmişinizi ve sorularınızı yazın; tetkik/rapor dosyalarını ekleyin.
+                Tıbbi geçmişinizi, şikayetinizi ve sorularınızı yazın; tetkik/rapor dosyalarını ekleyin.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-6">
+              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+                <p className="font-medium">{professionName || professionCode}</p>
+                {careProviderLabel ? (
+                  <p className="text-muted-foreground">Uzman: {careProviderLabel}</p>
+                ) : null}
+              </div>
               {surveyFormError ? (
                 <FormAlert title="Doğrulama hatası" message={surveyFormError} />
               ) : null}
@@ -613,33 +742,143 @@ export default function NewApplicationPage() {
             </CardContent>
             <CardFooter className="border-t flex flex-wrap gap-2">
               <Button type="submit" disabled={submitting}>
-                {submitting ? "Oluşturuluyor..." : "Başvuruyu oluştur"}
+                {submitting ? "Kaydediliyor..." : "Devam et — form önizleme (Adım 3)"}
               </Button>
               <Button type="button" variant="ghost" onClick={() => setStep("details")}>
-                Geri
+                Geri — bölüm seçimi
               </Button>
             </CardFooter>
           </form>
         </Card>
       )}
 
+      {step === "preview" && createdId ? (
+        <Card className="max-w-3xl border-primary/20">
+          <CardHeader>
+            <CardTitle>Adım 3 — Form önizleme</CardTitle>
+            <CardDescription>
+              Başvuru formunuzu kontrol edin. Bu adımda ödeme yapılmaz; onay sonrası bir sonraki
+              adıma geçersiniz.
+            </CardDescription>
+            <ApplicationFlowHint current="preview" />
+          </CardHeader>
+          <CardContent>
+            <ApplicationPreviewPanel applicationId={createdId} token={getToken() ?? ""} />
+          </CardContent>
+          <CardFooter className="border-t flex flex-wrap gap-2">
+            {applicationStatus === 1 ? (
+              <Button
+                type="button"
+                onClick={() => router.push(ROUTES.patient.application(createdId))}
+              >
+                Kaydet ve başvuruya dön
+              </Button>
+            ) : (
+              <Button type="button" onClick={() => setStep("payment")}>
+                Onayla — ödemeye geç (Adım 4)
+              </Button>
+            )}
+            <Button type="button" variant="outline" onClick={() => setStep("survey")}>
+              Düzenle
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setStep("details")}>
+              Geri — bölüm seçimi
+            </Button>
+          </CardFooter>
+        </Card>
+      ) : null}
+
+      {step === "payment" && createdId && applicationStatus === 0 ? (
+        <Card className="max-w-2xl border-2 border-primary/40">
+          <CardHeader>
+            <CardTitle>Adım 4 — Ödeme</CardTitle>
+            <CardDescription>
+              Form önizlemesi tamamlandı. Son adım olarak ödemeyi yapın; ardından başvurunuz
+              incelemeye alınır.
+            </CardDescription>
+            <ApplicationFlowHint current="payment" />
+          </CardHeader>
+          <CardContent className="flex flex-col gap-6">
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm space-y-1">
+              <p>
+                <span className="text-muted-foreground">Bölüm: </span>
+                {professionName || professionCode}
+              </p>
+              {careProviderLabel ? (
+                <p>
+                  <span className="text-muted-foreground">Uzman: </span>
+                  {careProviderLabel}
+                </p>
+              ) : null}
+              <p>
+                <span className="text-muted-foreground">Tutar: </span>
+                {PAYMENT_AMOUNT.toLocaleString("tr-TR")} TRY
+              </p>
+            </div>
+            <ApplicationPaymentForm
+              applicationId={createdId}
+              token={getToken() ?? ""}
+              onSuccess={() => {
+                setApplicationStatus(1);
+                setPaymentCompleted(true);
+                setStep("done");
+              }}
+            />
+          </CardContent>
+          <CardFooter className="border-t">
+            <Button type="button" variant="ghost" onClick={() => setStep("preview")}>
+              Geri — form önizleme (Adım 3)
+            </Button>
+          </CardFooter>
+        </Card>
+      ) : null}
+
       {step === "done" && (
         <Card className="max-w-xl">
           <CardHeader>
-            <CardTitle>Başvuru oluşturuldu</CardTitle>
-            <CardDescription>Ödeme bekleniyor durumunda kaydedildi.</CardDescription>
+            <CardTitle>
+              {paymentCompleted ? "Ödeme alındı — başvurunuz tamamlandı" : "Başvuru güncellendi"}
+            </CardTitle>
+            <CardDescription>
+              {paymentCompleted
+                ? "Ödemeniz başarıyla alındı. Başvurunuz sekreterya incelemesine iletilecektir."
+                : "Değişiklikleriniz kaydedildi."}
+            </CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-2 text-sm">
-            {forRelative ? (
-              <p>
-                <span className="text-muted-foreground">Yakın: </span>
-                {relative.firstName} {relative.lastName}
-              </p>
+          <CardContent className="flex flex-col gap-4">
+            {paymentCompleted ? (
+              <Alert>
+                <AlertTitle>Teşekkürler</AlertTitle>
+                <AlertDescription className="space-y-2">
+                  <p>
+                    <strong>{PAYMENT_AMOUNT.toLocaleString("tr-TR")} TRY</strong> tutarındaki ödemeniz
+                    onaylandı.
+                  </p>
+                  <p className="text-muted-foreground text-sm">
+                    Başvuru durumunuzu &quot;Başvurularım&quot; sayfasından takip edebilirsiniz. Uzman
+                    değerlendirmesi tamamlandığında bilgilendirileceksiniz.
+                  </p>
+                </AlertDescription>
+              </Alert>
             ) : null}
-            <p>
-              <span className="text-muted-foreground">Başvuru no: </span>
-              <span className="font-mono text-xs">{createdId}</span>
-            </p>
+            <div className="text-sm space-y-2">
+              {forRelative ? (
+                <p>
+                  <span className="text-muted-foreground">Yakın: </span>
+                  {relative.firstName} {relative.lastName}
+                </p>
+              ) : null}
+              <p>
+                <span className="text-muted-foreground">Bölüm: </span>
+                {professionName || professionCode}
+              </p>
+              <p>
+                <span className="text-muted-foreground">Başvuru no: </span>
+                <span className="font-mono text-xs">
+                  {applicationNumber || createdId}
+                </span>
+              </p>
+            </div>
           </CardContent>
           <CardFooter className="border-t flex flex-wrap gap-2">
             <Button asChild>
@@ -654,14 +893,20 @@ export default function NewApplicationPage() {
                 setRelative(emptyRelative);
                 setStatus(null);
                 setProfessionCode("");
+                setProfessionName("");
                 setCareProviderId("");
+                setCareProviderLabel("");
                 setSurveyAnswers(EMPTY_SURVEY);
                 setSurveyFields({});
                 setPendingFiles([]);
                 setFileError("");
                 setSurveyFormError("");
                 setCreatedId("");
+                setApplicationStatus(null);
+                setApplicationNumber("");
+                setPaymentCompleted(false);
                 setError("");
+                if (editId) router.replace(ROUTES.patient.newApplication);
               }}
             >
               Yeni başvuru daha

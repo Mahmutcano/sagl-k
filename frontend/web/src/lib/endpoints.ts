@@ -18,6 +18,9 @@ export const API = {
     doctorQueue: "/api/v1/applications/queue/doctor",
     nurseQueue: "/api/v1/applications/queue/nurse",
     detail: (id: string) => `/api/v1/applications/${id}`,
+    update: (id: string) => `/api/v1/applications/${id}`,
+    preview: (id: string) => `/api/v1/applications/${id}/preview`,
+    cancel: (id: string) => `/api/v1/applications/${id}`,
     attachments: (id: string) => `/api/v1/applications/${id}/attachments`,
     attachment: (id: string, attachmentId: string) =>
       `/api/v1/applications/${id}/attachments/${attachmentId}`,

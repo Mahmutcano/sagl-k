@@ -117,6 +117,31 @@ export async function api<T>(
   return body.result as T;
 }
 
+/** HTML/binary responses with bearer auth and token refresh (not JSON envelope). */
+export async function fetchTextWithAuth(
+  path: string,
+  options: RequestInit = {},
+  token?: string
+): Promise<Response> {
+  const authToken = token ?? getToken() ?? "";
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string>),
+  };
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
+
+  let res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+
+  if (res.status === 401 && authToken) {
+    const newToken = await refreshAccessToken();
+    if (newToken) {
+      headers.Authorization = `Bearer ${newToken}`;
+      res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+    }
+  }
+
+  return res;
+}
+
 export type AuthUser = {
   id: string;
   role: string;

@@ -103,8 +103,10 @@ func NewRouter(d Deps) http.Handler {
 			ar.With(authmw.RequireRole("nurse", "admin", "developer")).Post("/queue/nurse", appH.PagingNurse)
 			ar.With(authmw.RequireRole("doctor", "admin", "developer")).Post("/queue/doctor", appH.PagingDoctor)
 
+			ar.Get("/{id}/preview", appH.PreviewApplication)
 			ar.Get("/{id}", appH.ApplicationDetail)
 			ar.Patch("/{id}", appH.UpdateApplication)
+			ar.Delete("/{id}", appH.DeleteApplication)
 			ar.Post("/{id}/payment", appH.UpdatePayment)
 			ar.Get("/{id}/report", appH.GetFinalReport)
 			ar.Get("/{id}/attachments", appH.ListAttachments)
