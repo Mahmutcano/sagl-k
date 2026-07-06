@@ -1,11 +1,15 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	authmw "medical-consultation-platform/backend/internal/middleware"
+	"medical-consultation-platform/backend/internal/pkg/audit"
 	"medical-consultation-platform/backend/internal/pkg/password"
 	"medical-consultation-platform/backend/internal/pkg/response"
 	"medical-consultation-platform/backend/internal/pkg/validate"
@@ -16,10 +20,11 @@ import (
 type AdminHandler struct {
 	db      *repository.DB
 	payment *paysvc.Service
+	audit   *audit.Logger
 }
 
-func NewAdminHandler(db *repository.DB, payment *paysvc.Service) *AdminHandler {
-	return &AdminHandler{db: db, payment: payment}
+func NewAdminHandler(db *repository.DB, payment *paysvc.Service, audit *audit.Logger) *AdminHandler {
+	return &AdminHandler{db: db, payment: payment, audit: audit}
 }
 
 func (h *AdminHandler) ListApplications(w http.ResponseWriter, r *http.Request) {
@@ -376,4 +381,201 @@ func (h *AdminHandler) ListNotifications(w http.ResponseWriter, r *http.Request)
 		})
 	}
 	response.OK(w, items)
+}
+
+func (h *AdminHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.db.Pool.Query(r.Context(), `
+		SELECT l.id::text, l.action, l.entity_type, l.entity_id::text, l.payload, l.ip_address::text, l.created_at,
+		       u.email, u.first_name || ' ' || u.last_name
+		FROM audit_logs l
+		LEFT JOIN users u ON u.id = l.user_id
+		ORDER BY l.created_at DESC LIMIT 300
+	`)
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, "ADM070", "Sistem logları listelenemedi.")
+		return
+	}
+	defer rows.Close()
+
+	items := []map[string]interface{}{}
+	for rows.Next() {
+		var id, action, entityType, ipAddress, userEmail, userName string
+		var entityID *string
+		var payload []byte
+		var createdAt interface{}
+
+		var ipNull, emailNull, nameNull, entityNull *string
+		err := rows.Scan(&id, &action, &entityType, &entityNull, &payload, &ipNull, &createdAt, &emailNull, &nameNull)
+		if err != nil {
+			continue
+		}
+
+		if ipNull != nil {
+			ipAddress = *ipNull
+		}
+		if emailNull != nil {
+			userEmail = *emailNull
+		}
+		if nameNull != nil {
+			userName = *nameNull
+		}
+		if entityNull != nil {
+			entityID = entityNull
+		}
+
+		var payloadObj interface{}
+		if len(payload) > 0 {
+			_ = json.Unmarshal(payload, &payloadObj)
+		}
+
+		items = append(items, map[string]interface{}{
+			"id":         id,
+			"action":     action,
+			"entityType": entityType,
+			"entityId":   entityID,
+			"payload":    payloadObj,
+			"ipAddress":  ipAddress,
+			"createdAt":  createdAt,
+			"userEmail":  userEmail,
+			"userName":   userName,
+		})
+	}
+	response.OK(w, items)
+}
+
+type AdminApplicationUpdateRequest struct {
+	StatusCode            int    `json:"statusCode"`
+	ProfessionCode        string `json:"professionCode"`
+	CareProviderID        string `json:"careProviderId"`
+	ChiefComplaint        string `json:"chiefComplaint"`
+	MedicalHistory        string `json:"medicalHistory"`
+	CurrentMedications    string `json:"currentMedications"`
+	PreviousDiagnosis     string `json:"previousDiagnosis"`
+	QuestionsForDoctor    string `json:"questionsForDoctor"`
+	AdditionalNotes       string `json:"additionalNotes"`
+	IsForRelative         bool   `json:"isForRelative"`
+	RepFirstName          string `json:"repFirstName"`
+	RepLastName           string `json:"repLastName"`
+	RepNationalIdentifier string `json:"repNationalIdentifier"`
+	RepBirthDate          string `json:"repBirthDate"`
+	RepGender             int    `json:"repGender"`
+}
+
+func (h *AdminHandler) UpdateApplicationByAdmin(w http.ResponseWriter, r *http.Request) {
+	claims := authmw.ClaimsFromContext(r.Context())
+	if claims == nil {
+		response.Fail(w, http.StatusUnauthorized, "AUTH001", "Oturum gerekli.")
+		return
+	}
+
+	appIDStr := chi.URLParam(r, "id")
+	appID, err := uuid.Parse(appIDStr)
+	if err != nil {
+		response.Fail(w, http.StatusBadRequest, "ADM071", "Geçersiz başvuru ID.")
+		return
+	}
+
+	var req AdminApplicationUpdateRequest
+	if !validate.DecodeJSON(w, r, &req) {
+		return
+	}
+
+	// Validate doctor ID if present
+	var providerID *uuid.UUID
+	if strings.TrimSpace(req.CareProviderID) != "" {
+		pID, err := uuid.Parse(req.CareProviderID)
+		if err != nil {
+			response.Fail(w, http.StatusBadRequest, "ADM072", "Geçersiz hekim ID.")
+			return
+		}
+		providerID = &pID
+	}
+
+	tx, err := h.db.Pool.Begin(r.Context())
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, "ADM073", "İşlem başlatılamadı.")
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	// Update applications table
+	_, err = tx.Exec(r.Context(), `
+		UPDATE applications
+		SET status_code = $1, profession_code = $2, care_provider_id = $3,
+			is_for_relative = $4, updated_at = now()
+		WHERE id = $5
+	`, req.StatusCode, req.ProfessionCode, providerID, req.IsForRelative, appID)
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, "ADM074", "Başvuru ana bilgileri güncellenemedi.")
+		return
+	}
+
+	// Update or insert application_surveys
+	var existsSurvey bool
+	_ = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM application_surveys WHERE application_id = $1)`, appID).Scan(&existsSurvey)
+
+	if existsSurvey {
+		_, err = tx.Exec(r.Context(), `
+			UPDATE application_surveys
+			SET chief_complaint = $1, medical_history = $2, current_medications = $3,
+				previous_diagnosis = $4, questions_for_doctor = $5, additional_notes = $6
+			WHERE application_id = $7
+		`, req.ChiefComplaint, req.MedicalHistory, req.CurrentMedications, req.PreviousDiagnosis, req.QuestionsForDoctor, req.AdditionalNotes, appID)
+	} else {
+		_, err = tx.Exec(r.Context(), `
+			INSERT INTO application_surveys (application_id, chief_complaint, medical_history, current_medications, previous_diagnosis, questions_for_doctor, additional_notes)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`, appID, req.ChiefComplaint, req.MedicalHistory, req.CurrentMedications, req.PreviousDiagnosis, req.QuestionsForDoctor, req.AdditionalNotes)
+	}
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, "ADM075", "Başvuru şikayet/tıbbi geçmiş bilgileri güncellenemedi.")
+		return
+	}
+
+	// Update application_represented_persons if relative is true
+	if req.IsForRelative {
+		var dob *time.Time
+		if strings.TrimSpace(req.RepBirthDate) != "" {
+			parsed, err := time.Parse("2006-01-02", req.RepBirthDate)
+			if err == nil {
+				dob = &parsed
+			}
+		}
+
+		var existsRep bool
+		_ = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM application_represented_persons WHERE application_id = $1)`, appID).Scan(&existsRep)
+
+		if existsRep {
+			_, err = tx.Exec(r.Context(), `
+				UPDATE application_represented_persons
+				SET first_name = $1, last_name = $2, national_identifier = $3, birth_date = $4, gender = $5
+				WHERE application_id = $6
+			`, req.RepFirstName, req.RepLastName, req.RepNationalIdentifier, dob, req.RepGender, appID)
+		} else {
+			_, err = tx.Exec(r.Context(), `
+				INSERT INTO application_represented_persons (application_id, first_name, last_name, national_identifier, birth_date, gender)
+				VALUES ($1, $2, $3, $4, $5, $6)
+			`, appID, req.RepFirstName, req.RepLastName, req.RepNationalIdentifier, dob, req.RepGender)
+		}
+		if err != nil {
+			response.Fail(w, http.StatusInternalServerError, "ADM076", "Yakın (temsil edilen) bilgileri güncellenemedi.")
+			return
+		}
+	} else {
+		// If not for relative, clean up represent details if any exist
+		_, _ = tx.Exec(r.Context(), `DELETE FROM application_represented_persons WHERE application_id = $1`, appID)
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		response.Fail(w, http.StatusInternalServerError, "ADM077", "Değişiklikler kaydedilemedi.")
+		return
+	}
+
+	h.audit.Log(r.Context(), &claims.UserID, "admin_update_application", "applications", &appID, map[string]interface{}{
+		"statusCode": req.StatusCode, "profession": req.ProfessionCode, "doctor": req.CareProviderID,
+	})
+
+	response.OK(w, map[string]interface{}{
+		"message": "Başvuru bilgileri admin tarafından başarıyla güncellendi.",
+	})
 }

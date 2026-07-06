@@ -4,17 +4,20 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/google/uuid"
+	"medical-consultation-platform/backend/internal/pkg/audit"
 	"medical-consultation-platform/backend/internal/pkg/response"
 	"medical-consultation-platform/backend/internal/pkg/validate"
 	authsvc "medical-consultation-platform/backend/internal/service/auth"
 )
 
 type AuthHandler struct {
-	svc *authsvc.Service
+	svc   *authsvc.Service
+	audit *audit.Logger
 }
 
-func NewAuthHandler(svc *authsvc.Service) *AuthHandler {
-	return &AuthHandler{svc: svc}
+func NewAuthHandler(svc *authsvc.Service, audit *audit.Logger) *AuthHandler {
+	return &AuthHandler{svc: svc, audit: audit}
 }
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -39,6 +42,17 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		response.Fail(w, http.StatusUnauthorized, "AUTH011", "Kimlik numarası veya şifre hatalı.")
 		return
 	}
+
+	if userMap, ok := res.User.(map[string]interface{}); ok {
+		if idStr, ok := userMap["id"].(string); ok {
+			if uID, err := uuid.Parse(idStr); err == nil {
+				h.audit.Log(r.Context(), &uID, "user_login", "users", &uID, map[string]interface{}{
+					"role": userMap["role"],
+				})
+			}
+		}
+	}
+
 	response.OK(w, res)
 }
 

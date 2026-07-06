@@ -20,6 +20,7 @@ import (
 	"medical-consultation-platform/backend/internal/service/erciyes"
 	notifysvc "medical-consultation-platform/backend/internal/service/notification"
 	paysvc "medical-consultation-platform/backend/internal/service/payment"
+	"medical-consultation-platform/backend/internal/pkg/audit"
 )
 
 func main() {
@@ -51,6 +52,8 @@ func main() {
 	requireCard := strings.EqualFold(cfg.Param.Mode, "live") || strings.EqualFold(cfg.BizimHesap.Mode, "live")
 	payment := paysvc.NewService(param, bizim, payStore, cfg.DefaultPaymentProvider, requireCard)
 
+	auditLog := audit.NewLogger(db.Pool)
+
 	router := handler.NewRouter(handler.Deps{
 		Cfg:     cfg,
 		DB:      db,
@@ -60,6 +63,7 @@ func main() {
 		Notify:  notify,
 		Payment: payment,
 		Erciyes: erciyesSvc,
+		Audit:   auditLog,
 	})
 
 	srv := &http.Server{

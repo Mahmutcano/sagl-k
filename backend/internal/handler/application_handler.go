@@ -360,6 +360,36 @@ func (h *ApplicationHandler) PreviewApplication(w http.ResponseWriter, r *http.R
 	_, _ = w.Write([]byte(appsvc.RenderPreviewHTML(data)))
 }
 
+func (h *ApplicationHandler) VerifyApplicationPublicly(w http.ResponseWriter, r *http.Request) {
+	appID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Fail(w, http.StatusBadRequest, "APP901", "Geçersiz başvuru ID.")
+		return
+	}
+
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		response.Fail(w, http.StatusBadRequest, "APP902", "Doğrulama kodu eksik.")
+		return
+	}
+
+	expectedCode := appsvc.GenerateVerificationCode(appID)
+	if code != expectedCode {
+		response.Fail(w, http.StatusForbidden, "APP903", "Geçersiz doğrulama kodu.")
+		return
+	}
+
+	data, err := h.app.LoadPreview(r.Context(), appID)
+	if err != nil {
+		response.Fail(w, http.StatusNotFound, "APP904", "Başvuru bulunamadı.")
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(appsvc.RenderPreviewHTML(data)))
+}
+
 func (h *ApplicationHandler) AssessApplication(w http.ResponseWriter, r *http.Request) {
 	appID, ok := parseAppID(w, r)
 	if !ok {

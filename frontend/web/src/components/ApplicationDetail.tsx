@@ -7,22 +7,22 @@ import { ApiError, api } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
 import { API } from "@/lib/endpoints";
 import {
-  STATUS_LABELS,
-  statusVariant,
-  applicationDisplayNumber,
-  isConcludedStatus,
-  isPatientEditableStatus,
-  isPatientCancellableStatus,
-  isSurveyComplete,
-  type ApplicationAttachment,
-  type ApplicationDetail,
-  type ApplicationNote,
-  type FinalReport,
+	STATUS_LABELS,
+	statusVariant,
+	applicationDisplayNumber,
+	isConcludedStatus,
+	isPatientEditableStatus,
+	isPatientCancellableStatus,
+	isSurveyComplete,
+	type ApplicationAttachment,
+	type ApplicationDetail,
+	type ApplicationNote,
+	type FinalReport,
 } from "@/lib/application";
 import {
-  SURVEY_FIELDS,
-  downloadApplicationAttachment,
-  parseSurveyData,
+	SURVEY_FIELDS,
+	downloadApplicationAttachment,
+	parseSurveyData,
 } from "@/lib/applicationSurvey";
 import { FormAlert, FormField } from "@/components/FormField";
 import { ApplicationPreviewPanel } from "@/components/ApplicationPreviewPanel";
@@ -31,15 +31,16 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
+	Card,
+	CardContent,
+	CardDescription,
+	CardFooter,
+	CardHeader,
+	CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 type Props = {
   id: string;
@@ -59,6 +60,7 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
   const [loading, setLoading] = useState(true);
   const [noteText, setNoteText] = useState("");
   const [noteSaving, setNoteSaving] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   const load = useCallback(() => {
     return Promise.all([
@@ -94,10 +96,12 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
       .finally(() => setLoading(false));
   }, [load]);
 
-  async function cancelApplication() {
-    if (!confirm("Başvuru iptal edilecek ve kalıcı olarak silinecek. Devam etmek istiyor musunuz?")) {
-      return;
-    }
+  function cancelApplication() {
+    setIsConfirmOpen(true);
+  }
+
+  async function handleConfirmCancel() {
+    setIsConfirmOpen(false);
     setError("");
     try {
       await api(API.applications.cancel(id), { method: "DELETE" }, token);
@@ -390,6 +394,16 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
       <Button variant="outline" onClick={() => router.refresh()}>
         Yenile
       </Button>
+
+      <ConfirmModal
+        isOpen={isConfirmOpen}
+        title="Başvuruyu İptal Et"
+        message="Başvuru iptal edilecek ve kalıcı olarak silinecek. Devam etmek istiyor musunuz?"
+        confirmText="Evet, İptal Et"
+        variant="destructive"
+        onConfirm={handleConfirmCancel}
+        onCancel={() => setIsConfirmOpen(false)}
+      />
     </div>
   );
 }

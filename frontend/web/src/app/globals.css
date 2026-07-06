@@ -129,3 +129,99 @@
     0 0 0 2px var(--background),
     0 0 0 4px var(--ring);
 }
+
+/* Large Form overrides for superior UX, readability, and spaciousness */
+.large-form {
+  /* Increase container padding */
+  padding: 1.5rem !important;
+
+  @media (min-width: 640px) {
+    padding: 2.5rem !important;
+  }
+
+  & [class*="CardHeader"] {
+    padding: 0 0 2rem 0 !important;
+  }
+
+  & [class*="CardContent"] {
+    padding: 0 0 2rem 0 !important;
+  }
+
+  & [class*="CardFooter"] {
+    padding: 2rem 0 0 0 !important;
+  }
+
+  /* Increase titles and typography sizes */
+  & [class*="CardTitle"] {
+    font-size: 1.75rem !important; /* ~28px */
+    line-height: 2.25rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.025em !important;
+  }
+
+  & [class*="CardDescription"] {
+    font-size: 1rem !important; /* 16px */
+    line-height: 1.5rem !important;
+    margin-top: 0.5rem !important;
+  }
+
+  /* Inputs, Textareas, and Select boxes */
+  & input,
+  & textarea,
+  & button[role="combobox"],
+  & select {
+    font-size: 1.05rem !important; /* ~17px */
+    line-height: 1.5rem !important;
+    border-radius: 0.5rem !important;
+  }
+
+  & input {
+    height: 3rem !important; /* 48px */
+  }
+
+  & button[role="combobox"] {
+    height: 3rem !important; /* 48px */
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  & textarea {
+    padding: 0.875rem 1rem !important;
+  }
+
+  /* Form Labels and Hints */
+  & label {
+    font-size: 1.05rem !important; /* ~17px */
+    font-weight: 600 !important;
+    color: var(--foreground) !important;
+    margin-bottom: 0.25rem !important;
+  }
+
+  & [id$="-hint"] {
+    font-size: 0.9rem !important; /* 14px */
+    line-height: 1.25rem !important;
+    margin-top: 0.25rem !important;
+  }
+
+  & [id$="-error"] {
+    font-size: 0.9rem !important;
+    font-weight: 500 !important;
+    margin-top: 0.25rem !important;
+  }
+
+  /* Form spacing gaps */
+  & .grid {
+    gap: 1.5rem !important;
+  }
+
+  /* Action buttons in footer */
+  & [class*="CardFooter"] button {
+    height: 3rem !important; /* 48px */
+    font-size: 1.05rem !important;
+    font-weight: 600 !important;
+    padding-left: 1.75rem !important;
+    padding-right: 1.75rem !important;
+    border-radius: 0.5rem !important;
+  }
+}
+

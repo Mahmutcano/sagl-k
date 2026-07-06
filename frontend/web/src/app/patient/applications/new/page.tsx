@@ -20,7 +20,7 @@ import { ApplicationPaymentForm, PAYMENT_AMOUNT } from "@/components/Application
 import { ApplicationFlowSteps, ApplicationFlowHint } from "@/components/ApplicationFlowSteps";
 import { ApplicationPreviewPanel } from "@/components/ApplicationPreviewPanel";
 import { FileUploadField } from "@/components/FileUploadField";
-import { FormAlert, FormField, FormSelect, DateField } from "@/components/FormField";
+import { FormAlert, FormField, FormSelect, BirthDateSelect } from "@/components/FormField";
 import { useApplicationCatalog } from "@/hooks/useApplicationCatalog";
 import {
   EMPTY_SURVEY,
@@ -281,14 +281,14 @@ export default function NewApplicationPage() {
         ...surveyPayload,
         ...(forRelative
           ? {
-              representedPerson: {
-                firstName: relative.firstName.trim(),
-                lastName: relative.lastName.trim(),
-                nationalIdentifier: relative.nationalIdentifier.trim(),
-                birthDate: relative.birthDate,
-                gender: relative.gender,
-              },
-            }
+            representedPerson: {
+              firstName: relative.firstName.trim(),
+              lastName: relative.lastName.trim(),
+              nationalIdentifier: relative.nationalIdentifier.trim(),
+              birthDate: relative.birthDate,
+              gender: relative.gender,
+            },
+          }
           : {}),
       };
       let applicationId = createdId;
@@ -423,9 +423,9 @@ export default function NewApplicationPage() {
       ) : null}
 
       {!editLoading && step === "who" && (
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-6 sm:grid-cols-2 max-w-4xl w-full">
           <Card
-            className="cursor-pointer text-left transition hover:ring-2 hover:ring-ring"
+            className="cursor-pointer text-left transition-all hover:ring-2 hover:ring-ring hover:shadow-lg shadow-md large-form border-slate-200"
             onClick={chooseSelf}
             role="button"
             tabIndex={0}
@@ -441,11 +441,11 @@ export default function NewApplicationPage() {
               <CardDescription>Kendi adınıza tıbbi danışmanlık başvurusu</CardDescription>
             </CardHeader>
             <CardContent>
-              <Badge>Erciyes HIS kontrolü</Badge>
+              <Badge className="px-3 py-1 text-xs">Erciyes HIS kontrolü</Badge>
             </CardContent>
           </Card>
           <Card
-            className="cursor-pointer text-left transition hover:ring-2 hover:ring-ring"
+            className="cursor-pointer text-left transition-all hover:ring-2 hover:ring-ring hover:shadow-lg shadow-md large-form border-slate-200"
             onClick={chooseRelative}
             role="button"
             tabIndex={0}
@@ -463,14 +463,14 @@ export default function NewApplicationPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Badge variant="secondary">Yakın ekleme</Badge>
+              <Badge variant="secondary" className="px-3 py-1 text-xs">Yakın ekleme</Badge>
             </CardContent>
           </Card>
         </div>
       )}
 
       {step === "relative" && (
-        <Card className="max-w-2xl">
+        <Card className="max-w-4xl w-full large-form shadow-md border-slate-200">
           <form onSubmit={submitRelative} noValidate>
             <CardHeader>
               <CardTitle>Yakın (hasta) bilgileri</CardTitle>
@@ -505,7 +505,6 @@ export default function NewApplicationPage() {
                 label="TC Kimlik No"
                 hint="Başvuranın TC’si ile aynı olamaz"
                 error={relativeFields.nationalIdentifier}
-                className="sm:col-span-2"
               >
                 <Input
                   id="nationalIdentifier"
@@ -517,14 +516,6 @@ export default function NewApplicationPage() {
                   }
                 />
               </FormField>
-              <DateField
-                id="birthDate"
-                label="Doğum tarihi"
-                error={relativeFields.birthDate}
-                value={relative.birthDate}
-                onChange={(e) => updateRelative("birthDate", e.target.value)}
-                max={new Date().toISOString().slice(0, 10)}
-              />
               <FormSelect
                 id="gender"
                 label="Cinsiyet"
@@ -536,6 +527,12 @@ export default function NewApplicationPage() {
                   { value: "1", label: "Erkek" },
                   { value: "2", label: "Kadın" },
                 ]}
+              />
+              <BirthDateSelect
+                value={relative.birthDate}
+                onChange={(iso) => updateRelative("birthDate", iso)}
+                error={relativeFields.birthDate}
+                fieldClassName="sm:col-span-2"
               />
             </CardContent>
             <CardFooter className="border-t flex flex-wrap gap-2">
@@ -624,7 +621,7 @@ export default function NewApplicationPage() {
       )}
 
       {step === "details" && (
-        <Card className="max-w-2xl">
+        <Card className="max-w-4xl w-full large-form shadow-md border-slate-200">
           <form onSubmit={continueToSurvey} noValidate>
             <CardHeader>
               <CardTitle>Adım 1 — Bölüm ve doktor</CardTitle>
@@ -709,7 +706,7 @@ export default function NewApplicationPage() {
       )}
 
       {step === "survey" && (
-        <Card className="max-w-2xl">
+        <Card className="max-w-4xl w-full large-form shadow-md border-slate-200">
           <form onSubmit={saveAndGoToPreview} noValidate>
             <CardHeader>
               <CardTitle>Adım 2 — Şikayet ve belgeler</CardTitle>
@@ -753,7 +750,7 @@ export default function NewApplicationPage() {
       )}
 
       {step === "preview" && createdId ? (
-        <Card className="max-w-3xl border-primary/20">
+        <Card className="max-w-5xl w-full large-form shadow-md border-primary/20">
           <CardHeader>
             <CardTitle>Adım 3 — Form önizleme</CardTitle>
             <CardDescription>
@@ -789,7 +786,7 @@ export default function NewApplicationPage() {
       ) : null}
 
       {step === "payment" && createdId && applicationStatus === 0 ? (
-        <Card className="max-w-2xl border-2 border-primary/40">
+        <Card className="max-w-4xl w-full large-form shadow-md border-2 border-primary/40">
           <CardHeader>
             <CardTitle>Adım 4 — Ödeme</CardTitle>
             <CardDescription>
@@ -834,7 +831,7 @@ export default function NewApplicationPage() {
       ) : null}
 
       {step === "done" && (
-        <Card className="max-w-xl">
+        <Card className="max-w-4xl w-full large-form shadow-md border-slate-200">
           <CardHeader>
             <CardTitle>
               {paymentCompleted ? "Ödeme alındı — başvurunuz tamamlandı" : "Başvuru güncellendi"}

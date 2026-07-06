@@ -65,9 +65,6 @@ export function AppShellLayout({
                 {roleBadge}
               </Badge>
             ) : null}
-            <Button variant="ghost" size="sm" asChild className="hidden sm:inline-flex">
-              <Link href={ROUTES.home}>Ana sayfa</Link>
-            </Button>
             <Button variant="outline" size="sm" onClick={() => void onLogout()}>
               Çıkış
             </Button>

@@ -18,6 +18,7 @@ import {
 } from "@/components/PatientApplicationList";
 import { groupPatientApplications } from "@/lib/application";
 import { Button } from "@/components/ui/button";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 export default function ApplicationsPage() {
   const router = useRouter();
@@ -26,6 +27,7 @@ export default function ApplicationsPage() {
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState("");
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const load = useCallback(() => {
     const session = requireSession("patient");
@@ -50,14 +52,14 @@ export default function ApplicationsPage() {
     void load();
   }, [load]);
 
-  async function deleteApplication(id: string) {
-    if (
-      !confirm(
-        "Bu başvuru kalıcı olarak silinecek. Yalnızca ödeme yapılmamış taslaklar silinebilir. Devam edilsin mi?"
-      )
-    ) {
-      return;
-    }
+  function deleteApplication(id: string) {
+    setDeleteTargetId(id);
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteTargetId) return;
+    const id = deleteTargetId;
+    setDeleteTargetId(null);
     const token = getToken();
     if (!token) return;
     setDeletingId(id);
@@ -123,6 +125,16 @@ export default function ApplicationsPage() {
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteTargetId !== null}
+        title="Başvuruyu Sil"
+        message="Bu başvuru kalıcı olarak silinecek. Yalnızca ödeme yapılmamış taslaklar silinebilir. Devam edilsin mi?"
+        confirmText="Evet, Sil"
+        variant="destructive"
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </PatientAppShell>
   );
 }

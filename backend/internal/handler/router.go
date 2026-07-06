@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"medical-consultation-platform/backend/internal/service/erciyes"
 	notifysvc "medical-consultation-platform/backend/internal/service/notification"
 	paysvc "medical-consultation-platform/backend/internal/service/payment"
+	"medical-consultation-platform/backend/internal/pkg/audit"
 )
 
 type Deps struct {
@@ -28,11 +30,19 @@ type Deps struct {
 	Notify  *notifysvc.Service
 	Payment *paysvc.Service
 	Erciyes *erciyes.Service
+	Audit   *audit.Logger
 }
 
 func NewRouter(d Deps) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID, middleware.RealIP, middleware.Logger, middleware.Recoverer)
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ip := audit.GetIP(r)
+			ctx := context.WithValue(r.Context(), "ip_address", ip)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	})
 	r.Use(authmw.SecurityHeaders)
 	r.Use(authmw.MaxBody(validate.MaxBodyBytes))
 	r.Use(authmw.NewRateLimiter(120, time.Minute, 2*time.Minute).Middleware)
@@ -64,10 +74,12 @@ func NewRouter(d Deps) http.Handler {
 		MaxAge:           300,
 	}))
 
-	authH := NewAuthHandler(d.Auth)
+	authH := NewAuthHandler(d.Auth, d.Audit)
 	appH := NewApplicationHandler(d.App, d.Payment, d.Notify, d.DB, d.Cfg)
-	adminH := NewAdminHandler(d.DB, d.Payment)
+	adminH := NewAdminHandler(d.DB, d.Payment, d.Audit)
 	erciyesH := NewErciyesHandler(d.Erciyes, d.DB)
+	profileH := NewProfileHandler(d.DB, d.Notify, d.Audit)
+	adminUserH := NewAdminUserHandler(d.DB, d.Audit)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -93,6 +105,7 @@ func NewRouter(d Deps) http.Handler {
 
 		api.Get("/professions", appH.ListProfessions)
 		api.Get("/care-providers", appH.ListCareProviders)
+		api.Get("/public/applications/{id}/verify", appH.VerifyApplicationPublicly)
 
 		api.Route("/applications", func(ar chi.Router) {
 			ar.Use(authmw.Auth(d.JWT))
@@ -131,9 +144,17 @@ func NewRouter(d Deps) http.Handler {
 			er.With(authmw.Auth(d.JWT), authmw.RequireRole("admin", "developer")).Get("/health", erciyesH.Health)
 		})
 
+		api.Route("/profile", func(pr chi.Router) {
+			pr.Use(authmw.Auth(d.JWT))
+			pr.Get("/", profileH.GetProfile)
+			pr.Put("/", profileH.UpdateProfile)
+			pr.Post("/verify", profileH.VerifyProfilePhone)
+		})
+
 		api.Route("/admin", func(ar chi.Router) {
 			ar.Use(authmw.Auth(d.JWT), authmw.RequireRole("admin", "developer"))
 			ar.Get("/applications", adminH.ListApplications)
+			ar.Put("/applications/{id}", adminH.UpdateApplicationByAdmin)
 			ar.Get("/applications/{id}/history", adminH.ApplicationHistory)
 			ar.Get("/hospitals", adminH.ListHospitals)
 			ar.Post("/hospitals", adminH.CreateHospital)
@@ -143,6 +164,10 @@ func NewRouter(d Deps) http.Handler {
 			ar.Post("/refunds", adminH.CreateRefund)
 			ar.Get("/notifications", adminH.ListNotifications)
 			ar.Get("/integrations/erciyes/health", erciyesH.Health)
+			ar.Get("/users", adminUserH.ListUsers)
+			ar.Get("/users/{id}", adminUserH.GetUser)
+			ar.Put("/users/{id}", adminUserH.UpdateUser)
+			ar.Get("/audit-logs", adminH.ListAuditLogs)
 		})
 	})
 

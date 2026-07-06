@@ -27,7 +27,7 @@ export function PatientAppShell({ children, title, description, actions }: AppSh
           isActive: (p) => p.startsWith("/patient/applications"),
         },
       ]}
-      roleBadge={user?.role ? roleLabel(user.role) : undefined}
+      roleBadge={undefined}
       onLogout={() => router.push(logoutTo("patient"))}
       title={title}
       description={description}
