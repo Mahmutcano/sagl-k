@@ -11,6 +11,8 @@ const LINKS = [
   { href: ROUTES.admin.payments, label: "Ödemeler" },
   { href: ROUTES.admin.refunds, label: "İadeler" },
   { href: ROUTES.admin.notifications, label: "Bildirimler" },
+  { href: ROUTES.admin.users, label: "Kullanıcılar" },
+  { href: ROUTES.admin.logs, label: "Sistem Logları" },
 ];
 
 export function AdminNav() {

@@ -12,6 +12,8 @@ export const ROUTES = {
         ? `/patient/applications/new?edit=${encodeURIComponent(id)}&step=${step}`
         : `/patient/applications/new?edit=${encodeURIComponent(id)}`,
     application: (id: string) => `/patient/applications/${id}`,
+    results: "/patient/results",
+    profile: "/patient/profile",
   },
   doctor: {
     home: "/doctor/dashboard",
@@ -21,6 +23,7 @@ export const ROUTES = {
     applications: "/doctor/applications",
     newApplication: "/doctor/applications/new",
     application: (id: string) => `/doctor/applications/${id}`,
+    profile: "/doctor/profile",
   },
   admin: {
     home: "/admin",
@@ -30,5 +33,7 @@ export const ROUTES = {
     refunds: "/admin/refunds",
     notifications: "/admin/notifications",
     application: (id: string) => `/admin/applications/${id}`,
+    users: "/admin/users",
+    logs: "/admin/logs",
   },
 } as const;

@@ -25,7 +25,12 @@ export function DoctorAppShell({ children, title, description, actions }: AppShe
           label: "Sekreterya kuyruğu",
           isActive: (p: string) =>
             p === "/doctor/nurse" ||
-            (p.startsWith("/doctor/applications/") && p !== "/doctor/applications"),
+            (p.startsWith("/doctor/applications/") && p !== "/doctor/applications" && !p.endsWith("/profile")),
+        },
+        {
+          href: ROUTES.doctor.profile,
+          label: "Profil Ayarlarım",
+          isActive: (p: string) => p.startsWith("/doctor/profile"),
         },
       ]
     : [
@@ -34,7 +39,12 @@ export function DoctorAppShell({ children, title, description, actions }: AppShe
           label: "Başvurularım",
           isActive: (p: string) =>
             p === "/doctor/dashboard" ||
-            (p.startsWith("/doctor/applications/") && p !== "/doctor/applications"),
+            (p.startsWith("/doctor/applications/") && p !== "/doctor/applications" && !p.endsWith("/profile")),
+        },
+        {
+          href: ROUTES.doctor.profile,
+          label: "Profil Ayarlarım",
+          isActive: (p: string) => p.startsWith("/doctor/profile"),
         },
       ];
 

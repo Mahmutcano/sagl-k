@@ -2,8 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { AppShellLayout } from "@/components/AppShellLayout";
-import { useClientUser } from "@/hooks/useClientUser";
-import { logoutTo, roleLabel } from "@/lib/auth";
+import { logoutTo } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
 
 type AppShellProps = {
@@ -15,7 +14,6 @@ type AppShellProps = {
 
 export function PatientAppShell({ children, title, description, actions }: AppShellProps) {
   const router = useRouter();
-  const user = useClientUser();
 
   return (
     <AppShellLayout
@@ -24,7 +22,17 @@ export function PatientAppShell({ children, title, description, actions }: AppSh
         {
           href: ROUTES.patient.applications,
           label: "Başvurularım",
-          isActive: (p) => p.startsWith("/patient/applications"),
+          isActive: (p) => p === "/patient/applications" || p.startsWith("/patient/applications/"),
+        },
+        {
+          href: ROUTES.patient.results,
+          label: "Sonuçlarım",
+          isActive: (p) => p.startsWith("/patient/results"),
+        },
+        {
+          href: ROUTES.patient.profile,
+          label: "Profil Ayarlarım",
+          isActive: (p) => p.startsWith("/patient/profile"),
         },
       ]}
       roleBadge={undefined}
