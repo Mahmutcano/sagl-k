@@ -62,7 +62,7 @@ export default function ResultsPage() {
           description="Başvurunuz hekim tarafından değerlendirilip sonuç raporu hazırlandığında burada listelenecektir."
         />
       ) : (
-        <div className="rounded-xl border bg-card shadow-sm overflow-hidden large-form">
+        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
           <div className="divide-y">
             {items.map((item) => (
               <PatientApplicationRow

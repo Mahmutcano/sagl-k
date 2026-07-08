@@ -132,7 +132,7 @@ export function FileUploadField({ files, onChange, onError, error, disabled }: P
         <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/5 blur-2xl" />
         <div className="pointer-events-none absolute -bottom-6 -left-6 h-24 w-24 rounded-full bg-primary/5 blur-xl" />
 
-        <div className="relative flex flex-col items-center justify-center gap-4 px-6 py-10 text-center">
+        <div className="relative flex flex-col items-center justify-center gap-3 px-4 py-8 sm:gap-4 sm:px-6 sm:py-10 text-center">
           <div
             className={cn(
               "flex h-16 w-16 items-center justify-center rounded-2xl border shadow-sm transition-transform duration-200",
@@ -152,8 +152,9 @@ export function FileUploadField({ files, onChange, onError, error, disabled }: P
             <p className="text-sm font-bold text-slate-800">
               {dragOver ? "Dosyaları buraya bırakın" : "Belgelerinizi yükleyin"}
             </p>
-            <p className="text-xs text-slate-500 max-w-sm">
-              Sürükleyip bırakın veya bilgisayarınızdan seçin
+            <p className="text-xs text-slate-500 max-w-sm px-2">
+              <span className="sm:hidden">Dosya seçin veya buraya sürükleyin</span>
+              <span className="hidden sm:inline">Sürükleyip bırakın veya bilgisayarınızdan seçin</span>
             </p>
           </div>
 

@@ -51,7 +51,7 @@ export default function NurseQueuePage() {
   return (
     <DoctorAppShell
       title="Sekreterya kuyruğu"
-      description="Ödeme alınmış, sekreterya incelemesi bekleyen başvurular"
+      description="Sekreterya incelemesi bekleyen başvurular"
     >
       {error ? <FormAlert title="Hata" message={error} /> : null}
 
@@ -60,7 +60,7 @@ export default function NurseQueuePage() {
       ) : items.length === 0 ? (
         <EmptyState
           title="Kuyrukta başvuru yok"
-          description="Ödeme tamamlanan başvurular burada listelenir."
+          description="İnceleme ve hekime yönlendirme bekleyen başvurular burada listelenir."
         />
       ) : (
         <Card className="p-6 bg-card border shadow-sm rounded-xl">
@@ -73,7 +73,7 @@ export default function NurseQueuePage() {
                   subtitle={`Başvuru no: ${applicationDisplayNumber(item)}${
                     item.createdAt ? ` · ${new Date(item.createdAt).toLocaleDateString("tr-TR")}` : ""
                   }`}
-                  badge={<StatusBadge code={item.statusCode} />}
+                  badge={<StatusBadge code={item.statusCode} audience="staff" />}
                 />
               </li>
             ))}

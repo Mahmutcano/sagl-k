@@ -191,7 +191,7 @@ export function BirthDateSelect({
 
   return (
     <FormField id={id} label={label} hint={hint} error={error} className={fieldClassName}>
-      <div className="grid grid-cols-3 gap-2 min-w-0">
+      <div className="grid grid-cols-1 min-[400px]:grid-cols-3 gap-2 min-w-0">
         {subSelect("day", day, "Gün", dayOptions)}
         <Select value={month || undefined} onValueChange={(v) => update("month", v)}>
           <SelectTrigger className="min-w-0 w-full">

@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ApiError, api, getUser } from "@/lib/api";
 import { ROUTES } from "@/lib/routes";
 import { API } from "@/lib/endpoints";
 import {
-  STATUS_LABELS,
+  staffStatusLabel,
   statusVariant,
   applicationDisplayNumber,
   isDoctorReportWritable,
@@ -41,6 +42,7 @@ type Props = {
 };
 
 export function StaffApplicationDetail({ id, token, backHref = ROUTES.doctor.dashboard }: Props) {
+  const router = useRouter();
   const user = getUser();
   const role = user?.role;
   const isNurse = role === "nurse" || role === "admin" || role === "developer";
@@ -158,19 +160,19 @@ export function StaffApplicationDetail({ id, token, backHref = ROUTES.doctor.das
   const isConcluded = isConcludedStatus(app.statusCode);
 
   return (
-    <div className="max-w-5xl mx-auto flex flex-col gap-6 py-6 font-sans">
-      <div className="flex items-center gap-3">
-        <Button variant="outline" size="sm" className="h-9 px-3 rounded-xl border-slate-200" asChild>
+    <div className="max-w-5xl mx-auto flex flex-col gap-4 sm:gap-6 py-0 sm:py-2 font-sans">
+      <div className="flex flex-wrap items-start gap-2 sm:gap-3">
+        <Button variant="outline" size="sm" className="h-9 px-3 rounded-xl border-slate-200 shrink-0" asChild>
           <Link href={backHref}>
             <ArrowLeft className="mr-2 h-4 w-4 text-slate-500" />
             Geri
           </Link>
         </Button>
-        <div className="flex flex-col">
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <h2 className="text-base sm:text-lg font-bold text-slate-800 flex flex-wrap items-center gap-2 break-words">
             Başvuru: {applicationDisplayNumber(app)}
-            <Badge variant={statusVariant(app.statusCode)} className="text-[10px] font-semibold py-0.5 px-2">
-              {STATUS_LABELS[app.statusCode] ?? app.statusCode}
+            <Badge variant={statusVariant(app.statusCode)} className="text-[10px] font-semibold py-0.5 px-2 shrink-0">
+              {staffStatusLabel(app.statusCode)}
             </Badge>
           </h2>
         </div>
@@ -189,17 +191,17 @@ export function StaffApplicationDetail({ id, token, backHref = ROUTES.doctor.das
       {/* ADIM 1: Hasta başvuru formu */}
       {showReportEditor && flowStep === "application" ? (
         <Card className="shadow-premium border-slate-200 bg-white border-2">
-          <CardHeader className="bg-slate-50/50 border-b py-4 px-6">
+          <CardHeader className="bg-slate-50/50 border-b py-3 px-4 sm:py-4 sm:px-6">
             <CardTitle className="text-sm font-bold text-slate-800">Hasta Başvuru Formu (PDF)</CardTitle>
             <CardDescription className="text-xs">
               Hastanın gönderdiği başvuru belgesini inceleyin. Rapor yazmaya geçmeden önce tüm bilgileri kontrol edin.
             </CardDescription>
           </CardHeader>
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             <ApplicationPreviewPanel applicationId={id} token={token} />
           </CardContent>
-          <CardFooter className="border-t pt-4 px-6 flex justify-end bg-slate-50/50">
-            <Button onClick={() => goToFlow("edit")} className="gap-2 h-10 px-6 rounded-xl font-bold">
+          <CardFooter className="border-t pt-4 px-4 sm:px-6 flex flex-col gap-2 sm:flex-row sm:justify-end bg-slate-50/50">
+            <Button onClick={() => goToFlow("edit")} className="gap-2 h-10 px-6 rounded-xl font-bold w-full sm:w-auto">
               <FileEdit className="h-4 w-4" />
               Rapor Yaz
             </Button>
@@ -226,14 +228,14 @@ export function StaffApplicationDetail({ id, token, backHref = ROUTES.doctor.das
               />
             </FormField>
           </CardContent>
-          <CardFooter className="border-t pt-4 flex gap-2 justify-end bg-slate-50/40">
-            <Button variant="destructive" disabled={busy} onClick={() => assess(false)} className="rounded-xl font-bold">
+          <CardFooter className="border-t pt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end bg-slate-50/40 px-4 sm:px-6">
+            <Button variant="destructive" disabled={busy} onClick={() => assess(false)} className="rounded-xl font-bold w-full sm:w-auto">
               Reddet
             </Button>
-            <Button variant="secondary" disabled={busy} onClick={() => assess(true)} className="rounded-xl font-bold">
+            <Button variant="secondary" disabled={busy} onClick={() => assess(true)} className="rounded-xl font-bold w-full sm:w-auto">
               Onayla
             </Button>
-            <Button variant="default" disabled={busy} onClick={sendToDoctor} className="rounded-xl font-bold">
+            <Button variant="default" disabled={busy} onClick={sendToDoctor} className="rounded-xl font-bold w-full sm:w-auto">
               Hekime Yönlendir
             </Button>
           </CardFooter>
@@ -246,7 +248,7 @@ export function StaffApplicationDetail({ id, token, backHref = ROUTES.doctor.das
           applicationId={id}
           token={token}
           isConcluded={isConcluded}
-          onConcluded={() => load()}
+          onConcluded={() => router.push(backHref)}
           onStepChange={(s) => goToFlow(s)}
           onViewApplication={() => setAppModalOpen(true)}
         />
@@ -254,7 +256,7 @@ export function StaffApplicationDetail({ id, token, backHref = ROUTES.doctor.das
 
       {flowStep === "application" || !showReportEditor ? (
         <Card className="shadow-premium border-slate-200 bg-white">
-          <CardHeader className="bg-slate-50/50 border-b py-4 px-6">
+          <CardHeader className="bg-slate-50/50 border-b py-3 px-4 sm:py-4 sm:px-6">
             <CardTitle className="text-sm font-bold text-slate-800">Dahili Ekip Notları</CardTitle>
           </CardHeader>
           <CardContent className="p-6 grid gap-4">

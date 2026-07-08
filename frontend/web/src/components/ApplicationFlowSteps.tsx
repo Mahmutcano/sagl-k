@@ -21,8 +21,8 @@ export function ApplicationFlowSteps({ current, paymentComplete, compact }: Prop
   const currentIndex = FLOW_STEPS.findIndex((s) => s.key === current);
 
   return (
-    <nav aria-label="Başvuru adımları" className="mb-6">
-      <ol className="flex flex-wrap gap-2 sm:gap-0">
+    <nav aria-label="Başvuru adımları" className="mb-4 sm:mb-6">
+      <ol className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-0">
         {FLOW_STEPS.map((step, index) => {
           const done =
             index < currentIndex || (paymentComplete && step.key === "payment");
@@ -50,12 +50,13 @@ export function ApplicationFlowSteps({ current, paymentComplete, compact }: Prop
                 </span>
                 <span
                   className={cn(
-                    "text-center text-xs sm:text-sm",
+                    "text-center text-[11px] leading-tight sm:text-sm",
                     active && "font-semibold text-foreground",
                     !active && "text-muted-foreground"
                   )}
                 >
-                  {compact ? step.short : step.label}
+                  <span className="sm:hidden">{step.short}</span>
+                  <span className="hidden sm:inline">{compact ? step.short : step.label}</span>
                 </span>
               </div>
               {index < FLOW_STEPS.length - 1 ? (

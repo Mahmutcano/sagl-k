@@ -166,22 +166,24 @@ export function PatientReportPanel({ applicationId, token, report, reportLoading
       </CardHeader>
       <CardContent className="p-0">
         <div className="grid gap-0">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3 bg-background">
-            <p className="text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2.5 bg-background sm:px-4 sm:py-3">
+            <p className="text-xs sm:text-sm text-muted-foreground min-w-0">
               Yazdır butonu ile raporu PDF olarak kaydedebilirsiniz.
             </p>
-            <Button type="button" variant="outline" size="sm" onClick={openPrint} className="gap-1.5 shrink-0">
+            <Button type="button" variant="outline" size="sm" onClick={openPrint} className="gap-1.5 shrink-0 w-full sm:w-auto">
               <Printer className="h-4 w-4" />
               Yazdır / PDF kaydet
             </Button>
           </div>
           {blobUrl ? (
+            <div className="doc-preview-frame">
             <iframe
               title="Tıbbi uzman raporu"
               src={blobUrl}
-              className="w-full min-h-[min(75vh,720px)] border-0 bg-white"
+              className="w-full min-h-[min(55dvh,720px)] border-0 bg-white sm:min-h-[min(75vh,720px)]"
               sandbox="allow-same-origin allow-modals"
             />
+            </div>
           ) : hasSectionText && parsed ? (
             <div className="p-6 space-y-5">
               {REPORT_SECTIONS.map((section) =>

@@ -161,6 +161,7 @@ func RenderPreviewHTML(p *PreviewData) string {
 <html lang="tr">
 <head>
 <meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Başvuru Özeti %s</title>
 <style>
   body { 
@@ -366,6 +367,14 @@ func RenderPreviewHTML(p *PreviewData) string {
     text-align: center;
   }
   
+  @media (max-width: 640px) {
+    body { padding: 1rem; font-size: 14px; }
+    .header-table, .header-table tbody, .header-table tr, .header-table td { display: block; width: 100%% !important; }
+    .qr-container { text-align: left; margin-top: 1rem; }
+    .info-table th, .info-table td { display: block; width: 100%% !important; box-sizing: border-box; }
+    .signature-box, .signature-box.right { float: none; width: 100%%; text-align: left; margin-bottom: 1.5rem; }
+    .document-title { font-size: 1.05rem; margin-bottom: 1.5rem; }
+  }
   @media print {
     body {
       padding: 0;
@@ -606,6 +615,7 @@ func RenderDoctorReportHTML(p *PreviewData, report DoctorReportFields, authorNam
 <html lang="tr">
 <head>
 <meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Tıbbi Uzman Raporu %s</title>
 <style>
   body { 
@@ -645,6 +655,14 @@ func RenderDoctorReportHTML(p *PreviewData, report DoctorReportFields, authorNam
   .signature-line { border-bottom: 1px dashed #666; width: 100%%; height: 40px; margin-top: 0.5rem; }
   .clear { clear: both; }
   footer { margin-top: 3rem; padding-top: 0.75rem; border-top: 1px solid #ccc; font-size: 0.75rem; color: #666; text-align: center; }
+  @media (max-width: 640px) {
+    body { padding: 1rem; font-size: 14px; }
+    .header-table, .header-table tbody, .header-table tr, .header-table td { display: block; width: 100%% !important; }
+    .qr-container { text-align: left; margin-top: 1rem; }
+    .info-table th, .info-table td { display: block; width: 100%% !important; box-sizing: border-box; }
+    .signature-box, .signature-box.right { float: none; width: 100%%; text-align: left; margin-bottom: 1.5rem; }
+    .document-title { font-size: 1.05rem; margin-bottom: 1.5rem; }
+  }
   @media print { body { padding: 0; font-size: 11pt; } .badge { border: 1px solid #000 !important; } }
 </style>
 </head>

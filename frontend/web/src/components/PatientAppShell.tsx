@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { ClipboardList, FileCheck, UserCircle } from "lucide-react";
 import { AppShellLayout } from "@/components/AppShellLayout";
 import { logoutTo } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
@@ -22,16 +23,22 @@ export function PatientAppShell({ children, title, description, actions }: AppSh
         {
           href: ROUTES.patient.applications,
           label: "Başvurularım",
+          shortLabel: "Başvurular",
+          icon: ClipboardList,
           isActive: (p) => p === "/patient/applications" || p.startsWith("/patient/applications/"),
         },
         {
           href: ROUTES.patient.results,
           label: "Sonuçlarım",
+          shortLabel: "Sonuçlar",
+          icon: FileCheck,
           isActive: (p) => p.startsWith("/patient/results"),
         },
         {
           href: ROUTES.patient.profile,
           label: "Profil Ayarlarım",
+          shortLabel: "Profil",
+          icon: UserCircle,
           isActive: (p) => p.startsWith("/patient/profile"),
         },
       ]}

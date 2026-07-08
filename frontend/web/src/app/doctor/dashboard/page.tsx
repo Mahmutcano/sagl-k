@@ -134,7 +134,7 @@ export default function DoctorDashboardPage() {
           ) : null}
         </form>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
           {CATEGORY_OPTIONS.map((opt) => (
             <Button
               key={opt.id}
@@ -143,6 +143,7 @@ export default function DoctorDashboardPage() {
               variant={category === opt.id ? "default" : "outline"}
               onClick={() => setCategory(opt.id)}
               title={opt.description}
+              className="shrink-0"
             >
               {opt.label}
             </Button>
@@ -150,7 +151,8 @@ export default function DoctorDashboardPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground font-medium">Sırala:</span>
+          <span className="text-xs text-muted-foreground font-medium w-full sm:w-auto">Sırala:</span>
+          <div className="flex flex-wrap gap-2 flex-1">
           {SORT_OPTIONS.map((opt) => (
             <Button
               key={opt.id}
@@ -181,6 +183,7 @@ export default function DoctorDashboardPage() {
               </>
             )}
           </Button>
+          </div>
         </div>
       </Card>
 
@@ -215,7 +218,7 @@ export default function DoctorDashboardPage() {
                           Taslak
                         </Badge>
                       ) : null}
-                      <StatusBadge code={item.statusCode} />
+                      <StatusBadge code={item.statusCode} audience="staff" />
                     </div>
                   }
                 />

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { ClipboardList, UserCircle, Stethoscope } from "lucide-react";
 import { AppShellLayout } from "@/components/AppShellLayout";
 import { useClientUser } from "@/hooks/useClientUser";
 import { isNurseRole, logoutTo, roleLabel } from "@/lib/auth";
@@ -23,13 +24,19 @@ export function DoctorAppShell({ children, title, description, actions }: AppShe
         {
           href: ROUTES.doctor.nurse,
           label: "Sekreterya kuyruğu",
+          shortLabel: "Kuyruk",
+          icon: ClipboardList,
           isActive: (p: string) =>
             p === "/doctor/nurse" ||
-            (p.startsWith("/doctor/applications/") && p !== "/doctor/applications" && !p.endsWith("/profile")),
+            (p.startsWith("/doctor/applications/") &&
+              p !== "/doctor/applications" &&
+              !p.endsWith("/profile")),
         },
         {
           href: ROUTES.doctor.profile,
           label: "Profil Ayarlarım",
+          shortLabel: "Profil",
+          icon: UserCircle,
           isActive: (p: string) => p.startsWith("/doctor/profile"),
         },
       ]
@@ -37,13 +44,19 @@ export function DoctorAppShell({ children, title, description, actions }: AppShe
         {
           href: ROUTES.doctor.dashboard,
           label: "Başvurularım",
+          shortLabel: "Başvurular",
+          icon: Stethoscope,
           isActive: (p: string) =>
             p === "/doctor/dashboard" ||
-            (p.startsWith("/doctor/applications/") && p !== "/doctor/applications" && !p.endsWith("/profile")),
+            (p.startsWith("/doctor/applications/") &&
+              p !== "/doctor/applications" &&
+              !p.endsWith("/profile")),
         },
         {
           href: ROUTES.doctor.profile,
           label: "Profil Ayarlarım",
+          shortLabel: "Profil",
+          icon: UserCircle,
           isActive: (p: string) => p.startsWith("/doctor/profile"),
         },
       ];

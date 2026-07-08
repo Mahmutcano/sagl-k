@@ -194,22 +194,22 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
 
   return (
     <div className="grid gap-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="sm" asChild className="gap-1.5">
+      <div className="mobile-action-stack flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+        <Button variant="ghost" size="sm" asChild className="gap-1.5 w-full sm:w-auto justify-start sm:justify-center">
           <Link href={backHref}>
             <ArrowLeft className="h-4 w-4" />
             Listeye dön
           </Link>
         </Button>
-        <Badge variant={statusVariant(app.statusCode)}>
+        <Badge variant={statusVariant(app.statusCode)} className="w-fit">
           {STATUS_LABELS[app.statusCode] ?? `Durum ${app.statusCode}`}
         </Badge>
         {isPatientEditableStatus(app.statusCode) ? (
           <>
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
               <Link href={ROUTES.patient.editApplication(id)}>Başvuruya devam et</Link>
             </Button>
-            <Button variant="secondary" size="sm" asChild>
+            <Button variant="secondary" size="sm" asChild className="w-full sm:w-auto">
               <Link href={ROUTES.patient.editApplication(id, "details")}>
                 Bölüm ve doktoru değiştir
               </Link>
@@ -217,7 +217,7 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
           </>
         ) : null}
         {isPatientCancellableStatus(app.statusCode) ? (
-          <Button variant="destructive" size="sm" type="button" onClick={cancelApplication}>
+          <Button variant="destructive" size="sm" type="button" className="w-full sm:w-auto" onClick={cancelApplication}>
             Başvuruyu iptal et
           </Button>
         ) : null}

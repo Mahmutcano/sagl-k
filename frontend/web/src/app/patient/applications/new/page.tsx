@@ -41,12 +41,12 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { FormStepFooter, formStepButtonClass } from "@/components/FormStepFooter";
 import { ArrowLeft } from "lucide-react";
 
 type InpatientResult = {
@@ -439,6 +439,7 @@ function NewApplicationContent() {
         </Button>
       }
     >
+      <div className="application-form-flow">
       {error ? <FormAlert title="Hata" message={error} /> : null}
 
       {(step === "details" || step === "survey" || step === "payment" || step === "preview") && (
@@ -464,7 +465,7 @@ function NewApplicationContent() {
       {!editLoading && step === "who" && (
         <div className="grid gap-6 sm:grid-cols-2 max-w-4xl w-full">
           <Card
-            className="cursor-pointer text-left transition-all hover:ring-2 hover:ring-ring hover:shadow-lg shadow-md large-form border-slate-200"
+            className="cursor-pointer text-left transition-all hover:ring-2 hover:ring-ring hover:shadow-lg shadow-md application-form-card form-choice-card large-form border-slate-200 active:scale-[0.99] touch-manipulation"
             onClick={chooseSelf}
             role="button"
             tabIndex={0}
@@ -484,7 +485,7 @@ function NewApplicationContent() {
             </CardContent>
           </Card>
           <Card
-            className="cursor-pointer text-left transition-all hover:ring-2 hover:ring-ring hover:shadow-lg shadow-md large-form border-slate-200"
+            className="cursor-pointer text-left transition-all hover:ring-2 hover:ring-ring hover:shadow-lg shadow-md application-form-card form-choice-card large-form border-slate-200 active:scale-[0.99] touch-manipulation"
             onClick={chooseRelative}
             role="button"
             tabIndex={0}
@@ -509,7 +510,7 @@ function NewApplicationContent() {
       )}
 
       {step === "relative" && (
-        <Card className="max-w-4xl w-full large-form shadow-md border-slate-200">
+        <Card className="max-w-4xl w-full application-form-card large-form shadow-md border-slate-200">
           <form onSubmit={submitRelative} noValidate>
             <CardHeader>
               <CardTitle>Yakın (hasta) bilgileri</CardTitle>
@@ -574,8 +575,8 @@ function NewApplicationContent() {
                 fieldClassName="sm:col-span-2"
               />
             </CardContent>
-            <CardFooter className="border-t flex flex-wrap gap-2">
-              <Button type="submit">Kaydet ve kontrol et</Button>
+            <FormStepFooter>
+              <Button type="submit" className={formStepButtonClass()}>Kaydet ve kontrol et</Button>
               <Button
                 type="button"
                 variant="ghost"
@@ -584,12 +585,12 @@ function NewApplicationContent() {
                   setRelativeFields({});
                   setError("");
                 }}
-                className="gap-1.5"
+                className={formStepButtonClass("gap-1.5")}
               >
                 <ArrowLeft className="h-4 w-4" />
                 Geri
               </Button>
-            </CardFooter>
+            </FormStepFooter>
           </form>
         </Card>
       )}
@@ -641,11 +642,12 @@ function NewApplicationContent() {
               </ul>
             ) : null}
           </CardContent>
-          <CardFooter className="border-t flex flex-wrap gap-2">
+          <FormStepFooter>
             {forRelative ? (
               <Button
                 type="button"
                 variant="outline"
+                className={formStepButtonClass()}
                 onClick={() => {
                   setStep("relative");
                   setStatus(null);
@@ -654,15 +656,15 @@ function NewApplicationContent() {
                 Yakın bilgisini düzenle
               </Button>
             ) : null}
-            <Button asChild>
+            <Button asChild className={formStepButtonClass()}>
               <Link href={ROUTES.patient.applications}>Başvurularıma dön</Link>
             </Button>
-          </CardFooter>
+          </FormStepFooter>
         </Card>
       )}
 
       {step === "details" && (
-        <Card className="max-w-4xl w-full large-form shadow-md border-slate-200">
+        <Card className="max-w-4xl w-full application-form-card large-form shadow-md border-slate-200">
           <form onSubmit={continueToSurvey} noValidate>
             <CardHeader>
               <CardTitle>Adım 1 — Bölüm ve doktor</CardTitle>
@@ -726,9 +728,12 @@ function NewApplicationContent() {
                 disabled={!professionCode || catalog.loadingProviders}
               />
             </CardContent>
-            <CardFooter className="border-t flex flex-wrap gap-2">
-              <Button type="submit" disabled={submitting}>
-                {submitting ? "Kaydediliyor..." : "Devam et — şikayet bilgileri"}
+            <FormStepFooter>
+              <Button type="submit" disabled={submitting} className={formStepButtonClass()}>
+                <span className="sm:hidden">{submitting ? "Kaydediliyor..." : "Devam et"}</span>
+                <span className="hidden sm:inline">
+                  {submitting ? "Kaydediliyor..." : "Devam et — şikayet bilgileri"}
+                </span>
               </Button>
               {!createdId ? (
                 <Button
@@ -738,19 +743,19 @@ function NewApplicationContent() {
                     setStep(forRelative ? "relative" : "who");
                     setStatus(null);
                   }}
-                  className="gap-1.5"
+                  className={formStepButtonClass("gap-1.5")}
                 >
                   <ArrowLeft className="h-4 w-4" />
                   Geri
                 </Button>
               ) : null}
-            </CardFooter>
+            </FormStepFooter>
           </form>
         </Card>
       )}
 
       {step === "survey" && (
-        <Card className="max-w-4xl w-full large-form shadow-md border-slate-200">
+        <Card className="max-w-4xl w-full application-form-card large-form shadow-md border-slate-200">
           <form onSubmit={saveAndGoToPreview} noValidate>
             <CardHeader>
               <CardTitle>Adım 2 — Şikayet ve belgeler</CardTitle>
@@ -781,61 +786,67 @@ function NewApplicationContent() {
                 disabled={submitting}
               />
             </CardContent>
-            <CardFooter className="border-t flex flex-wrap gap-2">
-              <Button type="submit" disabled={submitting}>
-                {submitting ? "Kaydediliyor..." : "Devam et — form önizleme (Adım 3)"}
+            <FormStepFooter>
+              <Button type="submit" disabled={submitting} className={formStepButtonClass()}>
+                <span className="sm:hidden">{submitting ? "Kaydediliyor..." : "Önizlemeye geç"}</span>
+                <span className="hidden sm:inline">
+                  {submitting ? "Kaydediliyor..." : "Devam et — form önizleme (Adım 3)"}
+                </span>
               </Button>
-              <Button type="button" variant="ghost" onClick={() => setStep("details")} className="gap-1.5">
+              <Button type="button" variant="ghost" onClick={() => setStep("details")} className={formStepButtonClass("gap-1.5")}>
                 <ArrowLeft className="h-4 w-4" />
                 Geri — bölüm seçimi
               </Button>
-            </CardFooter>
+            </FormStepFooter>
           </form>
         </Card>
       )}
 
       {step === "preview" && createdId ? (
-        <Card className="max-w-5xl w-full large-form shadow-md border-primary/20">
+        <Card className="max-w-5xl w-full application-form-card large-form shadow-md border-primary/20">
           <CardHeader>
             <CardTitle>Adım 3 — Form önizleme</CardTitle>
             <CardDescription>
-              Başvuru formunuzu kontrol edin. Bu adımda ödeme yapılmaz; onay sonrası bir sonraki
-              adıma geçersiniz.
+              Başvuru formunuzu kontrol edin. Mobilde formu indirip veya tam ekranda açarak inceleyin; masaüstünde
+              doğrudan önizleyebilirsiniz. Onay sonrası ödeme adımına geçilir.
             </CardDescription>
             <ApplicationFlowHint current="preview" />
           </CardHeader>
           <CardContent>
             <ApplicationPreviewPanel applicationId={createdId} token={getToken() ?? ""} />
           </CardContent>
-          <CardFooter className="border-t flex flex-wrap gap-2">
+          <FormStepFooter>
             {applicationStatus === 1 ? (
               <Button
                 type="button"
+                className={formStepButtonClass()}
                 onClick={() => router.push(ROUTES.patient.application(createdId))}
               >
-                Kaydet ve başvuruya dön
+                Başvuruya dön
               </Button>
             ) : (
-              <Button type="button" onClick={() => setStep("payment")}>
-                Onayla — ödemeye geç (Adım 4)
+              <Button type="button" className={formStepButtonClass()} onClick={() => setStep("payment")}>
+                <span className="sm:hidden">Ödemeye geç</span>
+                <span className="hidden sm:inline">Onayla — ödemeye geç (Adım 4)</span>
               </Button>
             )}
-            <Button type="button" variant="outline" onClick={() => setStep("survey")}>
+            <Button type="button" variant="outline" className={formStepButtonClass()} onClick={() => setStep("survey")}>
               Şikayetleri düzenle
             </Button>
-            <Button type="button" variant="secondary" onClick={() => setStep("details")}>
-              Bölüm ve doktoru değiştir
+            <Button type="button" variant="secondary" className={formStepButtonClass()} onClick={() => setStep("details")}>
+              <span className="sm:hidden">Bölüm / doktor</span>
+              <span className="hidden sm:inline">Bölüm ve doktoru değiştir</span>
             </Button>
-            <Button type="button" variant="ghost" onClick={() => setStep("details")} className="gap-1.5">
+            <Button type="button" variant="ghost" className={formStepButtonClass("gap-1.5")} onClick={() => setStep("details")}>
               <ArrowLeft className="h-4 w-4" />
-              Geri — bölüm seçimi
+              Geri
             </Button>
-          </CardFooter>
+          </FormStepFooter>
         </Card>
       ) : null}
 
       {step === "payment" && createdId && applicationStatus === 0 ? (
-        <Card className="max-w-4xl w-full large-form shadow-md border-2 border-primary/40">
+        <Card className="max-w-4xl w-full application-form-card large-form shadow-md border-2 border-primary/40">
           <CardHeader>
             <CardTitle>Adım 4 — Ödeme</CardTitle>
             <CardDescription>
@@ -872,20 +883,22 @@ function NewApplicationContent() {
               }}
             />
           </CardContent>
-          <CardFooter className="border-t flex flex-wrap gap-2">
-            <Button type="button" variant="ghost" onClick={() => setStep("preview")} className="gap-1.5">
+          <FormStepFooter>
+            <Button type="button" variant="ghost" className={formStepButtonClass("gap-1.5")} onClick={() => setStep("preview")}>
               <ArrowLeft className="h-4 w-4" />
-              Geri — form önizleme (Adım 3)
+              <span className="sm:hidden">Önizlemeye dön</span>
+              <span className="hidden sm:inline">Geri — form önizleme (Adım 3)</span>
             </Button>
-            <Button type="button" variant="secondary" onClick={() => setStep("details")}>
-              Bölüm ve doktoru değiştir
+            <Button type="button" variant="secondary" className={formStepButtonClass()} onClick={() => setStep("details")}>
+              <span className="sm:hidden">Bölüm / doktor</span>
+              <span className="hidden sm:inline">Bölüm ve doktoru değiştir</span>
             </Button>
-          </CardFooter>
+          </FormStepFooter>
         </Card>
       ) : null}
 
       {step === "done" && (
-        <Card className="max-w-4xl w-full large-form shadow-md border-slate-200">
+        <Card className="max-w-4xl w-full application-form-card large-form shadow-md border-slate-200">
           <CardHeader>
             <CardTitle>
               {paymentCompleted ? "Başvurunuz tamamlandı" : "Başvuru güncellendi"}
@@ -935,13 +948,14 @@ function NewApplicationContent() {
               </div>
             ) : null}
           </CardContent>
-          <CardFooter className="border-t flex flex-wrap gap-2">
-            <Button asChild>
+          <FormStepFooter>
+            <Button asChild className={formStepButtonClass()}>
               <Link href={ROUTES.patient.applications}>Başvurularıma git</Link>
             </Button>
             <Button
               type="button"
               variant="outline"
+              className={formStepButtonClass()}
               onClick={() => {
                 setStep("who");
                 setForRelative(false);
@@ -967,9 +981,10 @@ function NewApplicationContent() {
             >
               Yeni başvuru daha
             </Button>
-          </CardFooter>
+          </FormStepFooter>
         </Card>
       )}
+      </div>
     </PatientAppShell>
   );
 }

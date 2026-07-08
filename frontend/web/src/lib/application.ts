@@ -13,6 +13,26 @@ export const STATUS_LABELS: Record<number, string> = {
   11: "Sekreterya incelemesi",
 };
 
+/** Hekim / sekreterya arayüzü — ödeme bilgisi gösterilmez */
+export const STAFF_STATUS_LABELS: Record<number, string> = {
+  0: "Başvuru tamamlanmadı",
+  1: "Başvuru yapıldı",
+  2: "Sonuç bekleniyor",
+  3: "Reddedildi",
+  4: "Sonuç bekleniyor",
+  5: "Ek bilgi gerekli",
+  6: "Sonuçlandı",
+  7: "İptal edildi",
+  8: "İade sürecinde",
+  9: "İade edildi",
+  10: "Sonuç bekleniyor",
+  11: "Sekreterya incelemesi",
+};
+
+export function staffStatusLabel(code: number): string {
+  return STAFF_STATUS_LABELS[code] ?? STATUS_LABELS[code] ?? `Durum ${code}`;
+}
+
 export function statusVariant(code: number): "default" | "secondary" | "outline" | "destructive" {
   if (code === 6) return "default";
   if (code === 0) return "outline";

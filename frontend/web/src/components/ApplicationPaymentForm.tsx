@@ -166,7 +166,7 @@ export function ApplicationPaymentForm({ applicationId, token, onSuccess, onErro
           onChange={(e) => setCard((c) => ({ ...c, cardNumber: e.target.value }))}
         />
       </FormField>
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <FormField id="expiryMonth" label="Ay (MM)" error={fieldErrors.expiryMonth}>
           <Input
             id="expiryMonth"
@@ -201,7 +201,7 @@ export function ApplicationPaymentForm({ applicationId, token, onSuccess, onErro
           />
         </FormField>
       </div>
-      <Button type="button" disabled={paying} onClick={pay}>
+      <Button type="button" disabled={paying} onClick={pay} className="w-full min-h-11 touch-manipulation sm:w-auto">
         {paying ? "İşleniyor..." : "Param ile ödemeyi tamamla"}
       </Button>
     </div>

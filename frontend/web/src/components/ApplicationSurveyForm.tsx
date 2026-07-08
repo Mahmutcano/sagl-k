@@ -29,9 +29,10 @@ export function ApplicationSurveyForm({ value, onChange, errors = {} }: Props) {
   }
 
   return (
-    <div className="grid gap-5">
+    <div className="grid gap-4 sm:gap-5">
       {SURVEY_FIELDS.map((field) => {
         const currentLen = value[field.key]?.length || 0;
+        const rows = field.rows ?? 3;
         return (
           <FormField
             key={field.key}
@@ -42,12 +43,12 @@ export function ApplicationSurveyForm({ value, onChange, errors = {} }: Props) {
           >
             <Textarea
               id={field.key}
-              rows={field.rows ?? 3}
+              rows={rows}
               placeholder={SURVEY_PLACEHOLDERS[field.key]}
               value={value[field.key]}
               onChange={(e) => update(field.key, e.target.value)}
               maxLength={2000}
-              className="resize-y"
+              className="resize-y min-h-[5.5rem] sm:min-h-[6rem] text-base sm:text-sm"
             />
             <div className="flex justify-between items-center text-[11px] text-muted-foreground mt-1 px-1">
               <span>

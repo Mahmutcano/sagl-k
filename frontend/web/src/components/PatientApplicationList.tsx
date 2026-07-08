@@ -55,13 +55,13 @@ export function PatientApplicationRow({ item, onDelete, deleting }: Props) {
             </p>
           ) : null}
         </Link>
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="mobile-action-stack flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:w-auto">
           {canEdit ? (
             <>
-              <Button size="sm" variant="secondary" asChild>
+              <Button size="sm" variant="secondary" asChild className="w-full sm:w-auto">
                 <Link href={ROUTES.patient.editApplication(item.applicationId)}>Devam et</Link>
               </Button>
-              <Button size="sm" variant="outline" asChild>
+              <Button size="sm" variant="outline" asChild className="w-full sm:w-auto">
                 <Link href={ROUTES.patient.editApplication(item.applicationId, "details")}>
                   Bölüm ve doktoru değiştir
                 </Link>
@@ -73,13 +73,14 @@ export function PatientApplicationRow({ item, onDelete, deleting }: Props) {
               size="sm"
               variant="destructive"
               type="button"
+              className="w-full sm:w-auto"
               disabled={deleting}
               onClick={() => onDelete(item.applicationId)}
             >
               {deleting ? "Siliniyor..." : "Sil"}
             </Button>
           ) : null}
-          <Button size="sm" variant="outline" asChild>
+          <Button size="sm" variant="outline" asChild className="w-full sm:w-auto">
             <Link href={ROUTES.patient.application(item.applicationId)}>Detay</Link>
           </Button>
         </div>

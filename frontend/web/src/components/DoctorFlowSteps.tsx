@@ -12,7 +12,7 @@ export function DoctorFlowSteps({ step }: { step: DoctorFlowStep }) {
   const currentIdx = steps.findIndex((s) => s.id === step);
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+    <div className="hidden md:flex flex-wrap items-center gap-2 text-xs font-semibold">
       {steps.map((s, i) => {
         const done = i < currentIdx;
         const active = i === currentIdx;
@@ -28,7 +28,7 @@ export function DoctorFlowSteps({ step }: { step: DoctorFlowStep }) {
                     : "bg-slate-50 text-slate-400 border-slate-200"
               }`}
             >
-              {done ? <Check className="h-3.5 w-3.5" /> : i + 1}
+              {done ? <Check className="h-3.5 w-3.5 shrink-0" /> : null}
               {s.label}
             </span>
           </span>

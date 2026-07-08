@@ -46,6 +46,42 @@
 
 html {
   font-size: 15px;
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (max-width: 639px) {
+  html {
+    font-size: 14px;
+  }
+}
+
+/* Mobile browser chrome — notch & home indicator safe areas */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Full-width stacked actions on small screens */
+@media (max-width: 639px) {
+  .mobile-action-row .btn-mobile-full,
+  .mobile-action-stack > * {
+    width: 100%;
+  }
+
+  .mobile-action-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    width: 100%;
+  }
+}
+
+/* Touch-friendly tap targets */
+.touch-manipulation {
+  touch-action: manipulation;
 }
 
 /* Premium shadows & transitions */
@@ -249,4 +285,117 @@ html {
 
 .large-form button:not(.h-auto):hover {
   transform: translateY(-1px);
+}
+
+@media (max-width: 639px) {
+  .large-form {
+    padding: 1rem !important;
+    border-radius: 1rem !important;
+  }
+
+  .large-form [class*="CardHeader"] {
+    padding: 0 0 1.25rem 0 !important;
+  }
+
+  .large-form [class*="CardContent"] {
+    padding: 0 0 1.25rem 0 !important;
+  }
+
+  .large-form [class*="CardFooter"] {
+    padding: 1.25rem 0 0 0 !important;
+    flex-direction: column;
+  }
+
+  .large-form [class*="CardTitle"] {
+    font-size: 1.35rem !important;
+    line-height: 1.65rem !important;
+  }
+
+  .large-form input,
+  .large-form button[role="combobox"],
+  .large-form button:not(.h-auto) {
+    height: 2.875rem !important;
+    font-size: 1rem !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+  }
+
+  .large-form button:not(.h-auto) {
+    width: 100%;
+  }
+
+  .large-form .grid {
+    gap: 1.25rem !important;
+  }
+}
+
+/* Scrollable document previews on narrow screens */
+.doc-preview-frame {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.doc-preview-frame iframe {
+  min-width: min(100%, 320px);
+}
+
+/* Başvuru formu akışı — mobil öncelikli */
+.application-form-flow {
+  width: 100%;
+  min-width: 0;
+}
+
+.application-form-flow .application-form-card {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 639px) {
+  .application-form-flow .application-form-card.large-form {
+    padding: 0.875rem !important;
+    border-radius: 1rem !important;
+    box-shadow: 0 4px 16px -4px rgba(148, 163, 184, 0.15) !important;
+  }
+
+  .application-form-flow .application-form-card [class*="CardHeader"] {
+    padding: 0 0 1rem 0 !important;
+  }
+
+  .application-form-flow .application-form-card [class*="CardContent"] {
+    padding: 0 0 1rem 0 !important;
+    scroll-margin-bottom: 7rem;
+  }
+
+  .application-form-flow .form-step-footer {
+    position: sticky;
+    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+    z-index: 20;
+    margin-left: -0.25rem;
+    margin-right: -0.25rem;
+    padding: 0.75rem 0.25rem 0.5rem !important;
+    background: color-mix(in oklab, var(--background) 92%, transparent);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -4px 20px -8px rgba(0, 0, 0, 0.08);
+  }
+
+  .application-form-flow .form-step-footer > * {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .application-form-flow .form-choice-card {
+    padding: 1rem !important;
+  }
+
+  .application-form-flow .form-choice-card [class*="CardTitle"] {
+    font-size: 1.15rem !important;
+    line-height: 1.4rem !important;
+  }
+
+  .application-form-flow input,
+  .application-form-flow textarea,
+  .application-form-flow button[role="combobox"] {
+    font-size: 16px !important; /* iOS zoom önleme */
+  }
 }

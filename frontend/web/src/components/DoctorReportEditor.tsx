@@ -370,7 +370,7 @@ export function DoctorReportEditor({
             ) : null}
           </CardContent>
 
-          <CardFooter className="border-t pt-4 px-6 flex flex-wrap gap-3 justify-between bg-slate-50/50">
+          <CardFooter className="border-t pt-4 px-4 sm:px-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-between bg-slate-50/50">
             <Button
               variant="outline"
               disabled={busy}
@@ -378,19 +378,19 @@ export function DoctorReportEditor({
                 setError("");
                 changeStep("edit");
               }}
-              className="gap-2 h-10 px-5 rounded-xl font-bold"
+              className="gap-2 h-10 px-5 rounded-xl font-bold w-full sm:w-auto"
             >
               <ArrowLeft className="h-4 w-4" />
               Düzenlemeye Dön
             </Button>
 
-            <div className="flex gap-2">
+            <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-row">
               {previewHtml ? (
                 <Button
                   variant="outline"
                   disabled={busy}
                   onClick={openPrint}
-                  className="gap-2 h-10 px-5 rounded-xl font-bold"
+                  className="gap-2 h-10 px-5 rounded-xl font-bold w-full sm:w-auto"
                 >
                   <Printer className="h-4 w-4" />
                   Yazdır / PDF
@@ -399,7 +399,7 @@ export function DoctorReportEditor({
               <Button
                 disabled={busy || previewLoading || !previewHtml}
                 onClick={() => setConfirmOpen(true)}
-                className="gap-2 h-10 px-6 rounded-xl font-bold shadow-md shadow-primary/10"
+                className="gap-2 h-10 px-6 rounded-xl font-bold shadow-md shadow-primary/10 w-full sm:w-auto"
               >
                 {isConcluded ? (
                   <>
@@ -537,8 +537,8 @@ export function DoctorReportEditor({
           </div>
         </CardContent>
 
-        <CardFooter className="border-t pt-4 px-6 flex flex-wrap gap-3 justify-between bg-slate-50/50">
-          <div className="flex gap-2">
+          <CardFooter className="border-t pt-4 px-4 sm:px-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-between bg-slate-50/50">
+            <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-row">
             {!isConcluded ? (
               <Button
                 variant="outline"
