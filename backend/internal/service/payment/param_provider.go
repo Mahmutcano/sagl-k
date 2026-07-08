@@ -34,11 +34,7 @@ func (p *paramProvider) Checkout(ctx context.Context, req CheckoutRequest) (*Che
 		return nil, err
 	}
 	if p.cfg.Mode == "test" {
-		return &CheckoutResult{
-			TransactionID: "param-test-" + req.IdempotencyKey,
-			OrderID:       req.ApplicationID,
-			Status:        "paid",
-		}, nil
+		return paramTestCheckout(req)
 	}
 	return p.chargeLive(ctx, req)
 }

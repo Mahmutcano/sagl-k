@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   FormAlert,
-  FormField,
   FormSelect,
   BirthDateSelect,
   TextInput,
@@ -75,8 +74,8 @@ export default function AdminUsersPage() {
     }
     setLoading(true);
     setError("");
-    api<UserListItem[]>("/api/v1/admin/users", {}, session.token)
-      .then((data) => setUsers(data ?? []))
+    api<{ items: UserListItem[] }>("/api/v1/admin/users", {}, session.token)
+      .then((res) => setUsers(res?.items ?? []))
       .catch((err) => {
         setError(err instanceof ApiError ? err.message : "Kullanıcılar yüklenemedi.");
       })
@@ -212,7 +211,7 @@ export default function AdminUsersPage() {
                     </Badge>
                   </td>
                   <td className="p-4">
-                    <Badge variant={u.isActive ? "default" : "destructive"} className={u.isActive ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100" : ""}>
+                    <Badge variant={u.isActive ? "default" : "destructive"}>
                       {u.isActive ? "Aktif" : "Pasif"}
                     </Badge>
                   </td>

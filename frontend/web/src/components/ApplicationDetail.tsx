@@ -12,6 +12,7 @@ import {
 	applicationDisplayNumber,
 	isConcludedStatus,
 	isPatientEditableStatus,
+	isPatientAwaitingDoctor,
 	isPatientCancellableStatus,
 	isSurveyComplete,
 	type ApplicationAttachment,
@@ -26,6 +27,7 @@ import {
 } from "@/lib/applicationSurvey";
 import { FormAlert, FormField } from "@/components/FormField";
 import { ApplicationPreviewPanel } from "@/components/ApplicationPreviewPanel";
+import { PatientReportPanel } from "@/components/PatientReportPanel";
 import { ApplicationFlowSteps } from "@/components/ApplicationFlowSteps";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -56,6 +58,7 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
   const [notes, setNotes] = useState<ApplicationNote[]>([]);
   const [attachments, setAttachments] = useState<ApplicationAttachment[]>([]);
   const [report, setReport] = useState<FinalReport | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(true);
@@ -73,14 +76,18 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
       setNotes(noteList ?? []);
       setAttachments(attachmentList ?? []);
       if (isConcludedStatus(detail.statusCode)) {
+        setReportLoading(true);
         try {
           const rep = await api<FinalReport>(API.applications.report(id), {}, token);
           setReport(rep);
         } catch {
           setReport(null);
+        } finally {
+          setReportLoading(false);
         }
       } else {
         setReport(null);
+        setReportLoading(false);
       }
     });
   }, [id, token]);
@@ -158,6 +165,33 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
           : ("details" as const)
       : ("preview" as const);
 
+  if (isConcludedStatus(app.statusCode)) {
+    return (
+      <div className="grid gap-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="ghost" size="sm" asChild className="gap-1.5">
+            <Link href={backHref}>
+              <ArrowLeft className="h-4 w-4" />
+              Listeye dön
+            </Link>
+          </Button>
+          <Badge variant={statusVariant(app.statusCode)}>
+            {STATUS_LABELS[app.statusCode]}
+          </Badge>
+        </div>
+
+        {error ? <FormAlert title="Hata" message={error} /> : null}
+
+        <PatientReportPanel
+          applicationId={id}
+          token={token}
+          report={report}
+          reportLoading={reportLoading}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-6">
       <div className="flex flex-wrap items-center gap-2">
@@ -171,9 +205,16 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
           {STATUS_LABELS[app.statusCode] ?? `Durum ${app.statusCode}`}
         </Badge>
         {isPatientEditableStatus(app.statusCode) ? (
-          <Button variant="outline" size="sm" asChild>
-            <Link href={ROUTES.patient.editApplication(id)}>Başvuruyu düzenle</Link>
-          </Button>
+          <>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={ROUTES.patient.editApplication(id)}>Başvuruya devam et</Link>
+            </Button>
+            <Button variant="secondary" size="sm" asChild>
+              <Link href={ROUTES.patient.editApplication(id, "details")}>
+                Bölüm ve doktoru değiştir
+              </Link>
+            </Button>
+          </>
         ) : null}
         {isPatientCancellableStatus(app.statusCode) ? (
           <Button variant="destructive" size="sm" type="button" onClick={cancelApplication}>
@@ -184,6 +225,16 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
 
       {error ? <FormAlert title="Hata" message={error} /> : null}
       {msg ? <FormAlert title="Bilgi" message={msg} variant="default" /> : null}
+
+      {isPatientAwaitingDoctor(app.statusCode) ? (
+        <Alert>
+          <AlertTitle>Doktorunuz tarafından raporlanıyor</AlertTitle>
+          <AlertDescription>
+            Ödemeniz alındı. Uzman hekiminiz başvurunuzu inceliyor ve rapor hazırlıyor.
+            Bu aşamada başvuruda düzenleme yapılamaz; süreç tamamlandığında bilgilendirileceksiniz.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -223,26 +274,6 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
               <span className="text-muted-foreground">Doğum: </span>
               {app.representedPerson.birthDate ?? "—"}
             </p>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {isConcludedStatus(app.statusCode) && report ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Tıbbi rapor</CardTitle>
-            <CardDescription>
-              {report.createdAt
-                ? `Sonuçlandırma: ${new Date(report.createdAt).toLocaleString("tr-TR")}`
-                : "Başvurunuz sonuçlandırıldı."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <pre className="text-xs overflow-auto rounded-lg border bg-muted/30 p-3 max-h-96">
-              {typeof report.reportJson === "string"
-                ? report.reportJson
-                : JSON.stringify(report.reportJson ?? {}, null, 2)}
-            </pre>
           </CardContent>
         </Card>
       ) : null}
@@ -294,7 +325,7 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
         </Card>
       ) : null}
 
-      {app.statusCode >= 1 && hasSurveyContent ? (
+      {app.statusCode >= 1 && !isConcludedStatus(app.statusCode) && hasSurveyContent ? (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Form önizleme</CardTitle>

@@ -4,7 +4,7 @@ import { ROUTES } from "@/lib/routes";
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ApiError, api, getToken, getUser, isAdminRole, clearAuth } from "@/lib/api";
+import { ApiError, api, getToken, getUser, isAdminRole, clearAuth, fetchTextWithAuth } from "@/lib/api";
 import { API } from "@/lib/endpoints";
 import { STATUS_LABELS, statusVariant, type StatusHistoryItem, type ApplicationDetail } from "@/lib/application";
 import { parseSurveyData, type ApplicationSurveyAnswers } from "@/lib/applicationSurvey";
@@ -16,11 +16,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useApplicationCatalog } from "@/hooks/useApplicationCatalog";
+import { FileText } from "lucide-react";
 
 export default function AdminApplicationDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [history, setHistory] = useState<StatusHistoryItem[]>([]);
-  const [app, setApp] = useState<ApplicationDetail | null>(null);
   
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -51,7 +51,8 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
   });
 
   const [draftReport, setDraftReport] = useState<string | null>(null);
-  const [finalReport, setFinalReport] = useState<{ reportJson: any; createdAt: string } | null>(null);
+  const [finalReport, setFinalReport] = useState<{ reportJson: unknown; createdAt: string } | null>(null);
+  const [attachments, setAttachments] = useState<{ id: string; fileName: string; mimeType: string; fileSize: number }[]>([]);
 
   const catalog = useApplicationCatalog(1, professionCode, true);
 
@@ -61,7 +62,6 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
       setHistory(histData);
 
       const appData = await api<ApplicationDetail>(API.applications.detail(params.id), {}, token);
-      setApp(appData);
       setStatus(appData.statusCode);
       setProfessionCode(appData.professionCode || "");
       setCareProviderId(appData.careProviderId || "");
@@ -94,7 +94,7 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
         .catch(() => setDraftReport(null));
 
       // Load final report if it exists
-      api<{ reportJson: any; createdAt: string }>(API.applications.report(params.id), {}, token)
+      api<{ reportJson: unknown; createdAt: string }>(API.applications.report(params.id), {}, token)
         .then((final) => {
           if (final && final.reportJson) {
             setFinalReport(final);
@@ -103,6 +103,15 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
           }
         })
         .catch(() => setFinalReport(null));
+
+      // Load attachments
+      api<{ id: string; fileName: string; mimeType: string; fileSize: number }[]>(
+        API.applications.attachments(params.id),
+        {},
+        token
+      )
+        .then((files) => setAttachments(files ?? []))
+        .catch(() => setAttachments([]));
 
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Veriler yüklenemedi.");
@@ -176,6 +185,21 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
     label: p.title ? `${p.title} ${p.fullName}` : p.fullName,
   }));
 
+  async function handleOpenAttachment(attachmentId: string, fileName: string, mimeType: string) {
+    try {
+      const token = getToken();
+      if (!token) return;
+      const res = await fetchTextWithAuth(API.applications.attachment(params.id, attachmentId), {}, token);
+      if (!res.ok) throw new Error("Dosya indirilemedi.");
+      const blob = await res.blob();
+      const file = new Blob([blob], { type: mimeType });
+      const url = window.URL.createObjectURL(file);
+      window.open(url, "_blank");
+    } catch {
+      setError("Dosya açılamadı.");
+    }
+  }
+
   return (
     <AdminAppShell title="Başvuru Yönetimi ve Geçmişi" description={params.id}>
       <div className="mb-4 flex items-center justify-between">
@@ -211,38 +235,40 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-5">
-                  <h4 className="text-sm font-semibold border-b pb-1 text-primary">Operasyonel Durum</h4>
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <FormSelect
-                      id="status-select"
-                      label="Başvuru Durumu"
-                      value={String(status)}
-                      onChange={(e) => setStatus(Number(e.target.value))}
-                      options={Object.entries(STATUS_LABELS).map(([code, label]) => ({
-                        value: code,
-                        label: label,
-                      }))}
-                    />
-                    <FormSelect
-                      id="profession-select"
-                      label="Tıbbi Bölüm"
-                      value={professionCode}
-                      onChange={(e) => {
-                        setProfessionCode(e.target.value);
-                        setCareProviderId("");
-                      }}
-                      options={professionOptions}
-                      placeholder="Bölüm seçiniz"
-                    />
-                    <FormSelect
-                      id="provider-select"
-                      label="Atanan Hekim"
-                      value={careProviderId}
-                      onChange={(e) => setCareProviderId(e.target.value)}
-                      options={providerOptions}
-                      placeholder={professionCode ? "Seçilmemiş (Kuyrukta)" : "Önce bölüm seçin"}
-                      disabled={!professionCode}
-                    />
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Operasyonel Durum & Hekim Atama</h4>
+                    <div className="grid gap-6 sm:grid-cols-3 bg-slate-50/60 border border-slate-200/50 rounded-2xl p-5 shadow-sm">
+                      <FormSelect
+                        id="status-select"
+                        label="Başvuru Durumu"
+                        value={String(status)}
+                        onChange={(e) => setStatus(Number(e.target.value))}
+                        options={Object.entries(STATUS_LABELS).map(([code, label]) => ({
+                          value: code,
+                          label: label,
+                        }))}
+                      />
+                      <FormSelect
+                        id="profession-select"
+                        label="Tıbbi Bölüm"
+                        value={professionCode}
+                        onChange={(e) => {
+                          setProfessionCode(e.target.value);
+                          setCareProviderId("");
+                        }}
+                        options={professionOptions}
+                        placeholder="Bölüm seçiniz"
+                      />
+                      <FormSelect
+                        id="provider-select"
+                        label="Atanan Hekim"
+                        value={careProviderId}
+                        onChange={(e) => setCareProviderId(e.target.value)}
+                        options={providerOptions}
+                        placeholder={professionCode ? "Seçilmemiş (Kuyrukta)" : "Önce bölüm seçin"}
+                        disabled={!professionCode}
+                      />
+                    </div>
                   </div>
 
                   <h4 className="text-sm font-semibold border-b pb-1 pt-2 text-primary">Tıbbi Şikayet Detayları</h4>
@@ -387,7 +413,9 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
                       <div className="text-sm bg-white border rounded-md p-3 whitespace-pre-wrap font-sans text-slate-800">
                         {typeof finalReport.reportJson === "string" 
                           ? finalReport.reportJson 
-                          : finalReport.reportJson.conclusion || JSON.stringify(finalReport.reportJson, null, 2)}
+                          : (finalReport.reportJson as Record<string, unknown>)?.conclusion 
+                            ? String((finalReport.reportJson as Record<string, unknown>).conclusion)
+                            : JSON.stringify(finalReport.reportJson, null, 2)}
                       </div>
                     </div>
                   )}
@@ -416,6 +444,46 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
 
           {/* Right Column: Status Change History (takes 1 col) */}
           <div className="flex flex-col gap-6">
+            {/* Attachments Card */}
+            <Card className="shadow-md border-slate-200">
+              <CardHeader className="bg-slate-50/50">
+                <CardTitle className="text-base text-slate-800 flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-slate-500" />
+                  Ekli Dosyalar (PDF & Görsel)
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Hasta tarafından yüklenen tıbbi evraklar
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 grid gap-2">
+                {attachments.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic text-center py-2">Yüklenmiş dosya yok.</p>
+                ) : (
+                  <div className="grid gap-2">
+                    {attachments.map((file) => (
+                      <div key={file.id} className="flex items-center justify-between gap-3 rounded-lg border p-2 text-xs bg-slate-50/50">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold truncate text-slate-800">{file.fileName}</p>
+                          <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
+                            {(file.fileSize / 1024).toFixed(1)} KB · {file.mimeType}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenAttachment(file.id, file.fileName, file.mimeType)}
+                          className="h-7 px-3 text-[10px] bg-white"
+                        >
+                          Aç
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <Card className="shadow-md border-slate-200">
               <CardHeader>
                 <CardTitle className="text-base">Durum Geçmişi</CardTitle>

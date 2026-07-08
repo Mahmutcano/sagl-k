@@ -1,47 +1,42 @@
 "use client";
 
-import { ROUTES } from "@/lib/routes";
-
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  ApiError,
-  api,
-  clearAuth,
-  getToken,
-  getUser,
-  isAdminRole,
-} from "@/lib/api";
-import { API } from "@/lib/endpoints";
-import {
-  hasErrors,
-  validateHospitalCode,
-  validateHospitalName,
-  type FieldErrors,
-} from "@/lib/validation";
-import { AdminAppShell } from "@/components/AdminAppShell";
-import { FormAlert, TextInput, FormSelect } from "@/components/FormField";
 import Link from "next/link";
-import { STATUS_LABELS, statusVariant, applicationDisplayNumber } from "@/lib/application";
+import { useRouter } from "next/navigation";
+import { ApiError, api, clearAuth, getToken, getUser, isAdminRole } from "@/lib/api";
+import { API } from "@/lib/endpoints";
+import { ROUTES } from "@/lib/routes";
+import { AdminAppShell } from "@/components/AdminAppShell";
+import { FormAlert, FormSelect } from "@/components/FormField";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { STATUS_LABELS, statusVariant, applicationDisplayNumber } from "@/lib/application";
+import { ClipboardList, Hash, ShoppingBag, Calendar, ChevronRight, DollarSign, CreditCard, Clock, RefreshCw, Search } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const getInitials = (name: string) => {
+  if (!name) return "?";
+  const parts = name.trim().split(" ");
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+const getAvatarColor = (name: string) => {
+  const colors = [
+    "bg-blue-50 text-blue-600 border-blue-100",
+    "bg-indigo-50 text-indigo-600 border-indigo-100",
+    "bg-purple-50 text-purple-600 border-purple-100",
+    "bg-sky-50 text-sky-600 border-sky-100",
+    "bg-violet-50 text-violet-600 border-violet-100",
+    "bg-teal-50 text-teal-600 border-teal-100",
+  ];
+  if (!name) return colors[0];
+  const charCode = name.charCodeAt(0) || 0;
+  return colors[charCode % colors.length];
+};
 
 type AppRow = {
   applicationId: string;
@@ -49,74 +44,34 @@ type AppRow = {
   patientName: string;
   applicationNumber?: string;
   ecommerceNumber?: string;
+  createdAt?: string;
 };
 
-type Hospital = {
+type PaymentRow = {
   id: string;
-  name: string;
-  code: string;
-  targetInstitution: number;
-};
-
-type Profession = {
-  id: string;
-  code: string;
-  name: string;
-  targetInstitution: number;
-  hospitalId: string | null;
-  hospitalName?: string;
-  isActive: boolean;
+  amount: number;
+  currency: string;
+  status: string;
 };
 
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [apps, setApps] = useState<AppRow[]>([]);
-  const [hospitals, setHospitals] = useState<Hospital[]>([]);
-  const [professions, setProfessions] = useState<Profession[]>([]);
-  const [erciyesHealth, setErciyesHealth] = useState<{
-    mode: string;
-    healthy: boolean;
-    targetInstitution: number;
-  } | null>(null);
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const [hospitalForm, setHospitalForm] = useState({
-    code: "",
-    name: "",
-    targetInstitution: 1,
-  });
-  const [hospitalFields, setHospitalFields] = useState<FieldErrors>({});
-  const [hospitalMsg, setHospitalMsg] = useState("");
-  const [hospitalOk, setHospitalOk] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  const [professionForm, setProfessionForm] = useState({
-    code: "",
-    name: "",
-    targetInstitution: 1,
-    hospitalId: "",
-  });
-  const [professionFields, setProfessionFields] = useState<FieldErrors>({});
-  const [professionMsg, setProfessionMsg] = useState("");
-  const [professionOk, setProfessionOk] = useState(false);
-  const [savingProfession, setSavingProfession] = useState(false);
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   function load(token: string) {
     return Promise.all([
       api<AppRow[]>(API.admin.applications, {}, token),
-      api<Hospital[]>(API.admin.hospitals, {}, token),
-      api<Profession[]>(API.admin.professions, {}, token),
-      api<{ mode: string; healthy: boolean; targetInstitution: number }>(
-        API.admin.erciyesHealth,
-        {},
-        token
-      ).catch(() => null),
-    ]).then(([a, h, p, e]) => {
+      api<{ items: PaymentRow[] }>(`${API.admin.payments}?pageSize=1000`, {}, token).catch(() => ({ items: [] })),
+    ]).then(([a, p]) => {
       setApps(a ?? []);
-      setHospitals(h ?? []);
-      setProfessions(p ?? []);
-      setErciyesHealth(e);
+      setPayments(p?.items ?? []);
     });
   }
 
@@ -129,405 +84,237 @@ export default function AdminDashboardPage() {
       return;
     }
     load(token)
-      .catch((err) => {
-        if (
-          err instanceof ApiError &&
-          (err.code === "AUTH001" || err.code === "AUTH002" || err.code === "AUTH004")
-        ) {
-          clearAuth();
-          router.replace(ROUTES.admin.login);
-          return;
-        }
-        setError(err instanceof ApiError ? err.message : "Veriler yüklenemedi.");
-      })
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Veriler yüklenemedi."))
       .finally(() => setLoading(false));
   }, [router]);
 
-  async function createHospital(e: React.FormEvent) {
-    e.preventDefault();
-    setHospitalMsg("");
-    setHospitalOk(false);
-    const fields: FieldErrors = {};
-    const codeErr = validateHospitalCode(hospitalForm.code);
-    if (codeErr) fields.code = codeErr;
-    const nameErr = validateHospitalName(hospitalForm.name);
-    if (nameErr) fields.name = nameErr;
-    if (hospitalForm.targetInstitution < 1 || hospitalForm.targetInstitution > 99) {
-      fields.targetInstitution = "Hedef kurum kodu 1–99 arasında olmalıdır.";
-    }
-    setHospitalFields(fields);
-    if (hasErrors(fields)) return;
+  // Client-side filtering of applications
+  const filteredApps = apps.filter((a) => {
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !query ||
+      a.patientName.toLowerCase().includes(query) ||
+      a.applicationNumber?.toLowerCase().includes(query) ||
+      a.ecommerceNumber?.toLowerCase().includes(query) ||
+      a.applicationId.toLowerCase().includes(query);
 
-    const token = getToken();
-    if (!token) return;
-    setSaving(true);
-    try {
-      await api(
-        API.admin.hospitals,
-        { method: "POST", body: JSON.stringify(hospitalForm) },
-        token
-      );
-      setHospitalForm({ code: "", name: "", targetInstitution: 1 });
-      setHospitalMsg("Hastane başarıyla oluşturuldu.");
-      setHospitalOk(true);
-      await load(token);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        if (Object.keys(err.fields).length) setHospitalFields(err.fields);
-        setHospitalMsg(err.message);
-      } else {
-        setHospitalMsg("Hastane oluşturulamadı.");
-      }
-    } finally {
-      setSaving(false);
-    }
-  }
+    const matchesStatus = statusFilter === "all" || String(a.statusCode) === statusFilter;
 
-  async function createProfession(e: React.FormEvent) {
-    e.preventDefault();
-    setProfessionMsg("");
-    setProfessionOk(false);
-    const fields: FieldErrors = {};
-    if (!professionForm.code.trim()) fields.code = "Branş kodu zorunludur.";
-    if (!professionForm.name.trim()) fields.name = "Branş adı zorunludur.";
-    if (professionForm.targetInstitution < 1 || professionForm.targetInstitution > 99) {
-      fields.targetInstitution = "Hedef kurum kodu 1–99 arasında olmalıdır.";
-    }
-    setProfessionFields(fields);
-    if (hasErrors(fields)) return;
+    return matchesSearch && matchesStatus;
+  });
 
-    const token = getToken();
-    if (!token) return;
-    setSavingProfession(true);
-    try {
-      await api(
-        API.admin.createProfession,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            code: professionForm.code.trim(),
-            name: professionForm.name.trim(),
-            targetInstitution: professionForm.targetInstitution,
-            hospitalId: professionForm.hospitalId || undefined,
-          }),
-        },
-        token
-      );
-      setProfessionForm({ code: "", name: "", targetInstitution: 1, hospitalId: "" });
-      setProfessionMsg("Bölüm başarıyla oluşturuldu.");
-      setProfessionOk(true);
-      await load(token);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        if (Object.keys(err.fields).length) setProfessionFields(err.fields);
-        setProfessionMsg(err.message);
-      } else {
-        setProfessionMsg("Bölüm oluşturulamadı.");
-      }
-    } finally {
-      setSavingProfession(false);
-    }
-  }
+  // Calculate statistics
+  const totalEarnings = payments.filter((p) => p.status === "paid").reduce((sum, p) => sum + p.amount, 0);
+  const paidCount = payments.filter((p) => p.status === "paid").length;
+  const pendingCount = payments.filter((p) => p.status === "pending" || p.status === "waiting").length;
+  const refundCount = payments.filter((p) => p.status === "refunded").length;
 
   return (
     <AdminAppShell
-      title="Yönetim paneli"
-      description="Hastaneler, başvurular ve operasyonel özet"
+      title="Yönetim Paneli"
+      description="Sistemdeki başvuruların durumunu inceleyin, finansal özetleri ve klinik istatistikleri görüntüleyin"
     >
       {error ? <FormAlert title="Hata" message={error} /> : null}
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Hastaneler</CardTitle>
-            <CardDescription>Kayıtlı kurum</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{loading ? "—" : hospitals.length}</p>
+      {/* Reports & Analytics Summary Dashboard */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+        <Card className="shadow-premium border-slate-200 bg-white/95 rounded-2xl overflow-hidden hover:-translate-y-0.5 transition-transform duration-200">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Toplam Ciro</span>
+              <span className="text-xl font-black text-slate-900">
+                {totalEarnings.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺
+              </span>
+              <span className="text-[10px] text-slate-500 font-semibold block">{paidCount} başarılı ödemeden</span>
+            </div>
+            <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl">
+              <DollarSign className="h-5 w-5" />
+            </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Başvurular</CardTitle>
-            <CardDescription>Son kayıtlar</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-semibold">{loading ? "—" : apps.length}</p>
+
+        <Card className="shadow-premium border-slate-200 bg-white/95 rounded-2xl overflow-hidden hover:-translate-y-0.5 transition-transform duration-200">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Başarılı Ödemeler</span>
+              <span className="text-xl font-black text-slate-900">{paidCount} Adet</span>
+              <span className="text-[10px] text-slate-500 font-semibold block">Hizmet bedeli tahsil edilen</span>
+            </div>
+            <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl">
+              <CreditCard className="h-5 w-5" />
+            </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base">Erciyes HIS</CardTitle>
-            <CardDescription>Web servisi</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            {loading || !erciyesHealth ? (
-              <Badge variant="outline">—</Badge>
-            ) : (
-              <>
-                <Badge variant={erciyesHealth.healthy ? "default" : "destructive"}>
-                  {erciyesHealth.healthy ? "Bağlı" : "Erişilemiyor"}
-                </Badge>
-                <span className="text-muted-foreground text-xs">
-                  mod: {erciyesHealth.mode} · kurum: {erciyesHealth.targetInstitution}
+
+        <Card className="shadow-premium border-slate-200 bg-white/95 rounded-2xl overflow-hidden hover:-translate-y-0.5 transition-transform duration-200">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Bekleyen Ödemeler</span>
+              <span className="text-xl font-black text-slate-900">{pendingCount} Adet</span>
+              <span className="text-[10px] text-slate-500 font-semibold block">Ödeme onayı veya havale bekleyen</span>
+            </div>
+            <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl">
+              <Clock className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-premium border-slate-200 bg-white/95 rounded-2xl overflow-hidden hover:-translate-y-0.5 transition-transform duration-200">
+          <CardContent className="p-5 flex items-center justify-between">
+            <div className="space-y-1">
+              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">İade İşlemleri</span>
+              <span className="text-xl font-black text-slate-900">{refundCount} Adet</span>
+              <span className="text-[10px] text-slate-500 font-semibold block">İadesi tamamlanmış başvurular</span>
+            </div>
+            <div className="p-3.5 bg-rose-50 text-rose-600 rounded-2xl">
+              <RefreshCw className="h-5 w-5" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Premium Filter Area */}
+      <Card className="shadow-premium border-slate-200/80 bg-white/95 rounded-2xl overflow-hidden mb-6 print:hidden">
+        <CardContent className="p-5 grid gap-4 md:grid-cols-3 items-end">
+          <div className="md:col-span-2 flex flex-col gap-1.5">
+            <label htmlFor="search" className="text-xs font-bold text-slate-700 tracking-wide">Arama</label>
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                id="search"
+                className="pl-10 h-10 border-slate-200 focus-visible:ring-primary/20 focus-visible:border-primary bg-white rounded-xl shadow-inner-sm"
+                placeholder="Hasta adı, Başvuru No veya E-Ticaret No yazın..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+          <div>
+            <FormSelect
+              id="status-filter"
+              label="Durum Filtresi"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              options={[
+                { value: "all", label: "Tüm Durumlar" },
+                ...Object.entries(STATUS_LABELS).map(([code, label]) => ({
+                  value: code,
+                  label: label,
+                })),
+              ]}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Applications List Table */}
+      <Card className="shadow-premium border-slate-200/80 bg-white/95 rounded-2xl overflow-hidden">
+        <CardHeader className="bg-slate-50/50 border-b flex flex-row items-center justify-between py-5 px-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary/10 rounded-xl">
+              <ClipboardList className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-base text-slate-800 font-bold flex items-center gap-2">
+                Hasta Başvuruları
+                <span className="text-xs bg-slate-100 border border-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-semibold">
+                  {filteredApps.length}
                 </span>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Hastaneler</CardTitle>
-            <CardDescription>Sistemde tanımlı kurumlar</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
-            ) : hospitals.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center py-6 text-center">
-                  <CardHeader className="p-0">
-                    <CardTitle className="text-base">Hastane yok</CardTitle>
-                    <CardDescription>Sağdaki formdan ilk kurumu ekleyin.</CardDescription>
-                  </CardHeader>
-                </CardContent>
-              </Card>
-            ) : (
-              <ul className="grid gap-2">
-                {hospitals.map((h) => (
-                  <li
-                    key={h.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm"
-                  >
-                    <span className="font-medium">{h.name}</span>
-                    <Badge variant="secondary">{h.code}</Badge>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <form onSubmit={createHospital} noValidate>
-            <CardHeader>
-              <CardTitle>Hastane ekle</CardTitle>
-              <CardDescription>Alanlar istemci ve sunucuda doğrulanır.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {hospitalMsg ? (
-                <FormAlert
-                  title={hospitalOk ? "Başarılı" : "Uyarı"}
-                  message={hospitalMsg}
-                  variant={hospitalOk ? "default" : "destructive"}
-                />
-              ) : null}
-              <TextInput
-                id="code"
-                label="Kod"
-                hint="2–32 karakter, benzersiz"
-                placeholder="ORN-01"
-                value={hospitalForm.code}
-                onChange={(e) => setHospitalForm((f) => ({ ...f, code: e.target.value }))}
-                error={hospitalFields.code}
-              />
-              <TextInput
-                id="name"
-                label="Ad"
-                placeholder="Örnek Hastanesi"
-                value={hospitalForm.name}
-                onChange={(e) => setHospitalForm((f) => ({ ...f, name: e.target.value }))}
-                error={hospitalFields.name}
-              />
-              <TextInput
-                id="targetInstitution"
-                label="Hedef kurum"
-                type="number"
-                min={1}
-                max={99}
-                hint="1–99 arası kurum kodu"
-                value={String(hospitalForm.targetInstitution)}
-                onChange={(e) =>
-                  setHospitalForm((f) => ({
-                    ...f,
-                    targetInstitution: Number(e.target.value),
-                  }))
-                }
-                error={hospitalFields.targetInstitution}
-              />
-            </CardContent>
-            <CardFooter className="border-t pt-6">
-              <Button type="submit" disabled={saving}>
-                {saving ? "Kaydediliyor..." : "Hastaneyi kaydet"}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Bölümler / Branşlar</CardTitle>
-            <CardDescription>Sistemdeki tüm klinik bölümler ve hastane bağlantıları</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-2/3" />
-                <Skeleton className="h-4 w-1/2" />
-              </div>
-            ) : professions.length === 0 ? (
-              <p className="text-muted-foreground text-sm">Tanımlı bölüm yok.</p>
-            ) : (
-              <div className="max-h-[350px] overflow-y-auto pr-1">
-                <ul className="grid gap-2">
-                  {professions.map((p) => (
-                    <li
-                      key={p.id}
-                      className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm"
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Sistemdeki son görüş talepleri ve operasyonel işlem geçmişi
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-8 space-y-3">
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <Skeleton className="h-10 w-full rounded-lg" />
+              <Skeleton className="h-10 w-full rounded-lg" />
+            </div>
+          ) : filteredApps.length === 0 ? (
+            <div className="p-16 text-center">
+              <ClipboardList className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+              <p className="text-sm text-slate-500 font-medium font-sans">Filtrelere uygun başvuru kaydı bulunamadı.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-slate-50/30">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="h-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider px-6">Hasta Adı</TableHead>
+                    <TableHead className="h-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider px-6">Başvuru Numarası</TableHead>
+                    <TableHead className="h-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider px-6">Referans No / ID</TableHead>
+                    <TableHead className="h-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider px-6">Oluşturulma</TableHead>
+                    <TableHead className="h-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider px-6">Durum</TableHead>
+                    <TableHead className="h-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider px-6 text-right print:hidden"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredApps.map((a) => (
+                    <TableRow
+                      key={a.applicationId}
+                      onClick={() => router.push(ROUTES.admin.application(a.applicationId))}
+                      className="hover:bg-slate-50/60 transition-all duration-150 group cursor-pointer border-b last:border-0"
                     >
-                      <div>
-                        <span className="font-medium">{p.name}</span>
-                        {p.hospitalName && (
-                          <span className="text-xs text-muted-foreground block">
-                            {p.hospitalName}
+                      <TableCell className="py-4 px-6">
+                        <div className="flex items-center gap-3">
+                          <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold shadow-sm", getAvatarColor(a.patientName))}>
+                            {getInitials(a.patientName)}
+                          </div>
+                          <Link
+                            href={ROUTES.admin.application(a.applicationId)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-semibold text-slate-900 group-hover:text-primary transition-colors underline-offset-4 hover:underline font-sans"
+                          >
+                            {a.patientName}
+                          </Link>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-4 px-6">
+                        <span className="font-mono text-xs bg-slate-100/80 border border-slate-200/60 text-slate-700 px-2 py-0.5 rounded inline-flex items-center gap-1 font-semibold">
+                          <Hash className="h-3 w-3 text-slate-400" />
+                          {applicationDisplayNumber(a)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-4 px-6">
+                        {a.ecommerceNumber ? (
+                          <span className="font-mono text-xs bg-primary/5 border border-primary/10 text-primary px-2 py-0.5 rounded inline-flex items-center gap-1 font-semibold">
+                            <ShoppingBag className="h-3 w-3 text-primary/70" />
+                            {a.ecommerceNumber}
+                          </span>
+                        ) : (
+                          <span className="font-mono text-xs text-slate-400 bg-slate-50 border border-slate-200/40 px-2 py-0.5 rounded">
+                            {a.applicationId.slice(0, 8)}…
                           </span>
                         )}
-                      </div>
-                      <Badge variant="secondary">{p.code}</Badge>
-                    </li>
+                      </TableCell>
+                      <TableCell className="py-4 px-6 text-slate-500 text-xs font-medium font-sans">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                          {a.createdAt ? new Date(a.createdAt).toLocaleString("tr-TR") : "—"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="py-4 px-6">
+                        <Badge variant={statusVariant(a.statusCode)}>
+                          {STATUS_LABELS[a.statusCode] ?? a.statusCode}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-4 px-6 text-right print:hidden">
+                        <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                          <span className="inline-flex items-center gap-0.5 text-xs font-bold text-primary group-hover:translate-x-0.5 transition-transform font-sans">
+                            Detay
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </ul>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <form onSubmit={createProfession} noValidate>
-            <CardHeader>
-              <CardTitle>Bölüm (Branş) Ekle</CardTitle>
-              <CardDescription>Hastaneye bağlı veya genel branş tanımlayın.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {professionMsg ? (
-                <FormAlert
-                  title={professionOk ? "Başarılı" : "Uyarı"}
-                  message={professionMsg}
-                  variant={professionOk ? "default" : "destructive"}
-                />
-              ) : null}
-              <TextInput
-                id="prof-code"
-                label="Bölüm Kodu"
-                hint="Örn: cardiology"
-                placeholder="cardiology"
-                value={professionForm.code}
-                onChange={(e) => setProfessionForm((f) => ({ ...f, code: e.target.value }))}
-                error={professionFields.code}
-              />
-              <TextInput
-                id="prof-name"
-                label="Bölüm Adı"
-                placeholder="Kardiyoloji"
-                value={professionForm.name}
-                onChange={(e) => setProfessionForm((f) => ({ ...f, name: e.target.value }))}
-                error={professionFields.name}
-              />
-              <FormSelect
-                id="prof-hospitalId"
-                label="Hastane (Bağlantı)"
-                placeholder="Seçilirse hastaneye bağlanır"
-                value={professionForm.hospitalId}
-                onChange={(e: { target: { value: string } }) => setProfessionForm((f) => ({ ...f, hospitalId: e.target.value }))}
-                options={[
-                  { value: "", label: "Genel / Hastaneye Bağlı Olmayan" },
-                  ...hospitals.map((h) => ({ value: h.id, label: h.name })),
-                ]}
-              />
-              <TextInput
-                id="prof-targetInstitution"
-                label="Hedef kurum"
-                type="number"
-                min={1}
-                max={99}
-                hint="Kurum kodu (Erciyes için 1)"
-                value={String(professionForm.targetInstitution)}
-                onChange={(e) =>
-                  setProfessionForm((f) => ({
-                    ...f,
-                    targetInstitution: Number(e.target.value),
-                  }))
-                }
-                error={professionFields.targetInstitution}
-              />
-            </CardContent>
-            <CardFooter className="border-t pt-6">
-              <Button type="submit" disabled={savingProfession}>
-                {savingProfession ? "Kaydediliyor..." : "Bölümü kaydet"}
-              </Button>
-            </CardFooter>
-          </form>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Başvurular</CardTitle>
-          <CardDescription>Son 100 başvuru kaydı</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="space-y-2">
-              <Skeleton className="h-8 w-full" />
-              <Skeleton className="h-8 w-full" />
+                </TableBody>
+              </Table>
             </div>
-          ) : apps.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-8 text-center">
-                <CardHeader className="p-0">
-                  <CardTitle className="text-base">Başvuru yok</CardTitle>
-                  <CardDescription>Hasta başvuruları burada listelenir.</CardDescription>
-                </CardHeader>
-              </CardContent>
-            </Card>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Hasta</TableHead>
-                  <TableHead>Başvuru no</TableHead>
-                  <TableHead>Durum</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {apps.map((a) => (
-                  <TableRow key={a.applicationId}>
-                    <TableCell>
-                      <Link
-                        href={ROUTES.admin.application(a.applicationId)}
-                        className="font-medium underline-offset-4 hover:underline"
-                      >
-                        {a.patientName}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{applicationDisplayNumber(a)}</TableCell>
-                    <TableCell>
-                      <Badge variant={statusVariant(a.statusCode)}>
-                        {STATUS_LABELS[a.statusCode] ?? a.statusCode}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
           )}
         </CardContent>
       </Card>

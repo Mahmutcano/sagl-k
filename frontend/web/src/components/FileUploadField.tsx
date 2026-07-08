@@ -1,7 +1,18 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ACCEPTED_FILE_TYPES, MAX_FILES, validateSelectedFiles } from "@/lib/applicationSurvey";
+import { cn } from "@/lib/utils";
+import {
+  CloudUpload,
+  FileImage,
+  FileText,
+  Paperclip,
+  Sparkles,
+  Trash2,
+  Upload,
+} from "lucide-react";
 
 type Props = {
   files: File[];
@@ -21,9 +32,20 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function fileIcon(type: string) {
+  if (type.startsWith("image/")) return FileImage;
+  return FileText;
+}
+
 export function FileUploadField({ files, onChange, onError, error, disabled }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const atLimit = files.length >= MAX_FILES;
+  const canAdd = !disabled && !atLimit;
+
   function addFiles(list: FileList | null) {
-    if (!list?.length) return;
+    if (!list?.length || !canAdd) return;
     const merged = [...files, ...Array.from(list)];
     const unique = merged.filter(
       (f, i, arr) => arr.findIndex((x) => x.name === f.name && x.size === f.size) === i
@@ -44,43 +66,165 @@ export function FileUploadField({ files, onChange, onError, error, disabled }: P
     onError?.(validateSelectedFiles(next) ?? "");
   }
 
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragOver(false);
+    if (!canAdd) return;
+    addFiles(e.dataTransfer.files);
+  }
+
   return (
-    <div className="grid gap-3">
-      <div>
-        <p className="text-sm font-medium">Tıbbi belgeler</p>
-        <p className="text-muted-foreground text-sm">
-          Tetkik, rapor, görüntüleme sonuçları (PDF, JPEG, PNG — dosya başına en fazla 10 MB, en
-          fazla {MAX_FILES} dosya)
-        </p>
+    <div className="grid gap-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <Paperclip className="h-4 w-4 text-primary" />
+            Tıbbi belgeler
+          </p>
+          <p className="text-muted-foreground text-xs mt-1 leading-relaxed">
+            Tetkik, rapor veya görüntüleme sonuçlarınızı ekleyin (isteğe bağlı)
+          </p>
+        </div>
+        <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-1 rounded-md">
+          {files.length}/{MAX_FILES}
+        </span>
       </div>
+
       <input
+        ref={inputRef}
         type="file"
         multiple
         accept={accept}
-        disabled={disabled || files.length >= MAX_FILES}
-        className="block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
+        disabled={!canAdd}
+        className="sr-only"
         onChange={(e) => {
           addFiles(e.target.files);
           e.target.value = "";
         }}
       />
-      {error ? <p className="text-destructive text-sm">{error}</p> : null}
-      {files.length > 0 ? (
-        <ul className="grid gap-2 rounded-lg border p-3">
-          {files.map((file, index) => (
-            <li key={`${file.name}-${file.size}`} className="flex items-center justify-between gap-2 text-sm">
-              <span className="truncate">
-                {file.name}{" "}
-                <span className="text-muted-foreground">({formatSize(file.size)})</span>
+
+      <div
+        role="button"
+        tabIndex={canAdd ? 0 : -1}
+        onClick={() => canAdd && inputRef.current?.click()}
+        onKeyDown={(e) => {
+          if ((e.key === "Enter" || e.key === " ") && canAdd) {
+            e.preventDefault();
+            inputRef.current?.click();
+          }
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (canAdd) setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={onDrop}
+        className={cn(
+          "relative overflow-hidden rounded-2xl border-2 border-dashed transition-all duration-200 outline-none",
+          canAdd && "cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+          dragOver
+            ? "border-primary bg-primary/5 scale-[1.01] shadow-lg shadow-primary/10"
+            : canAdd
+              ? "border-slate-200 bg-gradient-to-b from-slate-50/80 to-white hover:border-primary/40 hover:bg-primary/[0.02] hover:shadow-premium"
+              : "border-slate-100 bg-slate-50/50 opacity-60 cursor-not-allowed"
+        )}
+      >
+        <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/5 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-6 -left-6 h-24 w-24 rounded-full bg-primary/5 blur-xl" />
+
+        <div className="relative flex flex-col items-center justify-center gap-4 px-6 py-10 text-center">
+          <div
+            className={cn(
+              "flex h-16 w-16 items-center justify-center rounded-2xl border shadow-sm transition-transform duration-200",
+              dragOver
+                ? "scale-110 border-primary/30 bg-primary/10 text-primary"
+                : "border-slate-200 bg-white text-primary"
+            )}
+          >
+            {dragOver ? (
+              <Sparkles className="h-8 w-8 animate-pulse" />
+            ) : (
+              <CloudUpload className="h-8 w-8" />
+            )}
+          </div>
+
+          <div className="space-y-1.5">
+            <p className="text-sm font-bold text-slate-800">
+              {dragOver ? "Dosyaları buraya bırakın" : "Belgelerinizi yükleyin"}
+            </p>
+            <p className="text-xs text-slate-500 max-w-sm">
+              Sürükleyip bırakın veya bilgisayarınızdan seçin
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            size="sm"
+            disabled={!canAdd}
+            className="pointer-events-none gap-2 rounded-xl font-bold shadow-md shadow-primary/15 px-5 h-10"
+            tabIndex={-1}
+          >
+            <Upload className="h-4 w-4" />
+            Dosya Seç
+          </Button>
+
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {["PDF", "JPEG", "PNG"].map((fmt) => (
+              <span
+                key={fmt}
+                className="text-[10px] font-bold uppercase tracking-wide text-slate-500 bg-white border border-slate-200 px-2.5 py-1 rounded-full shadow-sm"
+              >
+                {fmt}
               </span>
-              <Button type="button" variant="ghost" size="sm" onClick={() => removeAt(index)}>
-                Kaldır
-              </Button>
-            </li>
-          ))}
+            ))}
+            <span className="text-[10px] text-slate-400">· max 10 MB</span>
+          </div>
+        </div>
+      </div>
+
+      {error ? (
+        <p className="text-destructive text-sm font-medium bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+          {error}
+        </p>
+      ) : null}
+
+      {files.length > 0 ? (
+        <ul className="grid gap-2">
+          {files.map((file, index) => {
+            const Icon = fileIcon(file.type);
+            return (
+              <li
+                key={`${file.name}-${file.size}`}
+                className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm hover:border-primary/20 hover:shadow-premium transition-all"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary border border-primary/10">
+                  <Icon className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-800 truncate">{file.name}</p>
+                  <p className="text-xs text-slate-400">{formatSize(file.size)}</p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={disabled}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeAt(index);
+                  }}
+                  className="h-8 w-8 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 opacity-70 group-hover:opacity-100"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </li>
+            );
+          })}
         </ul>
       ) : (
-        <p className="text-muted-foreground text-sm">Henüz dosya seçilmedi (isteğe bağlı).</p>
+        <p className="text-center text-xs text-slate-400 italic">
+          Henüz dosya eklenmedi — yüklemek zorunlu değildir
+        </p>
       )}
     </div>
   );

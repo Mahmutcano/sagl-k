@@ -44,7 +44,7 @@ type NotificationDetail = {
   body?: string;
   templateKey: string;
   status: string;
-  providerResponse?: any;
+  providerResponse?: unknown;
   createdAt: string;
   sentAt?: string;
 };
@@ -201,7 +201,7 @@ export default function AdminNotificationsPage() {
               </div>
 
               {/* Subject */}
-              {selectedNotif.subject && (
+              {!!selectedNotif.subject && (
                 <div>
                   <span className="text-xs text-muted-foreground block mb-0.5">Konu / Başlık</span>
                   <div className="border rounded-md px-3 py-2 bg-slate-50 font-medium text-sm text-slate-800">
@@ -222,7 +222,7 @@ export default function AdminNotificationsPage() {
               </div>
 
               {/* Provider raw Response */}
-              {selectedNotif.providerResponse && (
+              {!!selectedNotif.providerResponse && (
                 <div>
                   <span className="text-xs text-muted-foreground block mb-1">Sağlayıcı Yanıtı (Raw API Log)</span>
                   <pre className="text-[11px] font-mono border rounded-lg p-3 bg-slate-900 text-slate-200 overflow-x-auto max-h-[150px]">

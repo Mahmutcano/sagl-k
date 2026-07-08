@@ -24,10 +24,11 @@ func CanAccessApplication(ctx context.Context, db *repository.DB, appID uuid.UUI
 		return nil
 	case "doctor":
 		var doctorID *uuid.UUID
+		var statusCode int
 		err := db.Pool.QueryRow(ctx, `
-			SELECT doctor_user_id FROM applications WHERE id = $1
-		`, appID).Scan(&doctorID)
-		if err != nil || doctorID == nil || *doctorID != claims.UserID {
+			SELECT doctor_user_id, status_code FROM applications WHERE id = $1
+		`, appID).Scan(&doctorID, &statusCode)
+		if err != nil || doctorID == nil || *doctorID != claims.UserID || statusCode == 0 {
 			return ErrForbidden
 		}
 		return nil

@@ -7,6 +7,7 @@ import {
   applicationDisplayNumber,
   isPatientCancellableStatus,
   isPatientEditableStatus,
+  isPatientAwaitingDoctor,
 } from "@/lib/application";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
@@ -48,14 +49,24 @@ export function PatientApplicationRow({ item, onDelete, deleting }: Props) {
             Başvuru no: {applicationDisplayNumber(item)}
             {dateLabel ? ` · ${dateLabel}` : ""}
           </p>
+          {isPatientAwaitingDoctor(item.statusCode) ? (
+            <p className="text-muted-foreground text-xs mt-1">
+              Doktorunuz tarafından raporlanıyor
+            </p>
+          ) : null}
         </Link>
         <div className="flex shrink-0 flex-wrap gap-2">
           {canEdit ? (
-            <Button size="sm" variant="secondary" asChild>
-              <Link href={ROUTES.patient.editApplication(item.applicationId)}>
-                {item.statusCode === 0 ? "Devam et" : "Düzenle"}
-              </Link>
-            </Button>
+            <>
+              <Button size="sm" variant="secondary" asChild>
+                <Link href={ROUTES.patient.editApplication(item.applicationId)}>Devam et</Link>
+              </Button>
+              <Button size="sm" variant="outline" asChild>
+                <Link href={ROUTES.patient.editApplication(item.applicationId, "details")}>
+                  Bölüm ve doktoru değiştir
+                </Link>
+              </Button>
+            </>
           ) : null}
           {canDelete && onDelete ? (
             <Button

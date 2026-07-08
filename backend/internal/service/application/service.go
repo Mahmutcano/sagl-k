@@ -172,6 +172,27 @@ func (s *Service) GetLastTemporalReport(ctx context.Context, appID uuid.UUID) (s
 	return string(data), nil
 }
 
+func (s *Service) UpdateFinalReport(ctx context.Context, appID uuid.UUID, authorID uuid.UUID, reportJSON string) error {
+	raw := json.RawMessage(reportJSON)
+	if !json.Valid(raw) {
+		return errors.New("rapor geçerli JSON olmalıdır")
+	}
+	var statusCode int
+	err := s.db.Pool.QueryRow(ctx, `SELECT status_code FROM applications WHERE id = $1`, appID).Scan(&statusCode)
+	if err != nil {
+		return err
+	}
+	if statusCode != domain.StatusConcluded {
+		return errors.New("yalnızca sonuçlandırılmış başvuruların raporu güncellenebilir")
+	}
+	_, err = s.db.Pool.Exec(ctx, `
+		UPDATE application_final_reports
+		SET report_json = $2, author_user_id = $3
+		WHERE application_id = $1
+	`, appID, raw, authorID)
+	return err
+}
+
 func (s *Service) Conclude(ctx context.Context, appID uuid.UUID, authorID uuid.UUID, reportJSON string) error {
 	tx, err := s.db.Pool.Begin(ctx)
 	if err != nil {

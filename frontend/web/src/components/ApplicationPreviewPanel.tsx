@@ -74,7 +74,7 @@ export function ApplicationPreviewPanel({ applicationId, token }: Props) {
   return (
     <div className="grid gap-3">
       <p className="text-muted-foreground text-sm">
-        Başvuru formunuzun özeti aşağıdadır. PDF kaydetmek için &quot;Yazdır / PDF&quot; butonunu
+        Hasta başvuru formunun resmi belge çıktısı aşağıdadır. PDF kaydetmek için &quot;Yazdır / PDF&quot; butonunu
         kullanın.
       </p>
       <iframe

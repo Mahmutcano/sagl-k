@@ -24,6 +24,10 @@ export function isConcludedStatus(code: number): boolean {
   return code === 6;
 }
 
+export function isDoctorReportWritable(code: number): boolean {
+  return code !== 3 && code !== 7 && code !== 0;
+}
+
 export function isDoctorEditableStatus(code: number): boolean {
   return code !== 6 && code !== 3 && code !== 7 && code !== 0;
 }
@@ -55,6 +59,7 @@ export type ApplicationDetail = {
   professionCode?: string | null;
   professionName?: string | null;
   careProviderId?: string | null;
+  patientName?: string | null;
   isForRelative?: boolean;
   surveyData?: unknown;
   representedPerson?: {
@@ -78,7 +83,12 @@ export type ApplicationNote = {
 };
 
 export function isPatientEditableStatus(code: number): boolean {
-  return code === 0 || code === 1;
+  return code === 0;
+}
+
+/** Ödeme alındıktan sonra doktor değerlendirmesi bekleniyor. */
+export function isPatientAwaitingDoctor(code: number): boolean {
+  return [1, 2, 4, 5, 10, 11].includes(code);
 }
 
 export function isPatientCancellableStatus(code: number): boolean {
@@ -105,7 +115,7 @@ export const PATIENT_APPLICATION_GROUPS: PatientApplicationGroup[] = [
   {
     id: "in_progress",
     title: "İşlemde",
-    description: "Ödemesi alındı, değerlendirme sürecinde.",
+    description: "Ödemeniz alındı; doktorunuz başvurunuzu değerlendiriyor.",
     statusCodes: [1, 2, 4, 5, 10, 11],
   },
   {
@@ -132,14 +142,75 @@ export function groupPatientApplications<T extends { statusCode: number }>(
 }
 
 export function normalizePaymentResult(raw: Record<string, unknown>): PaymentResult {
+  const receiptRaw = raw.receipt;
+  const receipt =
+    receiptRaw && typeof receiptRaw === "object"
+      ? normalizePaymentReceipt(receiptRaw as Record<string, unknown>)
+      : undefined;
+
   return {
-    transactionId: String(raw.transactionId ?? raw.TransactionID ?? ""),
+    transactionId: String(raw.transactionId ?? raw.TransactionID ?? receipt?.transactionId ?? ""),
     orderId: String(raw.orderId ?? raw.OrderID ?? ""),
     status: String(raw.status ?? raw.Status ?? ""),
     redirectUrl: (raw.redirectUrl ?? raw.RedirectURL ?? null) as string | null,
-    paymentId: String(raw.paymentId ?? raw.PaymentID ?? ""),
+    paymentId: String(raw.paymentId ?? raw.PaymentID ?? receipt?.paymentId ?? ""),
+    receipt,
   };
 }
+
+export function normalizePaymentReceipt(raw: Record<string, unknown>): PaymentReceipt {
+  return {
+    amount: Number(raw.amount ?? 0),
+    currency: String(raw.currency ?? "TRY"),
+    provider: String(raw.provider ?? "param"),
+    providerLabel: String(raw.providerLabel ?? "Param"),
+    transactionId: String(raw.transactionId ?? ""),
+    paymentId: String(raw.paymentId ?? ""),
+    applicationId: String(raw.applicationId ?? ""),
+    applicationNumber: raw.applicationNumber ? String(raw.applicationNumber) : undefined,
+    ecommerceNumber: raw.ecommerceNumber ? String(raw.ecommerceNumber) : undefined,
+    authReference: raw.authReference ? String(raw.authReference) : undefined,
+    professionName: raw.professionName ? String(raw.professionName) : undefined,
+    doctorName: raw.doctorName ? String(raw.doctorName) : undefined,
+    paidAt: raw.paidAt ? String(raw.paidAt) : undefined,
+    description: raw.description ? String(raw.description) : "Tıbbi danışmanlık başvuru ücreti",
+    maskedCard: raw.maskedCard ? String(raw.maskedCard) : undefined,
+    cardBrand: raw.cardBrand ? String(raw.cardBrand) : undefined,
+    invoiceId: raw.invoiceId ? String(raw.invoiceId) : undefined,
+    invoiceNumber: raw.invoiceNumber ? String(raw.invoiceNumber) : undefined,
+    invoiceProvider: raw.invoiceProvider ? String(raw.invoiceProvider) : undefined,
+    invoiceProviderLabel: raw.invoiceProviderLabel ? String(raw.invoiceProviderLabel) : "Bizim Hesap",
+    invoiceStatus: raw.invoiceStatus ? String(raw.invoiceStatus) : undefined,
+    invoiceStatusLabel: raw.invoiceStatusLabel ? String(raw.invoiceStatusLabel) : undefined,
+    invoiceError: raw.invoiceError ? String(raw.invoiceError) : undefined,
+  };
+}
+
+export type PaymentReceipt = {
+  amount: number;
+  currency: string;
+  provider: string;
+  providerLabel: string;
+  transactionId: string;
+  paymentId: string;
+  applicationId: string;
+  applicationNumber?: string;
+  ecommerceNumber?: string;
+  authReference?: string;
+  professionName?: string;
+  doctorName?: string;
+  paidAt?: string;
+  description: string;
+  maskedCard?: string;
+  cardBrand?: string;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  invoiceProvider?: string;
+  invoiceProviderLabel?: string;
+  invoiceStatus?: string;
+  invoiceStatusLabel?: string;
+  invoiceError?: string;
+};
 
 export type PaymentResult = {
   transactionId?: string;
@@ -147,6 +218,7 @@ export type PaymentResult = {
   status: string;
   redirectUrl?: string | null;
   paymentId?: string;
+  receipt?: PaymentReceipt;
 };
 
 export function isPaymentSuccessful(status: string): boolean {
@@ -192,6 +264,9 @@ export function resolveEditStep(
     if (resumed === "details" || resumed === "survey") return resumed;
     return "payment";
   }
+  if (app.statusCode === 0 && (requested === "details" || requested === "survey")) {
+    return requested;
+  }
   const order = WIZARD_STEPS.indexOf(requested);
   const resumedOrder = WIZARD_STEPS.indexOf(resumed);
   if (order > resumedOrder) return resumed;
@@ -199,12 +274,12 @@ export function resolveEditStep(
 }
 
 export type PaymentRequest = {
-  provider: "param" | "bizimhesap";
-  cardHolder?: string;
-  cardNumber?: string;
-  expiryMonth?: number;
-  expiryYear?: number;
-  cvv?: string;
+  provider: "param";
+  cardHolder: string;
+  cardNumber: string;
+  expiryMonth: number;
+  expiryYear: number;
+  cvv: string;
 };
 
 export type StatusHistoryItem = {

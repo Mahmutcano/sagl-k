@@ -1,5 +1,14 @@
 import { errorsToMap, type FieldError, type FieldErrors } from "./validation";
 import { API } from "./endpoints";
+import {
+  getToken,
+  clearAuth,
+  setToken,
+  setUser,
+  getRefreshToken,
+  setRefreshToken,
+  type AuthUser,
+} from "./auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -24,21 +33,7 @@ export class ApiError extends Error {
     this.fields = fields;
   }
 }
-
-const TOKEN_KEY = "accessToken";
-const REFRESH_KEY = "refreshToken";
-const USER_KEY = "authUser";
-
 let refreshPromise: Promise<string | null> | null = null;
-
-export function getRefreshToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return sessionStorage.getItem(REFRESH_KEY);
-}
-
-export function setRefreshToken(token: string) {
-  sessionStorage.setItem(REFRESH_KEY, token);
-}
 
 async function refreshAccessToken(): Promise<string | null> {
   const refresh = getRefreshToken();
@@ -142,52 +137,13 @@ export async function fetchTextWithAuth(
   return res;
 }
 
-export type AuthUser = {
-  id: string;
-  role: string;
-  isDoctor?: boolean;
-  isNurse?: boolean;
-  isDeveloper?: boolean;
-};
-
-export function getToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return sessionStorage.getItem(TOKEN_KEY);
-}
-
-export function setToken(token: string) {
-  sessionStorage.setItem(TOKEN_KEY, token);
-}
-
-export function getUser(): AuthUser | null {
-  if (typeof window === "undefined") return null;
-  const raw = sessionStorage.getItem(USER_KEY);
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as AuthUser;
-  } catch {
-    return null;
-  }
-}
-
-export function setUser(user: AuthUser) {
-  sessionStorage.setItem(USER_KEY, JSON.stringify(user));
-}
-
-export function clearAuth() {
-  sessionStorage.removeItem(TOKEN_KEY);
-  sessionStorage.removeItem(REFRESH_KEY);
-  sessionStorage.removeItem(USER_KEY);
-}
-
-export function persistAuth(result: {
-  accessToken: string;
-  refreshToken?: string;
-  user?: AuthUser;
-}) {
-  setToken(result.accessToken);
-  if (result.refreshToken) setRefreshToken(result.refreshToken);
-  if (result.user) setUser(result.user);
-}
-
-export { isPatientRole, isDoctorRole, isAdminRole } from "./auth";
+export {
+  getToken,
+  getUser,
+  clearAuth,
+  persistAuth,
+  type AuthUser,
+  isPatientRole,
+  isDoctorRole,
+  isAdminRole,
+} from "./auth";

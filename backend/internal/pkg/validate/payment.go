@@ -18,9 +18,10 @@ func PaymentProvider(errs *Errors, field, value string) string {
 	case "", "param":
 		return "param"
 	case "bizimhesap", "bizim_hesap":
-		return "bizim_hesap"
+		errs.Add(field, "invalid", "Ödeme yalnızca Param ile yapılır. Bizim Hesap fatura için kullanılır.")
+		return "param"
 	default:
-		errs.Add(field, "enum", "Ödeme sağlayıcısı param veya bizimhesap olmalıdır.")
+		errs.Add(field, "enum", "Ödeme sağlayıcısı yalnızca param olabilir.")
 		return value
 	}
 }

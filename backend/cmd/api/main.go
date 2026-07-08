@@ -19,6 +19,7 @@ import (
 	authsvc "medical-consultation-platform/backend/internal/service/auth"
 	"medical-consultation-platform/backend/internal/service/erciyes"
 	notifysvc "medical-consultation-platform/backend/internal/service/notification"
+	invoicesvc "medical-consultation-platform/backend/internal/service/invoice"
 	paysvc "medical-consultation-platform/backend/internal/service/payment"
 	"medical-consultation-platform/backend/internal/pkg/audit"
 )
@@ -48,9 +49,9 @@ func main() {
 	app := appsvc.NewService(db, erciyesSvc)
 	payStore := paysvc.NewStore(db)
 	param := paysvc.NewParamProvider(cfg.Param)
-	bizim := paysvc.NewBizimHesapProvider(cfg.BizimHesap)
-	requireCard := strings.EqualFold(cfg.Param.Mode, "live") || strings.EqualFold(cfg.BizimHesap.Mode, "live")
-	payment := paysvc.NewService(param, bizim, payStore, cfg.DefaultPaymentProvider, requireCard)
+	requireCard := strings.EqualFold(cfg.Param.Mode, "live") || strings.EqualFold(cfg.Param.Mode, "test")
+	payment := paysvc.NewService(param, payStore, requireCard)
+	invoiceSvc := invoicesvc.NewService(cfg.BizimHesap)
 
 	auditLog := audit.NewLogger(db.Pool)
 
@@ -62,6 +63,7 @@ func main() {
 		App:     app,
 		Notify:  notify,
 		Payment: payment,
+		Invoice: invoiceSvc,
 		Erciyes: erciyesSvc,
 		Audit:   auditLog,
 	})

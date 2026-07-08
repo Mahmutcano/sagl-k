@@ -23,7 +23,7 @@ var ErrNotEditable = errors.New("başvuru bu aşamada düzenlenemez")
 var ErrNotCancellable = errors.New("ödenmiş başvuru iptal edilemez")
 
 func PatientEditableStatus(code int) bool {
-	return code == domain.StatusPaymentPending || code == domain.StatusPaymentCompleted
+	return code == domain.StatusPaymentPending
 }
 
 func (s *Service) Update(ctx context.Context, appID, ownerID uuid.UUID, req UpdateApplicationRequest) error {

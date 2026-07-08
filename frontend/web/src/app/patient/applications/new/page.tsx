@@ -2,7 +2,7 @@
 
 import { ROUTES } from "@/lib/routes";
 
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useState, Suspense, type ChangeEvent, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ApiError, api, getToken } from "@/lib/api";
@@ -17,6 +17,7 @@ import {
 import { PatientAppShell } from "@/components/PatientAppShell";
 import { ApplicationSurveyForm } from "@/components/ApplicationSurveyForm";
 import { ApplicationPaymentForm, PAYMENT_AMOUNT } from "@/components/ApplicationPaymentForm";
+import { PaymentReceiptCard } from "@/components/PaymentReceiptCard";
 import { ApplicationFlowSteps, ApplicationFlowHint } from "@/components/ApplicationFlowSteps";
 import { ApplicationPreviewPanel } from "@/components/ApplicationPreviewPanel";
 import { FileUploadField } from "@/components/FileUploadField";
@@ -32,7 +33,7 @@ import {
   parseSurveyData,
   type ApplicationSurveyAnswers,
 } from "@/lib/applicationSurvey";
-import { type ApplicationDetail, isPatientEditableStatus, resolveEditStep } from "@/lib/application";
+import { type ApplicationDetail, type PaymentReceipt, isPatientEditableStatus, resolveEditStep } from "@/lib/application";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,7 +78,7 @@ const emptyRelative: RepresentedPersonInput = {
   gender: 0,
 };
 
-export default function NewApplicationPage() {
+function NewApplicationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editId = searchParams.get("edit");
@@ -106,6 +107,7 @@ export default function NewApplicationPage() {
   const [applicationNumber, setApplicationNumber] = useState("");
   const [editLoading, setEditLoading] = useState(false);
   const [paymentCompleted, setPaymentCompleted] = useState(false);
+  const [paymentReceipt, setPaymentReceipt] = useState<PaymentReceipt | null>(null);
 
   const targetInstitution = 1;
   const catalog = useApplicationCatalog(
@@ -229,14 +231,47 @@ export default function NewApplicationPage() {
     if (!professionCode) fields.professionCode = "Bölüm seçiniz.";
     setDetailFields(fields);
     if (hasErrors(fields)) return;
+
     const profession = catalog.professions.find((p) => p.code === professionCode);
     setProfessionName(profession?.name ?? professionCode);
     const provider = catalog.providers.find((p) => p.careProviderId === careProviderId);
     setCareProviderLabel(
       provider ? (provider.title ? `${provider.title} ${provider.fullName}` : provider.fullName) : ""
     );
-    setStep("survey");
+
+    const token = getToken();
+    if (!createdId || !token) {
+      setStep("survey");
+      setError("");
+      return;
+    }
+
+    setSubmitting(true);
     setError("");
+    void api(
+      API.applications.update(createdId),
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          professionCode,
+          professionName: profession?.name ?? professionName ?? professionCode,
+          careProviderId: careProviderId || undefined,
+          surveyData: {
+            surveyName: "patient_intake",
+            data: surveyAnswersToJSON(surveyAnswers),
+          },
+        }),
+      },
+      token
+    )
+      .then(() => {
+        setStep("survey");
+        setError("");
+      })
+      .catch((err) => {
+        setError(err instanceof ApiError ? err.message : "Bölüm ve doktor kaydedilemedi.");
+      })
+      .finally(() => setSubmitting(false));
   }
 
   function scrollToFirstSurveyError(errs: FieldErrors) {
@@ -633,6 +668,7 @@ export default function NewApplicationPage() {
               <CardTitle>Adım 1 — Bölüm ve doktor</CardTitle>
               <CardDescription>
                 Danışmak istediğiniz bölümü seçin; isteğe bağlı olarak uzman hekim tercih edebilirsiniz.
+                {createdId ? " Ödeme yapılmadan önce bölüm ve doktor seçiminizi buradan değiştirebilirsiniz." : ""}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
@@ -691,8 +727,8 @@ export default function NewApplicationPage() {
               />
             </CardContent>
             <CardFooter className="border-t flex flex-wrap gap-2">
-              <Button type="submit">
-                Devam et — şikayet bilgileri
+              <Button type="submit" disabled={submitting}>
+                {submitting ? "Kaydediliyor..." : "Devam et — şikayet bilgileri"}
               </Button>
               {!createdId ? (
                 <Button
@@ -785,7 +821,10 @@ export default function NewApplicationPage() {
               </Button>
             )}
             <Button type="button" variant="outline" onClick={() => setStep("survey")}>
-              Düzenle
+              Şikayetleri düzenle
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setStep("details")}>
+              Bölüm ve doktoru değiştir
             </Button>
             <Button type="button" variant="ghost" onClick={() => setStep("details")} className="gap-1.5">
               <ArrowLeft className="h-4 w-4" />
@@ -825,17 +864,21 @@ export default function NewApplicationPage() {
             <ApplicationPaymentForm
               applicationId={createdId}
               token={getToken() ?? ""}
-              onSuccess={() => {
+              onSuccess={(receipt) => {
                 setApplicationStatus(1);
                 setPaymentCompleted(true);
+                if (receipt) setPaymentReceipt(receipt);
                 setStep("done");
               }}
             />
           </CardContent>
-          <CardFooter className="border-t">
+          <CardFooter className="border-t flex flex-wrap gap-2">
             <Button type="button" variant="ghost" onClick={() => setStep("preview")} className="gap-1.5">
               <ArrowLeft className="h-4 w-4" />
               Geri — form önizleme (Adım 3)
+            </Button>
+            <Button type="button" variant="secondary" onClick={() => setStep("details")}>
+              Bölüm ve doktoru değiştir
             </Button>
           </CardFooter>
         </Card>
@@ -845,16 +888,21 @@ export default function NewApplicationPage() {
         <Card className="max-w-4xl w-full large-form shadow-md border-slate-200">
           <CardHeader>
             <CardTitle>
-              {paymentCompleted ? "Ödeme alındı — başvurunuz tamamlandı" : "Başvuru güncellendi"}
+              {paymentCompleted ? "Başvurunuz tamamlandı" : "Başvuru güncellendi"}
             </CardTitle>
             <CardDescription>
               {paymentCompleted
-                ? "Ödemeniz başarıyla alındı. Başvurunuz sekreterya incelemesine iletilecektir."
+                ? "Ödemeniz onaylandı. Başvurunuz uzman hekim değerlendirmesine iletildi."
                 : "Değişiklikleriniz kaydedildi."}
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            {paymentCompleted ? (
+            {paymentCompleted && paymentReceipt ? (
+              <PaymentReceiptCard
+                receipt={paymentReceipt}
+                fallbackApplicationNumber={applicationNumber || createdId}
+              />
+            ) : paymentCompleted ? (
               <Alert>
                 <AlertTitle>Teşekkürler</AlertTitle>
                 <AlertDescription className="space-y-2">
@@ -863,30 +911,29 @@ export default function NewApplicationPage() {
                     onaylandı.
                   </p>
                   <p className="text-muted-foreground text-sm">
-                    Başvuru durumunuzu &quot;Başvurularım&quot; sayfasından takip edebilirsiniz. Uzman
-                    değerlendirmesi tamamlandığında bilgilendirileceksiniz.
+                    Başvuru durumunuzu &quot;Başvurularım&quot; sayfasından takip edebilirsiniz.
                   </p>
                 </AlertDescription>
               </Alert>
             ) : null}
-            <div className="text-sm space-y-2">
-              {forRelative ? (
+            {!paymentReceipt && paymentCompleted ? (
+              <div className="text-sm space-y-2">
+                {forRelative ? (
+                  <p>
+                    <span className="text-muted-foreground">Yakın: </span>
+                    {relative.firstName} {relative.lastName}
+                  </p>
+                ) : null}
                 <p>
-                  <span className="text-muted-foreground">Yakın: </span>
-                  {relative.firstName} {relative.lastName}
+                  <span className="text-muted-foreground">Bölüm: </span>
+                  {professionName || professionCode}
                 </p>
-              ) : null}
-              <p>
-                <span className="text-muted-foreground">Bölüm: </span>
-                {professionName || professionCode}
-              </p>
-              <p>
-                <span className="text-muted-foreground">Başvuru no: </span>
-                <span className="font-mono text-xs">
-                  {applicationNumber || createdId}
-                </span>
-              </p>
-            </div>
+                <p>
+                  <span className="text-muted-foreground">Başvuru no: </span>
+                  <span className="font-mono text-xs">{applicationNumber || createdId}</span>
+                </p>
+              </div>
+            ) : null}
           </CardContent>
           <CardFooter className="border-t flex flex-wrap gap-2">
             <Button asChild>
@@ -913,6 +960,7 @@ export default function NewApplicationPage() {
                 setApplicationStatus(null);
                 setApplicationNumber("");
                 setPaymentCompleted(false);
+                setPaymentReceipt(null);
                 setError("");
                 if (editId) router.replace(ROUTES.patient.newApplication);
               }}
@@ -923,5 +971,13 @@ export default function NewApplicationPage() {
         </Card>
       )}
     </PatientAppShell>
+  );
+}
+
+export default function NewApplicationPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Yükleniyor...</div>}>
+      <NewApplicationContent />
+    </Suspense>
   );
 }

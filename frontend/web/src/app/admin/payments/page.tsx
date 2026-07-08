@@ -1,15 +1,17 @@
 "use client";
 
 import { ROUTES } from "@/lib/routes";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ApiError, api, clearAuth, getToken, getUser, isAdminRole, fetchTextWithAuth } from "@/lib/api";
 import { API } from "@/lib/endpoints";
 import { AdminAppShell } from "@/components/AdminAppShell";
 import { FormAlert } from "@/components/FormField";
+import { CustomDatePicker } from "@/components/CustomDatePicker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Card,
   CardContent,
@@ -26,7 +28,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Download, FileText, Printer, X } from "lucide-react";
+import { Download, FileText, Printer, X, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type Payment = {
   id: string;
@@ -35,6 +38,7 @@ type Payment = {
   amount: number;
   currency: string;
   status: string;
+  patientName?: string;
   createdAt?: string;
 };
 
@@ -56,6 +60,11 @@ type Invoice = {
   professionName?: string;
   doctorName?: string;
   ecommerceNumber?: string;
+  invoiceId?: string;
+  invoiceNumber?: string;
+  invoiceProvider?: string;
+  invoiceStatus?: string;
+  invoiceError?: string;
 };
 
 export default function AdminPaymentsPage() {
@@ -65,10 +74,19 @@ export default function AdminPaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
 
+  // Filter & Pagination State
+  const [page, setPage] = useState(0);
+  const [pageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+  const [searchText, setSearchText] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
 
-  useEffect(() => {
+  const fetchPayments = useCallback(() => {
     const token = getToken();
     const user = getUser();
     if (!token || !isAdminRole(user?.role)) {
@@ -76,11 +94,43 @@ export default function AdminPaymentsPage() {
       router.replace(ROUTES.admin.login);
       return;
     }
-    api<Payment[]>(API.admin.payments, {}, token)
-      .then((rows) => setPayments(rows ?? []))
+    setLoading(true);
+    setError("");
+
+    const query = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+      search: searchQuery.trim(),
+      startDate,
+      endDate,
+    }).toString();
+
+    api<{ items: Payment[]; totalCount: number }>(`${API.admin.payments}?${query}`, {}, token)
+      .then((res) => {
+        setPayments(res?.items ?? []);
+        setTotalCount(res?.totalCount ?? 0);
+      })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Ödemeler yüklenemedi."))
       .finally(() => setLoading(false));
-  }, [router]);
+  }, [router, page, pageSize, searchQuery, startDate, endDate]);
+
+  useEffect(() => {
+    fetchPayments();
+  }, [fetchPayments]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(0);
+    setSearchQuery(searchText);
+  };
+
+  const handleClearFilters = () => {
+    setSearchText("");
+    setSearchQuery("");
+    setStartDate("");
+    setEndDate("");
+    setPage(0);
+  };
 
   async function handleExport() {
     const token = getToken();
@@ -99,7 +149,7 @@ export default function AdminPaymentsPage() {
       a.click();
       a.remove();
       window.URL.revokeObjectURL(url);
-    } catch (err) {
+    } catch {
       setError("CSV dışa aktarılamadı.");
     } finally {
       setExporting(false);
@@ -127,126 +177,255 @@ export default function AdminPaymentsPage() {
 
   return (
     <AdminAppShell title="Ödemeler & Faturalar" description="Sistemdeki finansal hareketler ve e-makbuzlar">
+      {/* Print-only CSS layout */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          body * {
+            visibility: hidden !important;
+          }
+          #print-receipt-container, #print-receipt-container * {
+            visibility: visible !important;
+          }
+          #print-receipt-container {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            box-shadow: none !important;
+            border: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+        }
+      `}} />
+
       {error ? <FormAlert title="Hata" message={error} /> : null}
 
-      <div className="mb-4 flex justify-end gap-2 print:hidden">
-        <Button onClick={handleExport} disabled={exporting} variant="outline" className="gap-2">
+      <div className="mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 print:hidden">
+        {/* Premium Filter Area */}
+        <form onSubmit={handleSearchSubmit} className="flex-1 grid gap-4 sm:grid-cols-4 items-end bg-white border border-slate-200/80 rounded-2xl p-5 shadow-premium">
+          <div className="sm:col-span-2 flex flex-col gap-1.5">
+            <label htmlFor="search" className="text-xs font-bold text-slate-700 tracking-wide">Arama</label>
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                id="search"
+                className="pl-10 h-10 border-slate-200 focus-visible:ring-primary/20 focus-visible:border-primary bg-white rounded-xl shadow-inner-sm"
+                placeholder="Hasta adı, başvuru veya e-ticaret referans no yazın..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+              />
+            </div>
+          </div>
+          <CustomDatePicker
+            id="startDate"
+            label="Başlangıç Tarihi"
+            value={startDate}
+            onChange={(val) => { setPage(0); setStartDate(val); }}
+          />
+          <CustomDatePicker
+            id="endDate"
+            label="Bitiş Tarihi"
+            value={endDate}
+            onChange={(val) => { setPage(0); setEndDate(val); }}
+          />
+          <div className="sm:col-span-4 flex justify-end gap-2.5 mt-2 border-t border-slate-100 pt-4">
+            <Button type="button" variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl font-bold px-4">
+              Filtreleri Temizle
+            </Button>
+            <Button type="submit" size="sm" className="h-9 gap-1.5 font-bold shadow-md shadow-primary/10 rounded-xl px-5">
+              <Search className="h-4 w-4" />
+              Filtrele
+            </Button>
+          </div>
+        </form>
+
+        <Button onClick={handleExport} disabled={exporting} variant="outline" className="gap-2 h-10 self-end font-bold rounded-xl border-slate-200 hover:bg-slate-50 shadow-sm print:hidden">
           <Download className="h-4 w-4" />
-          {exporting ? "Dışa Aktarılıyor..." : "CSV Olarak İndir"}
+          {exporting ? "Dışa Aktarılıyor..." : "CSV İndir"}
         </Button>
       </div>
 
       {loading ? (
-        <Skeleton className="h-40 w-full" />
+        <div className="space-y-3">
+          <Skeleton className="h-10 w-full rounded-xl" />
+          <Skeleton className="h-10 w-full rounded-xl" />
+          <Skeleton className="h-10 w-full rounded-xl" />
+        </div>
       ) : payments.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-10 text-center">
+        <Card className="rounded-2xl shadow-premium border-slate-200">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <CardHeader className="p-0">
-              <CardTitle>Ödeme kaydı yok</CardTitle>
-              <CardDescription>Hasta ödemeleri burada listelenir.</CardDescription>
+              <CardTitle className="text-lg font-bold text-slate-800">Ödeme kaydı bulunamadı</CardTitle>
+              <CardDescription>Belirttiğiniz kriterlere uygun veya sistemde kayıtlı ödeme bulunmuyor.</CardDescription>
             </CardHeader>
           </CardContent>
         </Card>
       ) : (
-        <Card className="print:hidden shadow-md border-slate-200">
-          <CardContent className="pt-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Başvuru</TableHead>
-                  <TableHead>Sağlayıcı</TableHead>
-                  <TableHead>Tutar</TableHead>
-                  <TableHead>Durum</TableHead>
-                  <TableHead>Tarih</TableHead>
-                  <TableHead className="text-right">İşlem</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {payments.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>
-                      <Link
-                        href={ROUTES.admin.application(p.applicationId)}
-                        className="underline-offset-4 hover:underline font-mono text-xs"
-                      >
-                        {p.applicationId.slice(0, 8)}…
-                      </Link>
-                    </TableCell>
-                    <TableCell className="capitalize">{p.provider}</TableCell>
-                    <TableCell className="font-semibold">
-                      {p.amount.toLocaleString("tr-TR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}{" "}
-                      {p.currency}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={p.status === "paid" ? "default" : "secondary"}>
-                        {p.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-xs font-mono">
-                      {p.createdAt ? new Date(p.createdAt).toLocaleString("tr-TR") : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewInvoice(p.id)}
-                        disabled={loadingInvoice}
-                        className="text-xs hover:text-primary gap-1.5"
-                      >
-                        <FileText className="h-3.5 w-3.5" />
-                        Fatura
-                      </Button>
-                    </TableCell>
+        <div className="flex flex-col gap-4">
+          <Card className="print:hidden shadow-premium border-slate-200/80 bg-white/95 rounded-2xl overflow-hidden">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-slate-50/50">
+                  <TableRow>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Hasta Adı</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Başvuru</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Sağlayıcı</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tutar</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Durum</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tarih</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right">İşlem</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                </TableHeader>
+                <TableBody>
+                  {payments.map((p) => (
+                    <TableRow key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                      <TableCell className="px-6 py-4 font-semibold text-slate-800">
+                        {p.patientName || "—"}
+                      </TableCell>
+                      <TableCell className="px-6 py-4">
+                        <Link
+                          href={ROUTES.admin.application(p.applicationId)}
+                          className="underline-offset-4 hover:underline font-mono text-xs text-primary font-medium"
+                        >
+                          {p.applicationId.slice(0, 8)}…
+                        </Link>
+                      </TableCell>
+                      <TableCell className="px-6 py-4 capitalize text-slate-600 font-medium">{p.provider}</TableCell>
+                      <TableCell className="px-6 py-4 font-bold text-slate-900">
+                        {p.amount.toLocaleString("tr-TR", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        {p.currency}
+                      </TableCell>
+                      <TableCell className="px-6 py-4">
+                        <Badge variant={p.status === "paid" ? "default" : "secondary"}>
+                          {p.status === "paid" ? "Ödendi" : p.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="px-6 py-4 text-muted-foreground text-xs font-mono">
+                        {p.createdAt ? new Date(p.createdAt).toLocaleString("tr-TR") : "—"}
+                      </TableCell>
+                      <TableCell className="px-6 py-4 text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewInvoice(p.id)}
+                          disabled={loadingInvoice}
+                          className="text-xs hover:text-primary gap-1.5 font-bold"
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                          E-Makbuz
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          {/* Premium Pagination */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50 border border-slate-200/50 rounded-2xl px-6 py-4 mt-2 print:hidden shadow-sm">
+            <div className="text-xs font-semibold text-slate-500 tracking-wide font-sans">
+              Toplam <span className="text-primary font-bold">{totalCount}</span> kayıttan <span className="text-slate-800 font-bold">{page * pageSize + 1} - {Math.min((page + 1) * pageSize, totalCount)}</span> arası gösteriliyor
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page === 0}
+                onClick={() => setPage((p) => p - 1)}
+                className="h-8 w-8 p-0 rounded-lg border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40 transition-all duration-150"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <div className="flex items-center gap-1">
+                {(() => {
+                  const totalPages = Math.ceil(totalCount / pageSize);
+                  const pages = [];
+                  const startPage = Math.max(0, page - 1);
+                  const endPage = Math.min(totalPages - 1, page + 1);
+
+                  for (let i = startPage; i <= endPage; i++) {
+                    const active = i === page;
+                    pages.push(
+                      <Button
+                        key={i}
+                        variant={active ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPage(i)}
+                        className={cn(
+                          "h-8 min-w-[32px] px-2 text-xs font-bold rounded-lg transition-all duration-150",
+                          active 
+                            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/10" 
+                            : "border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                        )}
+                      >
+                        {i + 1}
+                      </Button>
+                    );
+                  }
+                  return pages;
+                })()}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={(page + 1) * pageSize >= totalCount}
+                onClick={() => setPage((p) => p + 1)}
+                className="h-8 w-8 p-0 rounded-lg border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40 transition-all duration-150"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Invoice Receipt Modal Overlay */}
       {selectedInvoice && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 print:p-0 print:bg-white print:static print:inset-auto">
           <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] print:max-h-none print:shadow-none print:rounded-none">
-            
+
             {/* Modal Header */}
             <div className="flex justify-between items-center p-4 border-b bg-slate-50 print:hidden">
-              <span className="text-sm font-semibold text-slate-600 font-mono">E-Makbuz Detayı</span>
+              <span className="text-sm font-bold text-slate-600 font-mono">E-Makbuz Detayı</span>
               <div className="flex gap-2">
-                <Button onClick={handlePrint} size="sm" className="gap-1.5">
+                <Button onClick={handlePrint} size="sm" className="gap-1.5 font-bold">
                   <Printer className="h-4 w-4" />
                   Yazdır / PDF Kaydet
                 </Button>
-                <Button onClick={() => setSelectedInvoice(null)} variant="ghost" size="sm" className="p-1">
+                <Button onClick={() => setSelectedInvoice(null)} variant="ghost" size="sm" className="p-1 rounded-full hover:bg-slate-200">
                   <X className="h-5 w-5" />
                 </Button>
               </div>
             </div>
 
             {/* Printable Area */}
-            <div className="p-8 flex-1 overflow-y-auto print:overflow-visible print:p-4">
-              
+            <div id="print-receipt-container" className="p-8 flex-1 overflow-y-auto print:overflow-visible print:p-4">
+
               {/* Receipt Branding */}
               <div className="flex justify-between items-start border-b pb-6 mb-6">
                 <div>
-                  <h2 className="text-xl font-bold tracking-tight text-slate-800">TIBBİ DANIŞMANLIK PLATFORMU</h2>
-                  <p className="text-xs text-muted-foreground mt-0.5">{selectedInvoice.hospitalName || "Erciyes Üniversitesi Tıp Fakültesi"}</p>
+                  <h2 className="text-xl font-extrabold tracking-tight text-slate-900">TIBBİ DANIŞMANLIK</h2>
+                  <p className="text-xs text-slate-500 font-semibold mt-0.5">{selectedInvoice.hospitalName || "Erciyes Üniversitesi Tıp Fakültesi Hastaneleri"}</p>
                 </div>
                 <div className="text-right">
-                  <h3 className="text-base font-bold text-primary">E-HİZMET MAKBUZU</h3>
-                  <p className="text-xs text-muted-foreground font-mono mt-0.5">Tarih: {new Date(selectedInvoice.createdAt).toLocaleString("tr-TR")}</p>
+                  <h3 className="text-base font-extrabold text-primary">E-HİZMET MAKBUZU</h3>
+                  <p className="text-xs text-slate-500 font-mono mt-0.5">Tarih: {new Date(selectedInvoice.createdAt).toLocaleString("tr-TR")}</p>
                 </div>
               </div>
 
               {/* Invoice Meta Grid */}
               <div className="grid grid-cols-2 gap-6 text-sm mb-6 border-b pb-6">
                 <div>
-                  <span className="text-xs text-muted-foreground block mb-1">Hizmet Alan (Hasta)</span>
-                  <p className="font-semibold text-slate-800">{selectedInvoice.patientName}</p>
+                  <span className="text-xs text-slate-400 font-bold block mb-1 uppercase tracking-wider">Hizmet Alan (Hasta)</span>
+                  <p className="font-bold text-slate-800">{selectedInvoice.patientName}</p>
                   {selectedInvoice.patientNationalId && (
                     <p className="text-xs text-slate-600 font-mono mt-0.5">T.C.: {selectedInvoice.patientNationalId}</p>
                   )}
@@ -254,8 +433,8 @@ export default function AdminPaymentsPage() {
                   <p className="text-xs text-slate-600">E-Posta: {selectedInvoice.patientEmail}</p>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-muted-foreground block mb-1">Hizmet Veren (Hekim)</span>
-                  <p className="font-semibold text-slate-800">{selectedInvoice.doctorName || "Atanmamış / Havuz"}</p>
+                  <span className="text-xs text-slate-400 font-bold block mb-1 uppercase tracking-wider">Hizmet Veren (Hekim)</span>
+                  <p className="font-bold text-slate-800">{selectedInvoice.doctorName || "Atanmamış / Havuz"}</p>
                   {selectedInvoice.professionName && (
                     <p className="text-xs text-slate-600 mt-0.5">Klinik: {selectedInvoice.professionName}</p>
                   )}
@@ -264,24 +443,24 @@ export default function AdminPaymentsPage() {
               </div>
 
               {/* Receipt Details Table */}
-              <div className="border rounded-lg overflow-hidden mb-6">
+              <div className="border rounded-xl overflow-hidden mb-6">
                 <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50 border-b text-slate-600 font-medium text-xs">
+                  <thead className="bg-slate-50 border-b text-slate-600 font-bold text-xs">
                     <tr>
-                      <th className="p-3">Hizmet Açıklaması</th>
-                      <th className="p-3 text-right">Referans No</th>
-                      <th className="p-3 text-right">Tutar</th>
+                      <th className="p-3.5">Hizmet Açıklaması</th>
+                      <th className="p-3.5 text-right">Referans No</th>
+                      <th className="p-3.5 text-right">Tutar</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr className="border-b">
-                      <td className="p-3 font-medium">
+                      <td className="p-3.5 font-semibold text-slate-800">
                         Tıbbi İkinci Görüş Raporlama ve Klinik Danışmanlık Hizmeti
                       </td>
-                      <td className="p-3 text-right font-mono text-xs text-muted-foreground">
+                      <td className="p-3.5 text-right font-mono text-xs text-muted-foreground">
                         {selectedInvoice.ecommerceNumber || selectedInvoice.applicationId.slice(0, 8)}
                       </td>
-                      <td className="p-3 text-right font-semibold text-slate-800">
+                      <td className="p-3.5 text-right font-extrabold text-slate-900">
                         {selectedInvoice.amount.toLocaleString("tr-TR", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
@@ -297,8 +476,8 @@ export default function AdminPaymentsPage() {
               <div className="flex justify-end mb-8">
                 <div className="w-64 text-sm space-y-1.5 border-t pt-3">
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Ara Toplam:</span>
-                    <span>
+                    <span className="text-slate-500 font-medium">Ara Toplam:</span>
+                    <span className="font-semibold">
                       {selectedInvoice.amount.toLocaleString("tr-TR", {
                         minimumFractionDigits: 2,
                       })}{" "}
@@ -306,10 +485,10 @@ export default function AdminPaymentsPage() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">KDV (%0 / Muaf):</span>
+                    <span className="text-slate-500 font-medium">KDV (%0 / Muaf):</span>
                     <span>0,00 {selectedInvoice.currency}</span>
                   </div>
-                  <div className="flex justify-between border-t pt-1.5 font-bold text-base text-slate-800">
+                  <div className="flex justify-between border-t pt-1.5 font-bold text-base text-slate-900">
                     <span>Toplam Ödeme:</span>
                     <span>
                       {selectedInvoice.amount.toLocaleString("tr-TR", {
@@ -322,18 +501,31 @@ export default function AdminPaymentsPage() {
               </div>
 
               {/* Transaction Footers */}
-              <div className="bg-slate-50 rounded-xl p-4 text-xs text-slate-500 space-y-1 border border-slate-100">
-                <p><span className="font-semibold">Ödeme Durumu:</span> {selectedInvoice.status.toUpperCase()}</p>
-                <p><span className="font-semibold">Ödeme Kanalı:</span> {selectedInvoice.provider.toUpperCase()}</p>
+              <div className="bg-slate-50/50 rounded-xl p-4 text-xs text-slate-600 space-y-1.5 border border-slate-100">
+                <p><span className="font-bold text-slate-500">Ödeme Durumu:</span> {selectedInvoice.status.toUpperCase()}</p>
+                <p><span className="font-bold text-slate-500">Ödeme Kanalı:</span> Param</p>
                 {selectedInvoice.providerTransactionId && (
-                  <p className="font-mono"><span className="font-semibold font-sans">İşlem (TX) ID:</span> {selectedInvoice.providerTransactionId}</p>
+                  <p className="font-mono"><span className="font-bold font-sans text-slate-500">İşlem (TX) ID:</span> {selectedInvoice.providerTransactionId}</p>
                 )}
                 {selectedInvoice.paidAt && (
-                  <p><span className="font-semibold">Ödeme Zamanı:</span> {new Date(selectedInvoice.paidAt).toLocaleString("tr-TR")}</p>
+                  <p><span className="font-bold text-slate-500">Ödeme Zamanı:</span> {new Date(selectedInvoice.paidAt).toLocaleString("tr-TR")}</p>
                 )}
+                {selectedInvoice.invoiceNumber ? (
+                  <>
+                    <p className="pt-2 border-t border-slate-200"><span className="font-bold text-slate-500">Fatura (Bizim Hesap):</span> {selectedInvoice.invoiceNumber}</p>
+                    {selectedInvoice.invoiceId && (
+                      <p className="font-mono"><span className="font-bold font-sans text-slate-500">Fatura ID:</span> {selectedInvoice.invoiceId}</p>
+                    )}
+                    {selectedInvoice.invoiceStatus && (
+                      <p><span className="font-bold text-slate-500">Fatura Durumu:</span> {selectedInvoice.invoiceStatus.toUpperCase()}</p>
+                    )}
+                  </>
+                ) : selectedInvoice.invoiceError ? (
+                  <p className="pt-2 border-t border-slate-200 text-amber-700"><span className="font-bold">Fatura hatası:</span> {selectedInvoice.invoiceError}</p>
+                ) : null}
               </div>
 
-              <div className="text-center mt-12 text-[10px] text-muted-foreground border-t pt-4">
+              <div className="text-center mt-12 text-[10px] font-medium text-slate-400 border-t pt-4">
                 Bu belge dijital olarak oluşturulmuştur ve ıslak imza gerektirmez. Sorgulama ve doğrulama için başvuru ID kullanılabilir.
               </div>
 

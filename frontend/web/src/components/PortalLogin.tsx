@@ -132,7 +132,7 @@ export function PortalLogin({ area }: { area: AppArea }) {
                   required
                   value={nationalId}
                   onChange={(e) => setNationalId(e.target.value)}
-                  className="h-10 border-slate-200 focus-visible:ring-primary focus-visible:border-primary"
+                  className="h-10 border-slate-200 focus-visible:ring-primary focus-visible:border-primary bg-white"
                   placeholder="11 haneli TC kimlik numaranız"
                 />
               </FormField>
@@ -145,7 +145,7 @@ export function PortalLogin({ area }: { area: AppArea }) {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-10 border-slate-200 focus-visible:ring-primary focus-visible:border-primary"
+                  className="h-10 border-slate-200 focus-visible:ring-primary focus-visible:border-primary bg-white"
                   placeholder="••••••••"
                 />
               </FormField>

@@ -38,20 +38,16 @@ type Provider interface {
 }
 
 type Service struct {
-	param           Provider
-	bizimHesap      Provider
-	defaultProvider string
-	store           *Store
-	requireCard     bool
+	param      Provider
+	store      *Store
+	requireCard bool
 }
 
-func NewService(param, bizimHesap Provider, store *Store, defaultProvider string, requireCard bool) *Service {
+func NewService(param Provider, store *Store, requireCard bool) *Service {
 	return &Service{
-		param:           param,
-		bizimHesap:      bizimHesap,
-		store:           store,
-		defaultProvider: NormalizeProvider(defaultProvider),
-		requireCard:     requireCard,
+		param:       param,
+		store:       store,
+		requireCard: requireCard,
 	}
 }
 
@@ -59,27 +55,16 @@ func (s *Service) RequireCard() bool { return s.requireCard }
 
 func (s *Service) Store() *Store { return s.store }
 
-func (s *Service) Checkout(ctx context.Context, providerName string, req CheckoutRequest) (*CheckoutResult, error) {
-	p := s.resolve(providerName)
-	return p.Checkout(ctx, req)
+func (s *Service) Checkout(ctx context.Context, _ string, req CheckoutRequest) (*CheckoutResult, error) {
+	return s.param.Checkout(ctx, req)
 }
 
 func (s *Service) Refund(ctx context.Context, providerName, transactionID string, amount float64, reason string) (string, error) {
-	return s.resolve(providerName).Refund(ctx, transactionID, amount, reason)
-}
-
-func (s *Service) resolve(name string) Provider {
-	switch NormalizeProvider(name) {
-	case "bizim_hesap":
-		return s.bizimHesap
-	case "param":
-		return s.param
-	default:
-		if s.defaultProvider == "bizim_hesap" {
-			return s.bizimHesap
-		}
-		return s.param
+	// Refunds always go through Param (payment provider).
+	if NormalizeProvider(providerName) == "bizim_hesap" {
+		providerName = "param"
 	}
+	return s.param.Refund(ctx, transactionID, amount, reason)
 }
 
 func NormalizeProviderInput(name string) string {

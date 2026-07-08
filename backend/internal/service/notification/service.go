@@ -44,6 +44,17 @@ func (s *Service) SendSMS(ctx context.Context, phone, templateKey, message strin
 	return code, nil
 }
 
+func (s *Service) SendSMSDirect(ctx context.Context, phone, templateKey, message string, userID, appID *uuid.UUID) error {
+	status := "sent"
+	if err := s.sms.Send(ctx, phone, message); err != nil {
+		status = "failed"
+		_ = s.db.LogNotification(ctx, "sms", phone, templateKey, status, userID, appID, message)
+		return err
+	}
+	_ = s.db.LogNotification(ctx, "sms", phone, templateKey, status, userID, appID, message)
+	return nil
+}
+
 func (s *Service) SendWelcomeEmail(ctx context.Context, userID uuid.UUID, email, firstName string) {
 	if strings.TrimSpace(email) == "" {
 		return

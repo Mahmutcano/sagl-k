@@ -6,17 +6,21 @@ import { AdminAppShell } from "@/components/AdminAppShell";
 import { ApiError, api } from "@/lib/api";
 import { requireSession } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FormAlert } from "@/components/FormField";
+import { Input } from "@/components/ui/input";
+import { FormAlert, FormSelect } from "@/components/FormField";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Search, RotateCw, ChevronLeft, ChevronRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type AuditLogItem = {
   id: string;
   action: string;
   entityType: string;
   entityId: string | null;
-  payload: Record<string, any> | null;
+  payload: Record<string, unknown> | null;
   ipAddress: string;
   createdAt: string;
   userEmail: string;
@@ -30,6 +34,14 @@ export default function AdminLogsPage() {
   const [error, setError] = useState("");
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
+  // Pagination & Filtering
+  const [page, setPage] = useState(0);
+  const [pageSize] = useState(15);
+  const [totalCount, setTotalCount] = useState(0);
+  const [searchText, setSearchText] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [actionFilter, setActionFilter] = useState("");
+
   const load = useCallback(() => {
     const session = requireSession("admin");
     if (!session) {
@@ -38,17 +50,41 @@ export default function AdminLogsPage() {
     }
     setLoading(true);
     setError("");
-    api<AuditLogItem[]>("/api/v1/admin/audit-logs", {}, session.token)
-      .then((data) => setLogs(data ?? []))
+
+    const query = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+      search: searchQuery.trim(),
+      action: actionFilter,
+    }).toString();
+
+    api<{ items: AuditLogItem[]; totalCount: number }>(`/api/v1/admin/audit-logs?${query}`, {}, session.token)
+      .then((res) => {
+        setLogs(res?.items ?? []);
+        setTotalCount(res?.totalCount ?? 0);
+      })
       .catch((err) => {
         setError(err instanceof ApiError ? err.message : "Sistem logları yüklenemedi.");
       })
       .finally(() => setLoading(false));
-  }, [router]);
+  }, [router, page, pageSize, searchQuery, actionFilter]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(0);
+    setSearchQuery(searchText);
+  };
+
+  const handleClearFilters = () => {
+    setSearchText("");
+    setSearchQuery("");
+    setActionFilter("");
+    setPage(0);
+  };
 
   function getActionLabel(action: string): string {
     switch (action) {
@@ -70,6 +106,14 @@ export default function AdminLogsPage() {
         return "Başvuru İptali";
       case "delete_application":
         return "Başvuru Silme";
+      case "admin_create_title":
+        return "Admin: Unvan Ekleme";
+      case "admin_update_title":
+        return "Admin: Unvan Güncelleme";
+      case "admin_delete_title":
+        return "Admin: Unvan Silme";
+      case "admin_assign_doctor":
+        return "Admin: Hekim Atama";
       default:
         return action;
     }
@@ -111,102 +155,208 @@ export default function AdminLogsPage() {
   return (
     <AdminAppShell
       title="Sistem Aktivite Logları"
-      description="Sistem genelinde son 7 günde gerçekleşen girişler, veri güncellemeleri ve yönetici müdahalelerinin işlem geçmişi."
+      description="Sistem genelinde gerçekleşen girişler, veri güncellemeleri ve yönetici müdahalelerinin detaylı işlem geçmişi."
     >
       {error ? <FormAlert title="Hata" message={error} /> : null}
 
-      {loading ? (
-        <div className="text-center py-12 text-muted-foreground">İşlem logları yükleniyor...</div>
-      ) : logs.length === 0 ? (
-        <Card className="p-8 text-center text-muted-foreground">Son 1 haftaya ait herhangi bir aktivite kaydı bulunamadı.</Card>
-      ) : (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-muted-foreground font-medium">
-              Toplam {logs.length} işlem kaydı listeleniyor (7 günlük saklama politikası aktiftir)
-            </span>
-            <Button variant="outline" size="sm" onClick={load} className="cursor-pointer">
-              Yenile
+      {/* Premium Filter Bar */}
+      <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4 print:hidden">
+        <form onSubmit={handleSearchSubmit} className="flex-grow grid gap-4 sm:grid-cols-3 items-end bg-white border border-slate-200/80 rounded-2xl p-5 shadow-premium">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="search" className="text-xs font-bold text-slate-700 tracking-wide">Arama</label>
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                id="search"
+                className="pl-10 h-10 border-slate-200 focus-visible:ring-primary/20 focus-visible:border-primary bg-white rounded-xl shadow-inner-sm"
+                placeholder="İsim, e-posta veya IP yazın..."
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+              />
+            </div>
+          </div>
+          <div>
+            <FormSelect
+              id="action-filter"
+              label="Eylem Tipi Filtresi"
+              value={actionFilter}
+              onChange={(e) => { setPage(0); setActionFilter(e.target.value); }}
+              placeholder="Tüm Eylemler"
+              options={[
+                { value: "user_login", label: "Kullanıcı Girişi" },
+                { value: "update_profile", label: "Profil Güncelleme" },
+                { value: "change_phone", label: "Telefon Doğrulama" },
+                { value: "start_application", label: "Başvuru Başlatma" },
+                { value: "update_application", label: "Başvuru Güncelleme" },
+                { value: "cancel_application", label: "Başvuru İptali" },
+                { value: "delete_application", label: "Başvuru Silme" },
+                { value: "admin_update_user", label: "Admin: Kullanıcı Düzenleme" },
+                { value: "admin_update_application", label: "Admin: Başvuru Düzenleme" },
+                { value: "admin_create_title", label: "Admin: Unvan Ekleme" },
+                { value: "admin_update_title", label: "Admin: Unvan Güncelleme" },
+                { value: "admin_delete_title", label: "Admin: Unvan Silme" },
+                { value: "admin_assign_doctor", label: "Admin: Hekim Atama" },
+              ]}
+            />
+          </div>
+          <div className="flex gap-2.5 justify-end mt-1">
+            <Button type="button" variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 font-bold hover:bg-slate-100 rounded-xl">
+              Temizle
+            </Button>
+            <Button type="submit" size="sm" className="h-9 gap-1.5 font-bold shadow-md shadow-primary/10 rounded-xl px-5">
+              <Search className="h-4 w-4" />
+              Ara
             </Button>
           </div>
+        </form>
 
-          <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
+        <Button variant="outline" onClick={load} className="gap-2 h-10 self-end font-bold rounded-xl border-slate-200 hover:bg-slate-50 shadow-sm">
+          <RotateCw className="h-4 w-4" />
+          Yenile
+        </Button>
+      </div>
+
+      {loading ? (
+        <div className="space-y-3">
+          <Skeleton className="h-12 w-full rounded-xl" />
+          <Skeleton className="h-12 w-full rounded-xl" />
+          <Skeleton className="h-12 w-full rounded-xl" />
+        </div>
+      ) : logs.length === 0 ? (
+        <Card className="p-12 text-center text-slate-500 font-medium italic border border-dashed rounded-2xl bg-white shadow-sm">
+          Kriterlere uygun herhangi bir aktivite logu kaydı bulunamadı.
+        </Card>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <div className="text-xs text-slate-500 font-semibold px-2">
+            Toplam {totalCount} log kaydı bulundu.
+          </div>
+
+          <div className="overflow-hidden rounded-2xl border bg-white shadow-premium">
             <table className="w-full text-left text-sm border-collapse">
               <thead>
-                <tr className="border-b bg-muted/40 font-medium text-muted-foreground">
-                  <th className="p-4">Tarih</th>
-                  <th className="p-4">Kullanıcı</th>
-                  <th className="p-4">İşlem / Eylem</th>
-                  <th className="p-4">IP Adresi</th>
-                  <th className="p-4">Hedef Nesne</th>
-                  <th className="p-4 text-right">Detaylar</th>
+                <tr className="border-b bg-slate-50/50 font-bold text-slate-500 text-xs">
+                  <th className="p-4 uppercase tracking-wider">Tarih</th>
+                  <th className="p-4 uppercase tracking-wider">Kullanıcı</th>
+                  <th className="p-4 uppercase tracking-wider">İşlem / Eylem</th>
+                  <th className="p-4 uppercase tracking-wider">IP Adresi</th>
+                  <th className="p-4 text-right uppercase tracking-wider">Detay</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-slate-100">
                 {logs.map((log) => {
                   const isExpanded = expandedLogId === log.id;
                   return (
-                    <>
-                      <tr key={log.id} className="hover:bg-muted/20 transition-colors">
-                        <td className="p-4 font-mono text-xs text-muted-foreground">
+                    <caption key={log.id} className="table-row-group text-left text-slate-700">
+                      <tr className="hover:bg-slate-50/30 transition-colors">
+                        <td className="p-4 text-xs font-mono text-slate-500">
                           {formatDateTime(log.createdAt)}
                         </td>
                         <td className="p-4">
-                          {log.userName ? (
-                            <div>
-                              <p className="font-semibold text-foreground leading-none">{log.userName}</p>
-                              <span className="text-xs text-muted-foreground">{log.userEmail}</span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground italic text-xs">Sistem / Ziyaretçi</span>
-                          )}
+                          <span className="font-semibold text-slate-800 block text-xs">{log.userName || "Misafir"}</span>
+                          <span className="text-[10px] text-slate-400 block font-mono mt-0.5">{log.userEmail || "—"}</span>
                         </td>
                         <td className="p-4">
-                          <Badge variant="outline" className={getActionColorClass(log.action)}>
+                          <Badge variant="outline" className={`text-[10px] font-bold border ${getActionColorClass(log.action)}`}>
                             {getActionLabel(log.action)}
                           </Badge>
                         </td>
-                        <td className="p-4 font-mono text-xs text-muted-foreground">
-                          {log.ipAddress || "-"}
-                        </td>
-                        <td className="p-4 text-xs font-mono">
-                          {log.entityType ? (
-                            <div>
-                              <span className="font-semibold text-foreground uppercase">{log.entityType}</span>
-                              {log.entityId ? (
-                                <p className="text-muted-foreground text-[10px] truncate max-w-[150px]">{log.entityId}</p>
-                              ) : null}
-                            </div>
-                          ) : (
-                            "-"
-                          )}
-                        </td>
+                        <td className="p-4 font-mono text-xs text-slate-500">{log.ipAddress || "—"}</td>
                         <td className="p-4 text-right">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                            className="cursor-pointer text-xs"
+                            className="text-xs font-semibold"
                           >
-                            {isExpanded ? "Kapat" : "Göster"}
+                            {isExpanded ? "Gizle" : "Göster"}
                           </Button>
                         </td>
                       </tr>
-                      {isExpanded ? (
-                        <tr className="bg-slate-50/50">
-                          <td colSpan={6} className="p-4 border-t border-b">
-                            <div className="rounded-lg border bg-slate-900 text-slate-100 p-4 text-xs font-mono overflow-x-auto max-w-4xl">
-                              <p className="text-slate-400 mb-2">// İşlem Detayları & Payload Verisi (JSON)</p>
-                              <pre>{JSON.stringify(log.payload || {}, null, 2)}</pre>
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={5} className="p-4 bg-slate-50/40 border-t border-b">
+                            <div className="text-xs space-y-2">
+                              <p className="font-semibold text-slate-700">İşlem Parametreleri / Veri Detayı:</p>
+                              {log.payload ? (
+                                <pre className="bg-slate-900 text-slate-200 p-4 rounded-xl overflow-x-auto font-mono text-[11px] leading-relaxed max-w-full shadow-inner max-h-72">
+                                  {JSON.stringify(log.payload, null, 2)}
+                                </pre>
+                              ) : (
+                                <p className="text-slate-400 italic">Veri detayı bulunmuyor.</p>
+                              )}
+                              {log.entityId && (
+                                <p className="text-slate-400 font-mono text-[10px]">
+                                  Etkilenen Nesne (Entity): {log.entityType} ({log.entityId})
+                                </p>
+                              )}
                             </div>
                           </td>
                         </tr>
-                      ) : null}
-                    </>
+                      )}
+                    </caption>
                   );
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Premium Pagination */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50 border border-slate-200/50 rounded-2xl px-6 py-4 mt-2 shadow-sm">
+            <div className="text-xs font-semibold text-slate-500 tracking-wide font-sans">
+              Toplam <span className="text-primary font-bold">{totalCount}</span> logtan {page * pageSize + 1} - {Math.min((page + 1) * pageSize, totalCount)} arası listeleniyor
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page === 0}
+                onClick={() => setPage((p) => p - 1)}
+                className="h-8 w-8 p-0 rounded-lg border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-all duration-150"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <div className="flex items-center gap-1">
+                {(() => {
+                  const totalPages = Math.ceil(totalCount / pageSize);
+                  const pages = [];
+                  const startPage = Math.max(0, page - 1);
+                  const endPage = Math.min(totalPages - 1, page + 1);
+
+                  for (let i = startPage; i <= endPage; i++) {
+                    const active = i === page;
+                    pages.push(
+                      <Button
+                        key={i}
+                        variant={active ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPage(i)}
+                        className={cn(
+                          "h-8 min-w-[32px] px-2 text-xs font-bold rounded-lg transition-all duration-150",
+                          active 
+                            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/10" 
+                            : "border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                        )}
+                      >
+                        {i + 1}
+                      </Button>
+                    );
+                  }
+                  return pages;
+                })()}
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={(page + 1) * pageSize >= totalCount}
+                onClick={() => setPage((p) => p + 1)}
+                className="h-8 w-8 p-0 rounded-lg border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-all duration-150"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       )}

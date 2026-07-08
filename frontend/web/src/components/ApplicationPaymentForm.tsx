@@ -3,24 +3,31 @@
 import { useState } from "react";
 import { ApiError, api } from "@/lib/api";
 import { API } from "@/lib/endpoints";
-import { type PaymentRequest, normalizePaymentResult, isPaymentSuccessful } from "@/lib/application";
+import { type PaymentRequest, type PaymentReceipt, normalizePaymentResult, isPaymentSuccessful } from "@/lib/application";
 import { FormAlert, FormField } from "@/components/FormField";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 export const PAYMENT_AMOUNT = 1500;
 
+const PARAM_TEST_CARD = {
+  cardHolder: "TEST KULLANICI",
+  cardNumber: "4546711234567894",
+  expiryMonth: "12",
+  expiryYear: "26",
+  cvv: "000",
+};
+
 type Props = {
   applicationId: string;
   token: string;
-  onSuccess?: () => void;
+  onSuccess?: (receipt?: PaymentReceipt) => void;
   onError?: (message: string) => void;
 };
 
 export function ApplicationPaymentForm({ applicationId, token, onSuccess, onError }: Props) {
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState("");
-  const [provider, setProvider] = useState<"param" | "bizimhesap">("param");
   const [card, setCard] = useState({
     cardHolder: "",
     cardNumber: "",
@@ -29,6 +36,12 @@ export function ApplicationPaymentForm({ applicationId, token, onSuccess, onErro
     cvv: "",
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  function fillTestCard() {
+    setCard({ ...PARAM_TEST_CARD });
+    setFieldErrors({});
+    setError("");
+  }
 
   function validatePaymentForm(): boolean {
     const f: Record<string, string> = {};
@@ -60,20 +73,19 @@ export function ApplicationPaymentForm({ applicationId, token, onSuccess, onErro
     setError("");
     setFieldErrors({});
 
-    const body: PaymentRequest = { provider };
-    const hasCardInput =
-      card.cardHolder || card.cardNumber || card.expiryMonth || card.expiryYear || card.cvv;
-    if (hasCardInput) {
-      if (!validatePaymentForm()) {
-        setPaying(false);
-        return;
-      }
-      body.cardHolder = card.cardHolder.trim();
-      body.cardNumber = card.cardNumber.replace(/\s/g, "");
-      body.expiryMonth = parseInt(card.expiryMonth, 10);
-      body.expiryYear = parseInt(card.expiryYear, 10);
-      body.cvv = card.cvv.replace(/\D/g, "");
+    if (!validatePaymentForm()) {
+      setPaying(false);
+      return;
     }
+
+    const body: PaymentRequest = {
+      provider: "param",
+      cardHolder: card.cardHolder.trim(),
+      cardNumber: card.cardNumber.replace(/\s/g, ""),
+      expiryMonth: parseInt(card.expiryMonth, 10),
+      expiryYear: parseInt(card.expiryYear, 10),
+      cvv: card.cvv.replace(/\D/g, ""),
+    };
 
     try {
       const raw = await api<Record<string, unknown>>(
@@ -87,12 +99,12 @@ export function ApplicationPaymentForm({ applicationId, token, onSuccess, onErro
         return;
       }
       if (isPaymentSuccessful(res.status)) {
-        onSuccess?.();
+        onSuccess?.(res.receipt);
       } else if (res.status) {
         setError(`Ödeme durumu: ${res.status}`);
         onError?.(`Ödeme durumu: ${res.status}`);
       } else {
-        onSuccess?.();
+        onSuccess?.(res.receipt);
       }
     } catch (err) {
       if (err instanceof ApiError) {
@@ -115,28 +127,26 @@ export function ApplicationPaymentForm({ applicationId, token, onSuccess, onErro
   return (
     <div className="grid gap-4">
       {error ? <FormAlert title="Ödeme hatası" message={error} /> : null}
-      <p className="text-muted-foreground text-sm">
-        Tutar: <span className="font-medium text-foreground">{PAYMENT_AMOUNT.toLocaleString("tr-TR")} TRY</span>
-        {" · "}
-        Test modunda kart bilgisi isteğe bağlıdır.
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant={provider === "param" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setProvider("param")}
-        >
-          Param
-        </Button>
-        <Button
-          type="button"
-          variant={provider === "bizimhesap" ? "default" : "outline"}
-          size="sm"
-          onClick={() => setProvider("bizimhesap")}
-        >
-          Bizim Hesap
-        </Button>
+      <div className="rounded-lg border bg-muted/40 p-4 text-sm">
+        <p className="font-medium text-foreground">Param ile güvenli ödeme</p>
+        <p className="text-muted-foreground mt-1">
+          Tutar:{" "}
+          <span className="font-medium text-foreground">
+            {PAYMENT_AMOUNT.toLocaleString("tr-TR")} TRY
+          </span>
+          {" · "}
+          Ödeme sonrası fatura Bizim Hesap üzerinden otomatik oluşturulur.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-muted-foreground text-xs">Param test kartı:</span>
+          <code className="rounded bg-background px-2 py-0.5 text-xs">
+            {PARAM_TEST_CARD.cardNumber}
+          </code>
+          <span className="text-muted-foreground text-xs">12/26 · CVV 000</span>
+          <Button type="button" variant="outline" size="sm" onClick={fillTestCard}>
+            Test kartını doldur
+          </Button>
+        </div>
       </div>
       <FormField id="cardHolder" label="Kart üzerindeki isim" error={fieldErrors.cardHolder}>
         <Input
@@ -192,7 +202,7 @@ export function ApplicationPaymentForm({ applicationId, token, onSuccess, onErro
         </FormField>
       </div>
       <Button type="button" disabled={paying} onClick={pay}>
-        {paying ? "İşleniyor..." : "Ödemeyi tamamla"}
+        {paying ? "İşleniyor..." : "Param ile ödemeyi tamamla"}
       </Button>
     </div>
   );

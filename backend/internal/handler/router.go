@@ -17,6 +17,7 @@ import (
 	authsvc "medical-consultation-platform/backend/internal/service/auth"
 	"medical-consultation-platform/backend/internal/service/erciyes"
 	notifysvc "medical-consultation-platform/backend/internal/service/notification"
+	invoicesvc "medical-consultation-platform/backend/internal/service/invoice"
 	paysvc "medical-consultation-platform/backend/internal/service/payment"
 	"medical-consultation-platform/backend/internal/pkg/audit"
 )
@@ -29,6 +30,7 @@ type Deps struct {
 	App     *appsvc.Service
 	Notify  *notifysvc.Service
 	Payment *paysvc.Service
+	Invoice *invoicesvc.Service
 	Erciyes *erciyes.Service
 	Audit   *audit.Logger
 }
@@ -76,8 +78,8 @@ func NewRouter(d Deps) http.Handler {
 	}))
 
 	authH := NewAuthHandler(d.Auth, d.Audit)
-	appH := NewApplicationHandler(d.App, d.Payment, d.Notify, d.DB, d.Cfg)
-	adminH := NewAdminHandler(d.DB, d.Payment, d.Audit)
+	appH := NewApplicationHandler(d.App, d.Payment, d.Invoice, d.Notify, d.DB, d.Cfg)
+	adminH := NewAdminHandler(d.DB, d.Payment, d.Audit, d.Notify)
 	erciyesH := NewErciyesHandler(d.Erciyes, d.DB)
 	profileH := NewProfileHandler(d.DB, d.Notify, d.Audit)
 	adminUserH := NewAdminUserHandler(d.DB, d.Audit)
@@ -122,6 +124,7 @@ func NewRouter(d Deps) http.Handler {
 			ar.Patch("/{id}", appH.UpdateApplication)
 			ar.Delete("/{id}", appH.DeleteApplication)
 			ar.Post("/{id}/payment", appH.UpdatePayment)
+			ar.Get("/{id}/report/html", appH.GetFinalReportHTML)
 			ar.Get("/{id}/report", appH.GetFinalReport)
 			ar.Post("/{id}/report/viewed", appH.MarkReportViewed)
 			ar.Get("/{id}/attachments", appH.ListAttachments)
@@ -137,6 +140,8 @@ func NewRouter(d Deps) http.Handler {
 
 			ar.With(authmw.RequireRole("doctor", "admin", "developer")).Put("/{id}/report/draft", appH.SaveTemporalReport)
 			ar.With(authmw.RequireRole("doctor", "admin", "developer")).Get("/{id}/report/draft", appH.GetTemporalReport)
+			ar.With(authmw.RequireRole("doctor", "admin", "developer")).Post("/{id}/report/preview", appH.PreviewDoctorReport)
+			ar.With(authmw.RequireRole("doctor", "admin", "developer")).Put("/{id}/report", appH.UpdateFinalReport)
 			ar.With(authmw.RequireRole("doctor", "admin", "developer")).Post("/{id}/conclude", appH.ConcludeApplication)
 		})
 
@@ -162,6 +167,7 @@ func NewRouter(d Deps) http.Handler {
 			ar.Post("/applications/{id}/assign-doctor", adminH.AssignDoctor)
 			ar.Get("/hospitals", adminH.ListHospitals)
 			ar.Post("/hospitals", adminH.CreateHospital)
+			ar.Put("/hospitals/{id}", adminH.UpdateHospital)
 			ar.Get("/professions", adminH.ListProfessionsAdmin)
 			ar.Post("/professions", adminH.CreateProfession)
 			ar.Get("/doctors", adminH.ListDoctors)
@@ -180,6 +186,10 @@ func NewRouter(d Deps) http.Handler {
 			ar.Put("/users/{id}", adminUserH.UpdateUser)
 			ar.Patch("/users/{id}/active", adminUserH.ToggleActive)
 			ar.Get("/audit-logs", adminH.ListAuditLogs)
+			ar.Get("/titles", adminH.ListTitles)
+			ar.Post("/titles", adminH.CreateTitle)
+			ar.Put("/titles/{id}", adminH.UpdateTitle)
+			ar.Delete("/titles/{id}", adminH.DeleteTitle)
 		})
 	})
 
