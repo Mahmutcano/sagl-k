@@ -11,7 +11,7 @@ Platformun temel amacı, hastaların veya onların yakınlarının hastaneye fiz
 ### Temel Özellikler:
 - **Çoklu Rol Yönetimi**: Hasta, Doktor, Hemşire/Tıbbi Sekreter ve Yönetici (Admin) rollerine özel paneller. *(Not: Mevcut iş akışında hemşire/sekreter katmanı devre dışı bırakılmıştır, başvurular doğrudan doktora gitmektedir. Bu katmanın ilerleyen aşamalarda bir AI Agent veya Çağrı Merkezi sistemi ile yönetilmesi planlanmaktadır.)*
 - **Kapsamlı Klinik Başvuru Akışı**: Dinamik anket soruları, epikriz/tahlil/dosya yükleme ve hekim seçimi.
-- **Tümleşik Ödeme Sistemleri**: Param ve Bizim Hesap entegrasyonu ile çevrimiçi ödeme.
+- **Tümleşik Ödeme Sistemleri**: Param (ödeme) ve Bizim Hesap (fatura) entegrasyon altyapısı — geliştirmede test/mock, canlıda Faz 2’de devreye alınacak (bkz. §9).
 - **Erciyes HBYS Entegrasyonu**: Yatan hastaların başvuru yapmasının engellenmesi ve PACS görüntüleme bağlantılarının sorgulanması.
 - **Güvenli Raporlama ve Taslak Kaydetme**: Hekimler için taslak rapor kaydetme ve tamamlandığında hastaya iletilen nihai tıbbi görüş raporları.
 - **Tam Denetim ve İzlenebilirlik**: Sistem üzerindeki kritik yönetici işlemlerinin ve durum değişikliklerinin loglanması (Audit & Status History).
@@ -195,11 +195,84 @@ Tüm API'ler `/api/v1` ön eki altındadır.
 - **PACS Linki**: Erciyes radyoloji veritabanına bağlanarak hastanın taranmış radyolojik görüntülerini inceleme ekranında hekime doğrudan sunar.
 
 ### Ödeme Entegrasyonu
-Ödemeler esnek bir yapıdadır; geliştirme modunda ücretsiz (`free`) veya test moduyla, canlı modda ise `Param` veya `Bizim Hesap` API'leri üzerinden güvenli 3D Secure ile gerçekleştirilir.
+
+| Bileşen | Şimdiki durum (MVP) | Canlıya geçişte gerekli |
+| :--- | :--- | :--- |
+| **Param** | Test/sandbox modu; test kartları ile ödeme simülasyonu | Canlı merchant bilgileri, 3D Secure, hata/iptal senaryoları, PCI uyumu |
+| **Bizim Hesap** | Ödeme sonrası otomatik fatura oluşturma altyapısı hazır; test modu | Canlı API anahtarı, firma tanımı, fatura şablonları ve muhasebe mutabakatı |
+
+Ödeme akışı uygulama tarafında **yalnızca Param** üzerinden yapılır; fatura **Bizim Hesap** ile otomatik kesilir. Canlı ortamda uçtan uca test (başarılı ödeme, red, iade) zorunludur.
 
 ### Bildirim Servisi (Notification Service)
-- **NetGSM SMS API**: Kullanıcılara şifre sıfırlama, OTP doğrulama veya başvuru durum değişikliklerini bildirmek için entegre edilmiştir.
-- **SMTP E-Posta**: Kayıt doğrulama ve nihai hekim raporu tamamlandığında rapor detayını e-posta ile bildirmek için şablon desteğiyle çalışır.
+
+| Kanal | Şimdiki durum (MVP) | Canlıya geçişte gerekli |
+| :--- | :--- | :--- |
+| **SMS (NetGSM)** | `SMS_PROVIDER=mock` — konsola log; altyapı ve şablon anahtarları kodda mevcut | NetGSM kullanıcı/şifre/başlık, OTP ve durum SMS’leri, gönderim logları ve hata yönetimi |
+| **E-posta (SMTP)** | `EMAIL_PROVIDER=mock` — konsola log | SMTP veya transactional e-posta sağlayıcısı (SendGrid, AWS SES vb.), HTML şablonlar, bounce/spam takibi |
+
+Bildirim tetikleyicileri (kayıt OTP, şifre sıfırlama, ödeme onayı, rapor hazır) backend’de tanımlıdır; canlı sağlayıcı kimlik bilgileri `.env` ile devreye alınır.
+
+---
+
+## 9. Entegrasyon Yol Haritası (Roadmap)
+
+Aşağıdaki maddeler **şu an tamamlanmış ürün kapsamında değildir**; sırayla planlanması gereken dış bağımlılıklardır.
+
+### Faz 2 — Canlı entegrasyonlar (öncelikli, orta vadeli)
+
+Platformun production ortamında çalışması için gerekli:
+
+1. **SMS entegrasyonu (NetGSM)**
+   - Kayıt ve şifre sıfırlama OTP
+   - Başvuru durum değişiklikleri (rapor hazır vb.)
+   - Admin bildirim takibi ekranı ile uyumlu loglama
+
+2. **E-posta entegrasyonu**
+   - Hoş geldiniz, ödeme onayı, rapor hazır e-postaları
+   - HTML şablonlar ve KVKK uyumlu içerik
+
+3. **Ödeme entegrasyonu (Param — canlı)**
+   - Sandbox’tan production’a geçiş
+   - 3D Secure, webhook/callback doğrulama (varsa), iade akışı ile uyum
+
+4. **Fatura entegrasyonu (Bizim Hesap — canlı)**
+   - Başarılı ödeme sonrası otomatik e-fatura / e-arşiv
+   - Admin ödemeler ekranından fatura görüntüleme
+
+**Not:** Geliştirme ortamında bu servisler mock/test modunda çalışır; `.env.example` dosyasındaki ilgili değişkenler referans alınmalıdır.
+
+### Faz 3 — AI Agent / Çağrı Merkezi katmanı (ileri vadeli, ayrı proje)
+
+Hasta ödemeyi tamamladıktan sonra başvurunun **doğrudan hekime düşmesi** yerine (veya sekreterya kuyruğunun yanında) araya konulması planlanan **büyük ve bağımsız** bir bileşendir. **Şu an geliştirilmemektedir.**
+
+Planlanan rol:
+
+- Başvuru evraklarının ön kontrolü (eksik belge, okunaksız PDF vb.)
+- Hastaya otomatik bilgi talebi (`info_required` durumu)
+- Sesli/görüşmeli çağrı merkezi veya sohbet tabanlı AI agent ile yönlendirme
+- Uygun başvuruların hekime veya sekreterya kuyruğuna iletilmesi
+
+```mermaid
+flowchart LR
+    subgraph now [Mevcut akış]
+        P1[Hasta ödeme] --> D1[Hekim kuyruğu]
+    end
+    subgraph future [Planlanan — Faz 3]
+        P2[Hasta ödeme] --> AI[AI Agent / Çağrı Merkezi]
+        AI -->|Eksik evrak| P2b[Hastaya talep]
+        AI -->|Uygun| D2[Hekim / Sekreterya]
+    end
+```
+
+Bu faz için ayrıca gerekecekler (yüksek seviye):
+
+- Agent/IVR veya chatbot platformu seçimi ve API entegrasyonu
+- Evrak sınıflandırma / OCR (isteğe bağlı)
+- İnsan operatör devralma (handoff) senaryoları
+- KVKK, kayıt altına alma ve tıbbi veri güvenliği değerlendirmesi
+- Mevcut `application_status_history` ve bildirim altyapısı ile entegrasyon
+
+**Özet:** SMS, e-posta ve canlı ödeme **Faz 2** işidir; AI Agent / çağrı merkezi **Faz 3** ayrı bir proje olarak ele alınmalıdır.
 
 ---
 
@@ -255,3 +328,10 @@ Geliştirme ve test süreçlerinde kullanabileceğiniz önceden tanımlanmış k
   - Şifre: `Doctor123!`
 - **Hasta (Patient)**:
   - Kayıt olmak için arayüzdeki `/patient/register` (Kayıt Ol) sayfasını kullanabilir veya mevcut bir hasta TC'si ile giriş yapabilirsiniz.
+
+---
+
+## 10. İlgili dokümanlar
+
+- **Entegrasyon yol haritası (SMS, e-posta, ödeme, AI Agent):** §9
+- **Kullanıcı rehberi:** [KULLANICI_REHBERI.md](./KULLANICI_REHBERI.md)
