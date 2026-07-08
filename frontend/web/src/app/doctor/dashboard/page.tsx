@@ -12,6 +12,7 @@ import { EmptyState, LoadingCards } from "@/components/EmptyState";
 import { ListLinkCard } from "@/components/AppShellLayout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { FormAlert } from "@/components/FormField";
+import { Card } from "@/components/ui/card";
 import { applicationDisplayNumber } from "@/lib/application";
 
 type ApplicationItem = {
@@ -62,20 +63,22 @@ export default function DoctorDashboardPage() {
           description="Hastalar başvuru oluştururken sizi seçtiğinde başvurular burada listelenir."
         />
       ) : (
-        <ul className="grid gap-3">
-          {items.map((item) => (
-            <li key={item.applicationId}>
-              <ListLinkCard
-                href={ROUTES.doctor.application(item.applicationId)}
-                title={item.professionName ?? "Başvuru"}
-                subtitle={`Başvuru no: ${applicationDisplayNumber(item)}${
-                  item.createdAt ? ` · ${new Date(item.createdAt).toLocaleDateString("tr-TR")}` : ""
-                }`}
-                badge={<StatusBadge code={item.statusCode} />}
-              />
-            </li>
-          ))}
-        </ul>
+        <Card className="p-6 bg-card border shadow-sm rounded-xl">
+          <ul className="grid gap-3">
+            {items.map((item) => (
+              <li key={item.applicationId}>
+                <ListLinkCard
+                  href={ROUTES.doctor.application(item.applicationId)}
+                  title={item.professionName ?? "Başvuru"}
+                  subtitle={`Başvuru no: ${applicationDisplayNumber(item)}${
+                    item.createdAt ? ` · ${new Date(item.createdAt).toLocaleDateString("tr-TR")}` : ""
+                  }`}
+                  badge={<StatusBadge code={item.statusCode} />}
+                />
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
     </DoctorAppShell>
   );

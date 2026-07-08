@@ -97,7 +97,7 @@ export default function ForgotPasswordPage() {
   if (step === "reset") {
     return (
       <AuthShell>
-        <Card className="w-full">
+        <Card className="large-form w-full shadow-premium-lg">
           <CardHeader>
             <CardTitle>Yeni şifre</CardTitle>
             <CardDescription>
@@ -143,7 +143,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthShell>
-      <Card className="w-full">
+      <Card className="large-form w-full shadow-premium-lg">
         <CardHeader>
           <CardTitle>Şifremi unuttum</CardTitle>
           <CardDescription>Kayıtlı cep telefonunuza doğrulama kodu gönderilir.</CardDescription>

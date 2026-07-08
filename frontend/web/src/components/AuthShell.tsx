@@ -1,53 +1,39 @@
 import { AppLogo } from "@/components/AppLogo";
 import { Badge } from "@/components/ui/badge";
 
+
 type AuthShellProps = {
   children: React.ReactNode;
   badge?: string;
 };
 
-const SIDEBAR: Record<string, { title: string; description: string }> = {
-  Hasta: {
-    title: "Hasta portalı",
-    description: "Başvurularınızı oluşturun, ödemenizi tamamlayın ve süreci takip edin.",
-  },
-  Doktor: {
-    title: "Doktor paneli",
-    description: "Size atanan başvuruları inceleyin, rapor hazırlayın ve sonuçlandırın.",
-  },
-  Yönetim: {
-    title: "Yönetim paneli",
-    description: "Kurumlar, ödemeler, iadeler ve operasyonel özet.",
-  },
-};
-
 export function AuthShell({ children, badge = "Hasta" }: AuthShellProps) {
-  const copy = SIDEBAR[badge] ?? SIDEBAR.Hasta;
-
   return (
-    <div className="min-h-svh grid lg:grid-cols-2 bg-background text-foreground">
-      <aside className="auth-sidebar relative hidden flex-col justify-between overflow-hidden p-8 lg:flex xl:p-12">
-        <div className="auth-sidebar-glow pointer-events-none absolute inset-0" aria-hidden />
-        <AppLogo href="/" inverted className="relative z-10" />
-        <div className="relative z-10 space-y-4 max-w-md">
-          <h1 className="text-3xl font-semibold tracking-tight text-balance text-primary-foreground">
-            {copy.title}
-          </h1>
-          <p className="text-primary-foreground/80 text-sm leading-relaxed">{copy.description}</p>
+    <div className="min-h-svh flex flex-col bg-background text-foreground relative overflow-hidden">
+      {/* Premium medical-clinical background glow effects */}
+      <div className="pointer-events-none absolute -right-40 -top-40 size-[500px] rounded-full bg-primary/8 blur-[120px] opacity-70" />
+      <div className="pointer-events-none absolute -left-40 -bottom-40 size-[500px] rounded-full bg-primary/5 blur-[120px] opacity-60" />
+      <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 size-[600px] rounded-full bg-primary/[0.03] blur-[150px]" />
+
+      {/* Top Header */}
+      <header className="relative z-10 w-full max-w-5xl mx-auto px-6 py-6 flex items-center justify-between">
+        <AppLogo href="/" />
+        <Badge variant="outline" className="px-3 py-1 text-xs border-primary/20 bg-primary/5 text-primary font-medium backdrop-blur-sm">
+          {badge} Portalı
+        </Badge>
+      </header>
+
+      {/* Main Content (Centered Form) */}
+      <main className="relative z-10 flex-1 flex flex-col justify-center px-4 py-8 sm:px-6">
+        <div className="w-full max-w-md mx-auto space-y-6">
+          {children}
         </div>
-        <p className="relative z-10 text-primary-foreground/60 text-xs">
-          Erciyes Üniversitesi · Güvenli erişim
-        </p>
-      </aside>
-      <div className="flex flex-col bg-background">
-        <div className="flex items-center justify-between border-b px-4 py-3 lg:hidden">
-          <AppLogo href="/" showText={false} />
-          <Badge variant="secondary">{badge}</Badge>
-        </div>
-        <div className="flex flex-1 items-center justify-center p-4 sm:p-8">
-          <div className="w-full max-w-md">{children}</div>
-        </div>
-      </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="relative z-10 w-full max-w-5xl mx-auto px-6 py-6 border-t border-slate-200/40 flex items-center justify-center text-xs text-muted-foreground">
+        <p>© 2026 Erciyes Üniversitesi Tıp Fakültesi. Tüm hakları saklıdır.</p>
+      </footer>
     </div>
   );
 }

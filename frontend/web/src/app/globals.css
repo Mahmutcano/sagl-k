@@ -1,126 +1,128 @@
-@import "tailwindcss";
-
-@custom-variant dark (&:is(.dark *));
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(0.985 0.002 247);
-  --foreground: oklch(0.145 0.02 265);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0.02 265);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0.02 265);
-  --primary: oklch(0.45 0.14 255);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.96 0.01 255);
-  --secondary-foreground: oklch(0.25 0.04 265);
-  --muted: oklch(0.96 0.008 255);
-  --muted-foreground: oklch(0.5 0.02 265);
-  --accent: oklch(0.94 0.02 255);
-  --accent-foreground: oklch(0.25 0.04 265);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.91 0.01 255);
-  --input: oklch(0.91 0.01 255);
-  --ring: oklch(0.45 0.14 255);
+  /* Premium medical-clinical color palette using oklch for uniform chroma/lightness */
+  --background: oklch(98.5% 0.006 230deg);       /* Soft cool ice-blue slate background */
+  --foreground: oklch(20% 0.025 230deg);         /* Deep navy slate for high-readability text */
+  --card: oklch(100% 0 0deg);                    /* Pure white cards */
+  --card-foreground: oklch(20% 0.025 230deg);
+  --popover: oklch(100% 0 0deg);
+  --popover-foreground: oklch(20% 0.025 230deg);
+  --primary: oklch(56% 0.16 235deg);             /* Vibrant clinical royal blue */
+  --primary-foreground: oklch(99.5% 0 0deg);
+  --secondary: oklch(95% 0.015 235deg);          /* Light ice-blue secondary background */
+  --secondary-foreground: oklch(40% 0.1 235deg);  /* Contrast text for secondary elements */
+  --muted: oklch(96.2% 0.008 230deg);            /* Soft cool grey for disabled/muted states */
+  --muted-foreground: oklch(48% 0.018 230deg);   /* Readable grey for captions/hints */
+  --accent: oklch(93.8% 0.038 210deg);           /* Muted clinical teal accent background */
+  --accent-foreground: oklch(36% 0.13 210deg);   /* Muted teal text */
+  --destructive: oklch(58% 0.185 24deg);         /* Premium crimson/coral red */
+  --destructive-foreground: oklch(99.5% 0 0deg);
+  --border: oklch(92.5% 0.008 230deg);           /* Very clean, light grey-blue border */
+  --input: oklch(92.5% 0.008 230deg);
+  --ring: oklch(56% 0.16 235deg);                /* Matches primary color */
+  --radius: 0.75rem;                             /* Rounded corners for components */
+
+  --success: oklch(68% 0.15 145deg);             /* Healthy clinical green */
+  --warning: oklch(82% 0.12 75deg);              /* Warm yellow-amber */
+  --error: oklch(58% 0.185 24deg);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground antialiased min-h-[100vh] flex flex-col;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  label {
+    margin: 0 !important;
+    padding: 0 !important;
   }
 }
 
-@source "../**/*.{js,ts,jsx,tsx,mdx}";
+html {
+  font-size: 15px;
+}
 
-/* App shell subtle mesh background */
+/* Premium shadows & transitions */
+.shadow-premium {
+  box-shadow: 0 4px 20px -2px rgba(148, 163, 184, 0.08), 0 2px 8px -1px rgba(148, 163, 184, 0.04);
+}
+.shadow-premium-lg {
+  box-shadow: 0 12px 30px -4px rgba(148, 163, 184, 0.12), 0 4px 12px -2px rgba(148, 163, 184, 0.06);
+}
+.shadow-premium-xl {
+  box-shadow: 0 20px 40px -6px rgba(148, 163, 184, 0.16), 0 8px 20px -4px rgba(148, 163, 184, 0.08);
+}
+
+/* App shell subtle mesh background matching CMS theme */
 .app-shell {
   background:
-    radial-gradient(ellipse 70% 50% at 50% -20%, color-mix(in oklab, var(--primary) 6%, transparent), transparent),
+    radial-gradient(ellipse 80% 50% at 50% -20%, color-mix(in oklab, var(--primary) 4%, transparent), transparent),
     var(--background);
 }
 
-/* Auth sidebar */
+/* Premium dark auth sidebar matching CMS dark/clinical layout */
 .auth-sidebar {
-  background: linear-gradient(
-    160deg,
-    oklch(0.38 0.14 255) 0%,
-    oklch(0.32 0.12 265) 50%,
-    oklch(0.28 0.1 270) 100%
-  );
+  background: linear-gradient(135deg, oklch(25% 0.08 235deg) 0%, oklch(12% 0.04 235deg) 100%);
   color: var(--primary-foreground);
+  border-right: 1px solid oklch(20% 0.05 235deg);
 }
 
 .auth-sidebar-glow {
   background:
-    radial-gradient(circle at 20% 80%, color-mix(in oklab, white 12%, transparent), transparent 50%),
-    radial-gradient(circle at 80% 20%, color-mix(in oklab, white 8%, transparent), transparent 40%);
+    radial-gradient(circle at 20% 80%, color-mix(in oklab, var(--primary) 15%, transparent), transparent 60%),
+    radial-gradient(circle at 80% 20%, color-mix(in oklab, var(--primary) 20%, transparent), transparent 50%);
+  opacity: 0.85;
 }
 
-/* Landing */
+/* Landing Page Glow & Layout */
 .landing-glow {
   background:
-    radial-gradient(ellipse 80% 60% at 50% -10%, color-mix(in oklab, var(--primary) 15%, transparent), transparent),
-    radial-gradient(ellipse 50% 40% at 100% 50%, color-mix(in oklab, var(--primary) 8%, transparent), transparent);
+    radial-gradient(ellipse 90% 60% at 50% -10%, color-mix(in oklab, var(--primary) 10%, transparent), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 100% 50%, color-mix(in oklab, var(--primary) 5%, transparent), transparent 60%);
 }
 
 .landing-gradient-text {
-  background: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklab, var(--primary) 60%, var(--foreground)) 100%);
+  background: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklab, var(--primary) 50%, var(--foreground)) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .landing-step-num {
-  color: color-mix(in oklab, var(--primary) 40%, var(--muted-foreground));
+  color: color-mix(in oklab, var(--primary) 45%, var(--muted-foreground));
 }
 
 .landing-card-main {
   animation: landing-float 6s ease-in-out infinite;
+  box-shadow: 0 10px 30px rgba(148, 163, 184, 0.1);
 }
 
 .landing-card-float {
   animation: landing-float 6s ease-in-out infinite 1.5s;
-  box-shadow: 0 8px 32px color-mix(in oklab, var(--primary) 12%, transparent);
+  box-shadow: 0 12px 35px color-mix(in oklab, var(--primary) 8%, rgba(148, 163, 184, 0.12));
 }
 
 @keyframes landing-float {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+  50% { transform: translateY(-8px); }
 }
 
 /* Interactive list cards */
 .interactive-card {
   box-shadow: 0 0 0 1px transparent;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.interactive-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in oklab, var(--primary) 20%, var(--border));
+  box-shadow: 0 10px 25px -5px rgba(148, 163, 184, 0.12);
 }
 
 .interactive-card:focus-visible {
@@ -132,96 +134,119 @@
 
 /* Large Form overrides for superior UX, readability, and spaciousness */
 .large-form {
-  /* Increase container padding */
   padding: 1.5rem !important;
+  border-radius: 1.25rem !important;
+  box-shadow: 0 15px 35px -5px rgba(148, 163, 184, 0.12) !important;
+}
 
-  @media (min-width: 640px) {
+@media (min-width: 640px) {
+  .large-form {
     padding: 2.5rem !important;
-  }
-
-  & [class*="CardHeader"] {
-    padding: 0 0 2rem 0 !important;
-  }
-
-  & [class*="CardContent"] {
-    padding: 0 0 2rem 0 !important;
-  }
-
-  & [class*="CardFooter"] {
-    padding: 2rem 0 0 0 !important;
-  }
-
-  /* Increase titles and typography sizes */
-  & [class*="CardTitle"] {
-    font-size: 1.75rem !important; /* ~28px */
-    line-height: 2.25rem !important;
-    font-weight: 700 !important;
-    letter-spacing: -0.025em !important;
-  }
-
-  & [class*="CardDescription"] {
-    font-size: 1rem !important; /* 16px */
-    line-height: 1.5rem !important;
-    margin-top: 0.5rem !important;
-  }
-
-  /* Inputs, Textareas, and Select boxes */
-  & input,
-  & textarea,
-  & button[role="combobox"],
-  & select {
-    font-size: 1.05rem !important; /* ~17px */
-    line-height: 1.5rem !important;
-    border-radius: 0.5rem !important;
-  }
-
-  & input {
-    height: 3rem !important; /* 48px */
-  }
-
-  & button[role="combobox"] {
-    height: 3rem !important; /* 48px */
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
-  }
-
-  & textarea {
-    padding: 0.875rem 1rem !important;
-  }
-
-  /* Form Labels and Hints */
-  & label {
-    font-size: 1.05rem !important; /* ~17px */
-    font-weight: 600 !important;
-    color: var(--foreground) !important;
-    margin-bottom: 0.25rem !important;
-  }
-
-  & [id$="-hint"] {
-    font-size: 0.9rem !important; /* 14px */
-    line-height: 1.25rem !important;
-    margin-top: 0.25rem !important;
-  }
-
-  & [id$="-error"] {
-    font-size: 0.9rem !important;
-    font-weight: 500 !important;
-    margin-top: 0.25rem !important;
-  }
-
-  /* Form spacing gaps */
-  & .grid {
-    gap: 1.5rem !important;
-  }
-
-  /* Action buttons in footer */
-  & [class*="CardFooter"] button {
-    height: 3rem !important; /* 48px */
-    font-size: 1.05rem !important;
-    font-weight: 600 !important;
-    padding-left: 1.75rem !important;
-    padding-right: 1.75rem !important;
-    border-radius: 0.5rem !important;
   }
 }
 
+.large-form [class*="CardHeader"] {
+  padding: 0 0 2rem 0 !important;
+}
+
+.large-form [class*="CardContent"] {
+  padding: 0 0 2rem 0 !important;
+}
+
+.large-form [class*="CardFooter"] {
+  padding: 2rem 0 0 0 !important;
+  display: flex;
+  gap: 1rem;
+}
+
+.large-form [class*="CardTitle"] {
+  font-size: 1.85rem !important;
+  line-height: 2.25rem !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.03em !important;
+}
+
+.large-form [class*="CardDescription"] {
+  font-size: 1rem !important;
+  line-height: 1.5rem !important;
+  margin-top: 0.5rem !important;
+}
+
+/* Perfectly proportioned sizes for inputs, buttons, and selects in large-form */
+.large-form input,
+.large-form textarea,
+.large-form button[role="combobox"],
+.large-form select {
+  font-size: 1.05rem !important;
+  line-height: 1.5rem !important;
+  border-radius: 0.75rem !important;
+  border-width: 1px !important;
+  border-color: var(--border) !important;
+  transition: all 0.2s ease-in-out !important;
+}
+
+.large-form input {
+  height: 3.25rem !important; /* 52px - premium input height */
+  padding-left: 1.25rem !important;
+  padding-right: 1.25rem !important;
+}
+
+.large-form button[role="combobox"] {
+  height: 3.25rem !important; /* 52px */
+  padding-left: 1.25rem !important;
+  padding-right: 1.25rem !important;
+}
+
+.large-form textarea {
+  padding: 1rem 1.25rem !important;
+  min-height: 120px !important;
+}
+
+.large-form input:focus,
+.large-form textarea:focus,
+.large-form button[role="combobox"]:focus-within,
+.large-form select:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 12%, transparent) !important;
+  outline: none !important;
+}
+
+.large-form label {
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  color: var(--foreground) !important;
+  margin-bottom: 0px !important;
+  letter-spacing: -0.01em;
+}
+
+.large-form [id$="-hint"] {
+  font-size: 0.9rem !important;
+  line-height: 1.35rem !important;
+  margin-top: 0.35rem !important;
+}
+
+.large-form [id$="-error"] {
+  font-size: 0.9rem !important;
+  font-weight: 600 !important;
+  margin-top: 0.35rem !important;
+  color: var(--error) !important;
+}
+
+.large-form .grid {
+  gap: 1.75rem !important;
+}
+
+/* Beautiful form action buttons */
+.large-form button:not(.h-auto) {
+  height: 3.25rem !important; /* Matches input height perfectly at 52px */
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  padding-left: 2rem !important;
+  padding-right: 2rem !important;
+  border-radius: 0.75rem !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.large-form button:not(.h-auto):hover {
+  transform: translateY(-1px);
+}

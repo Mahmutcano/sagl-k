@@ -18,6 +18,7 @@ import {
 } from "@/components/PatientApplicationList";
 import { groupPatientApplications } from "@/lib/application";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 export default function ApplicationsPage() {
@@ -104,26 +105,28 @@ export default function ApplicationsPage() {
           }
         />
       ) : (
-        <div className="grid gap-8">
-          {grouped.map(({ group, items: groupItems }) => (
-            <ApplicationListGroup
-              key={group.id}
-              title={group.title}
-              description={group.description}
-              stepHint={group.stepHint}
-            >
-              {groupItems.map((item) => (
-                <li key={item.applicationId}>
-                  <PatientApplicationRow
-                    item={item}
-                    onDelete={deleteApplication}
-                    deleting={deletingId === item.applicationId}
-                  />
-                </li>
-              ))}
-            </ApplicationListGroup>
-          ))}
-        </div>
+        <Card className="p-6 bg-card border shadow-sm rounded-xl">
+          <div className="grid gap-8">
+            {grouped.map(({ group, items: groupItems }) => (
+              <ApplicationListGroup
+                key={group.id}
+                title={group.title}
+                description={group.description}
+                stepHint={group.stepHint}
+              >
+                {groupItems.map((item) => (
+                  <li key={item.applicationId}>
+                    <PatientApplicationRow
+                      item={item}
+                      onDelete={deleteApplication}
+                      deleting={deletingId === item.applicationId}
+                    />
+                  </li>
+                ))}
+              </ApplicationListGroup>
+            ))}
+          </div>
+        </Card>
       )}
 
       <ConfirmModal

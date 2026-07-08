@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { ArrowLeft } from "lucide-react";
 
 type Props = {
   id: string;
@@ -210,8 +211,11 @@ export function StaffApplicationDetail({ id, token, backHref = ROUTES.doctor.das
   return (
     <div className="grid gap-6">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={backHref}>← Geri</Link>
+        <Button variant="ghost" size="sm" asChild className="gap-1.5">
+          <Link href={backHref}>
+            <ArrowLeft className="h-4 w-4" />
+            Geri
+          </Link>
         </Button>
         <Badge variant={statusVariant(app.statusCode)}>
           {STATUS_LABELS[app.statusCode] ?? `Durum ${app.statusCode}`}

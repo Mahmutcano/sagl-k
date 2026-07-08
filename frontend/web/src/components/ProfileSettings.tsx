@@ -12,7 +12,7 @@ import {
 } from "@/components/FormField";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { type FieldErrors, hasErrors } from "@/lib/validation";
+import { type FieldErrors } from "@/lib/validation";
 
 type ProfileData = {
   id: string;
@@ -225,9 +225,9 @@ export function ProfileSettings() {
         </div>
       ) : null}
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="flex flex-col gap-6">
         {/* Personal Details Card */}
-        <Card className="md:col-span-2 large-form shadow-md border-slate-200">
+        <Card className="large-form shadow-md border-slate-200">
           <form onSubmit={handleProfileSubmit} noValidate>
             <CardHeader>
               <CardTitle>Kişisel Bilgiler</CardTitle>
@@ -301,16 +301,16 @@ export function ProfileSettings() {
         </Card>
 
         {/* Password Card */}
-        <Card className="large-form shadow-md border-slate-200 h-fit">
+        <Card className="large-form shadow-md border-slate-200">
           <form onSubmit={handlePasswordSubmit} noValidate>
             <CardHeader>
               <CardTitle>Şifre İşlemleri</CardTitle>
               <CardDescription>Güvenliğiniz için şifrenizi düzenli aralıklarla güncelleyin.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {passError ? <p className="text-sm text-destructive font-medium">{passError}</p> : null}
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              {passError ? <p className="text-sm text-destructive font-medium sm:col-span-2">{passError}</p> : null}
               {passSuccess ? (
-                <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded p-2 font-medium">
+                <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded p-2 font-medium sm:col-span-2">
                   {passSuccess}
                 </p>
               ) : null}
@@ -331,7 +331,7 @@ export function ProfileSettings() {
               />
             </CardContent>
             <CardFooter className="border-t flex justify-end">
-              <Button type="submit" variant="secondary" disabled={saving} className="w-full">
+              <Button type="submit" variant="secondary" disabled={saving}>
                 {saving ? "Değiştiriliyor..." : "Şifreyi Değiştir"}
               </Button>
             </CardFooter>

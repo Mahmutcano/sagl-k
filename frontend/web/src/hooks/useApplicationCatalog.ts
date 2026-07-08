@@ -11,6 +11,7 @@ export type CareProvider = {
   fullName: string;
   title: string;
   professionCode: string;
+  consultationFee?: number;
 };
 
 export function useApplicationCatalog(

@@ -41,6 +41,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { ArrowLeft } from "lucide-react";
 
 type Props = {
   id: string;
@@ -160,8 +161,11 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
   return (
     <div className="grid gap-6">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={backHref}>← Listeye dön</Link>
+        <Button variant="ghost" size="sm" asChild className="gap-1.5">
+          <Link href={backHref}>
+            <ArrowLeft className="h-4 w-4" />
+            Listeye dön
+          </Link>
         </Button>
         <Badge variant={statusVariant(app.statusCode)}>
           {STATUS_LABELS[app.statusCode] ?? `Durum ${app.statusCode}`}

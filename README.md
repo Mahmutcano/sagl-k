@@ -2,6 +2,9 @@
 
 Erciyes Üniversitesi Tıp Fakültesi için tıbbi danışmanlık (ikinci görüş) platformu.
 
+* 🧑‍💻 **Teknik Dokümantasyon**: Sistem mimarisi, veritabanı şeması ve API detayları için [PROJECT_DOCUMENTATION.md](file:///Users/canozgan/Documents/sagl-k/PROJECT_DOCUMENTATION.md) dosyasını inceleyebilirsiniz.
+* 👥 **Yönetici ve Kullanıcı Rehberi**: Yazılımcı olmayan kullanıcılar, doktorlar ve hastane yöneticileri için hazırlanan açıklayıcı rehbere [KULLANICI_REHBERI.md](file:///Users/canozgan/Documents/sagl-k/KULLANICI_REHBERI.md) dosyasından ulaşabilirsiniz.
+
 ## Proje yapısı
 
 ```

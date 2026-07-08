@@ -20,7 +20,7 @@ import {
   type FieldErrors,
 } from "@/lib/validation";
 import { AdminAppShell } from "@/components/AdminAppShell";
-import { FormAlert, TextInput } from "@/components/FormField";
+import { FormAlert, TextInput, FormSelect } from "@/components/FormField";
 import Link from "next/link";
 import { STATUS_LABELS, statusVariant, applicationDisplayNumber } from "@/lib/application";
 import { Badge } from "@/components/ui/badge";
@@ -58,10 +58,21 @@ type Hospital = {
   targetInstitution: number;
 };
 
+type Profession = {
+  id: string;
+  code: string;
+  name: string;
+  targetInstitution: number;
+  hospitalId: string | null;
+  hospitalName?: string;
+  isActive: boolean;
+};
+
 export default function AdminDashboardPage() {
   const router = useRouter();
   const [apps, setApps] = useState<AppRow[]>([]);
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
+  const [professions, setProfessions] = useState<Profession[]>([]);
   const [erciyesHealth, setErciyesHealth] = useState<{
     mode: string;
     healthy: boolean;
@@ -80,18 +91,31 @@ export default function AdminDashboardPage() {
   const [hospitalOk, setHospitalOk] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [professionForm, setProfessionForm] = useState({
+    code: "",
+    name: "",
+    targetInstitution: 1,
+    hospitalId: "",
+  });
+  const [professionFields, setProfessionFields] = useState<FieldErrors>({});
+  const [professionMsg, setProfessionMsg] = useState("");
+  const [professionOk, setProfessionOk] = useState(false);
+  const [savingProfession, setSavingProfession] = useState(false);
+
   function load(token: string) {
     return Promise.all([
       api<AppRow[]>(API.admin.applications, {}, token),
       api<Hospital[]>(API.admin.hospitals, {}, token),
+      api<Profession[]>(API.admin.professions, {}, token),
       api<{ mode: string; healthy: boolean; targetInstitution: number }>(
         API.admin.erciyesHealth,
         {},
         token
       ).catch(() => null),
-    ]).then(([a, h, e]) => {
+    ]).then(([a, h, p, e]) => {
       setApps(a ?? []);
       setHospitals(h ?? []);
+      setProfessions(p ?? []);
       setErciyesHealth(e);
     });
   }
@@ -156,6 +180,52 @@ export default function AdminDashboardPage() {
       }
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function createProfession(e: React.FormEvent) {
+    e.preventDefault();
+    setProfessionMsg("");
+    setProfessionOk(false);
+    const fields: FieldErrors = {};
+    if (!professionForm.code.trim()) fields.code = "Branş kodu zorunludur.";
+    if (!professionForm.name.trim()) fields.name = "Branş adı zorunludur.";
+    if (professionForm.targetInstitution < 1 || professionForm.targetInstitution > 99) {
+      fields.targetInstitution = "Hedef kurum kodu 1–99 arasında olmalıdır.";
+    }
+    setProfessionFields(fields);
+    if (hasErrors(fields)) return;
+
+    const token = getToken();
+    if (!token) return;
+    setSavingProfession(true);
+    try {
+      await api(
+        API.admin.createProfession,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            code: professionForm.code.trim(),
+            name: professionForm.name.trim(),
+            targetInstitution: professionForm.targetInstitution,
+            hospitalId: professionForm.hospitalId || undefined,
+          }),
+        },
+        token
+      );
+      setProfessionForm({ code: "", name: "", targetInstitution: 1, hospitalId: "" });
+      setProfessionMsg("Bölüm başarıyla oluşturuldu.");
+      setProfessionOk(true);
+      await load(token);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (Object.keys(err.fields).length) setProfessionFields(err.fields);
+        setProfessionMsg(err.message);
+      } else {
+        setProfessionMsg("Bölüm oluşturulamadı.");
+      }
+    } finally {
+      setSavingProfession(false);
     }
   }
 
@@ -295,6 +365,113 @@ export default function AdminDashboardPage() {
             <CardFooter className="border-t pt-6">
               <Button type="submit" disabled={saving}>
                 {saving ? "Kaydediliyor..." : "Hastaneyi kaydet"}
+              </Button>
+            </CardFooter>
+          </form>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Bölümler / Branşlar</CardTitle>
+            <CardDescription>Sistemdeki tüm klinik bölümler ve hastane bağlantıları</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-2/3" />
+                <Skeleton className="h-4 w-1/2" />
+              </div>
+            ) : professions.length === 0 ? (
+              <p className="text-muted-foreground text-sm">Tanımlı bölüm yok.</p>
+            ) : (
+              <div className="max-h-[350px] overflow-y-auto pr-1">
+                <ul className="grid gap-2">
+                  {professions.map((p) => (
+                    <li
+                      key={p.id}
+                      className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm"
+                    >
+                      <div>
+                        <span className="font-medium">{p.name}</span>
+                        {p.hospitalName && (
+                          <span className="text-xs text-muted-foreground block">
+                            {p.hospitalName}
+                          </span>
+                        )}
+                      </div>
+                      <Badge variant="secondary">{p.code}</Badge>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <form onSubmit={createProfession} noValidate>
+            <CardHeader>
+              <CardTitle>Bölüm (Branş) Ekle</CardTitle>
+              <CardDescription>Hastaneye bağlı veya genel branş tanımlayın.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              {professionMsg ? (
+                <FormAlert
+                  title={professionOk ? "Başarılı" : "Uyarı"}
+                  message={professionMsg}
+                  variant={professionOk ? "default" : "destructive"}
+                />
+              ) : null}
+              <TextInput
+                id="prof-code"
+                label="Bölüm Kodu"
+                hint="Örn: cardiology"
+                placeholder="cardiology"
+                value={professionForm.code}
+                onChange={(e) => setProfessionForm((f) => ({ ...f, code: e.target.value }))}
+                error={professionFields.code}
+              />
+              <TextInput
+                id="prof-name"
+                label="Bölüm Adı"
+                placeholder="Kardiyoloji"
+                value={professionForm.name}
+                onChange={(e) => setProfessionForm((f) => ({ ...f, name: e.target.value }))}
+                error={professionFields.name}
+              />
+              <FormSelect
+                id="prof-hospitalId"
+                label="Hastane (Bağlantı)"
+                placeholder="Seçilirse hastaneye bağlanır"
+                value={professionForm.hospitalId}
+                onChange={(e: { target: { value: string } }) => setProfessionForm((f) => ({ ...f, hospitalId: e.target.value }))}
+                options={[
+                  { value: "", label: "Genel / Hastaneye Bağlı Olmayan" },
+                  ...hospitals.map((h) => ({ value: h.id, label: h.name })),
+                ]}
+              />
+              <TextInput
+                id="prof-targetInstitution"
+                label="Hedef kurum"
+                type="number"
+                min={1}
+                max={99}
+                hint="Kurum kodu (Erciyes için 1)"
+                value={String(professionForm.targetInstitution)}
+                onChange={(e) =>
+                  setProfessionForm((f) => ({
+                    ...f,
+                    targetInstitution: Number(e.target.value),
+                  }))
+                }
+                error={professionFields.targetInstitution}
+              />
+            </CardContent>
+            <CardFooter className="border-t pt-6">
+              <Button type="submit" disabled={savingProfession}>
+                {savingProfession ? "Kaydediliyor..." : "Bölümü kaydet"}
               </Button>
             </CardFooter>
           </form>

@@ -93,29 +93,34 @@ func (h *ApplicationHandler) ListCareProviders(w http.ResponseWriter, r *http.Re
 		return
 	}
 	rows, err := h.db.Pool.Query(r.Context(), `
-		SELECT id::text, full_name, COALESCE(title,''), profession_code
-		FROM care_providers
-		WHERE target_institution = $1 AND is_active = true AND user_id IS NOT NULL
-		  AND ($2 = '' OR profession_code = $2)
-		ORDER BY full_name
+		SELECT cp.id::text, cp.full_name, COALESCE(cp.title,''), cp.profession_code, cp.consultation_fee
+		FROM care_providers cp
+		WHERE cp.target_institution = $1 AND cp.is_active = true AND cp.user_id IS NOT NULL
+		  AND ($2 = '' OR cp.profession_code = $2 OR EXISTS (
+		      SELECT 1 FROM care_provider_professions cpp
+		      JOIN professions p ON p.id = cpp.profession_id
+		      WHERE cpp.care_provider_id = cp.id AND p.code = $2
+		  ))
+		ORDER BY cp.full_name
 	`, target, code)
 	if err != nil {
 		response.Fail(w, http.StatusInternalServerError, "APP002", "Doktor listesi alınamadı.")
 		return
 	}
 	defer rows.Close()
-	var list []map[string]string
+	var list []map[string]interface{}
 	for rows.Next() {
 		var id, name, title, pcode string
-		if err := rows.Scan(&id, &name, &title, &pcode); err != nil {
+		var fee float64
+		if err := rows.Scan(&id, &name, &title, &pcode, &fee); err != nil {
 			continue
 		}
-		list = append(list, map[string]string{
-			"careProviderId": id, "fullName": name, "title": title, "professionCode": pcode,
+		list = append(list, map[string]interface{}{
+			"careProviderId": id, "fullName": name, "title": title, "professionCode": pcode, "consultationFee": fee,
 		})
 	}
 	if list == nil {
-		list = []map[string]string{}
+		list = []map[string]interface{}{}
 	}
 	response.OK(w, list)
 }
@@ -697,9 +702,19 @@ func (h *ApplicationHandler) UpdatePayment(w http.ResponseWriter, r *http.Reques
 		provider = h.cfg.DefaultPaymentProvider
 	}
 
+	var amount float64
+	err := h.db.Pool.QueryRow(r.Context(), `
+		SELECT COALESCE(cp.consultation_fee, 1000.00)
+		FROM applications a
+		LEFT JOIN care_providers cp ON cp.id = a.care_provider_id
+		WHERE a.id = $1
+	`, appID).Scan(&amount)
+	if err != nil || amount <= 0 {
+		amount = h.cfg.PaymentAmount
+	}
+
 	var errs validate.Errors
 	provider = validate.PaymentProvider(&errs, "provider", provider)
-	amount := h.cfg.PaymentAmount
 	validate.PaymentAmount(&errs, "amount", amount)
 	live := isLivePaymentProvider(h.cfg, provider)
 	if live || h.payment.RequireCard() {
@@ -715,7 +730,7 @@ func (h *ApplicationHandler) UpdatePayment(w http.ResponseWriter, r *http.Reques
 
 	var statusCode int
 	var appNumber *string
-	err := h.db.Pool.QueryRow(r.Context(), `
+	err = h.db.Pool.QueryRow(r.Context(), `
 		SELECT status_code, application_number FROM applications WHERE id = $1
 	`, appID).Scan(&statusCode, &appNumber)
 	if err != nil {
@@ -744,6 +759,31 @@ func (h *ApplicationHandler) UpdatePayment(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	cardBrand := "Unknown"
+	maskedCard := ""
+	cleanCard := strings.ReplaceAll(req.CardNumber, " ", "")
+	if len(cleanCard) >= 6 {
+		if strings.HasPrefix(cleanCard, "4") {
+			cardBrand = "Visa"
+		} else if strings.HasPrefix(cleanCard, "5") {
+			cardBrand = "Mastercard"
+		} else if strings.HasPrefix(cleanCard, "9") || strings.HasPrefix(cleanCard, "6") {
+			cardBrand = "Troy"
+		}
+		if len(cleanCard) >= 16 {
+			maskedCard = cleanCard[0:6] + "******" + cleanCard[len(cleanCard)-4:]
+		} else {
+			maskedCard = cleanCard[0:6] + "******"
+		}
+	}
+
+	meta := map[string]interface{}{
+		"provider":    provider,
+		"card_brand":  cardBrand,
+		"masked_card": maskedCard,
+		"card_holder": req.CardHolder,
+	}
+
 	dbProvider := paysvc.ProviderDBValue(paysvc.NormalizeProvider(provider))
 	paymentID, err := h.payment.Store().CreatePending(r.Context(), paysvc.PaymentRecord{
 		ApplicationID:  appID,
@@ -752,7 +792,7 @@ func (h *ApplicationHandler) UpdatePayment(w http.ResponseWriter, r *http.Reques
 		Amount:         amount,
 		Currency:       "TRY",
 		IdempotencyKey: appID.String(),
-	}, map[string]interface{}{"provider": provider})
+	}, meta)
 	if err != nil {
 		response.Fail(w, http.StatusInternalServerError, "APP113", "Ödeme kaydı oluşturulamadı.")
 		return
@@ -861,4 +901,23 @@ func (h *ApplicationHandler) NoteHistory(w http.ResponseWriter, r *http.Request)
 		})
 	}
 	response.OK(w, notes)
+}
+
+func (h *ApplicationHandler) MarkReportViewed(w http.ResponseWriter, r *http.Request) {
+	appID, ok := parseAppID(w, r)
+	if !ok {
+		return
+	}
+	if !authmw.RequireApplicationAccess(w, r, h.db, appID) {
+		return
+	}
+	// Only mark if not already marked
+	_, err := h.db.Pool.Exec(r.Context(), `
+		UPDATE applications SET report_viewed_at = now() WHERE id = $1 AND report_viewed_at IS NULL
+	`, appID)
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, "APP140", "Rapor görüntüleme kaydedilemedi.")
+		return
+	}
+	response.OK(w, map[string]bool{"viewed": true})
 }

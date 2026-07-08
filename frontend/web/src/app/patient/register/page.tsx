@@ -17,6 +17,7 @@ import {
 import { AuthShell } from "@/components/AuthShell";
 import { BirthDateSelect, FormAlert, FormSelect, TextInput } from "@/components/FormField";
 import { Button } from "@/components/ui/button";
+import { AgreementModal } from "@/components/AgreementModal";
 import {
   Card,
   CardContent,
@@ -65,6 +66,7 @@ export default function RegisterPage() {
   const [acceptedAgreements, setAcceptedAgreements] = useState<Record<string, boolean>>({});
   const [fields, setFields] = useState<FieldErrors>({});
   const [formError, setFormError] = useState("");
+  const [modalOpen, setModalOpen] = useState<"terms" | "kvkk" | null>(null);
   const [loading, setLoading] = useState(false);
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
@@ -184,7 +186,7 @@ export default function RegisterPage() {
   if (step === "otp") {
     return (
       <AuthShell badge="Hasta">
-        <Card className="w-full">
+        <Card className="large-form w-full shadow-premium-lg">
           <CardHeader>
             <CardTitle>SMS doğrulama</CardTitle>
             <CardDescription>
@@ -228,7 +230,7 @@ export default function RegisterPage() {
 
   return (
     <AuthShell badge="Hasta">
-      <Card className="w-full max-w-xl mx-auto">
+      <Card className="large-form w-full max-w-xl mx-auto shadow-premium-lg">
         <CardHeader>
           <CardTitle>Hesap oluştur</CardTitle>
           <CardDescription>Tüm alanlar doğrulanır; SMS ile telefonunuzu onaylarsınız.</CardDescription>
@@ -334,23 +336,35 @@ export default function RegisterPage() {
 
             {agreements.length > 0 ? (
               <fieldset id="agreements" className="space-y-3 rounded-lg border p-4">
-                <legend className="px-1 text-sm font-medium">Sözleşmeler</legend>
-                {agreements.map((a) => (
-                  <label key={a.id} className="flex items-start gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      className="mt-1 shrink-0"
-                      checked={acceptedAgreements[a.id] ?? false}
-                      onChange={(e) =>
-                        setAcceptedAgreements((prev) => ({ ...prev, [a.id]: e.target.checked }))
-                      }
-                    />
-                    <span>
-                      {a.title}
-                      {a.isRequired ? " *" : ""}
-                    </span>
-                  </label>
-                ))}
+                <legend className="px-1 text-sm font-medium text-foreground">Sözleşmeler</legend>
+                {agreements.map((a) => {
+                  const isKVKK = a.title.toLowerCase().includes("kvkk");
+                  const type = isKVKK ? "kvkk" : "terms";
+                  return (
+                    <div key={a.id} className="flex items-start gap-2.5 text-sm py-1">
+                      <input
+                        type="checkbox"
+                        className="mt-1 shrink-0 cursor-not-allowed"
+                        checked={acceptedAgreements[a.id] ?? false}
+                        readOnly
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setModalOpen(type);
+                        }}
+                      />
+                      <span className="text-foreground/80">
+                        <button
+                          type="button"
+                          className="text-primary font-semibold underline hover:text-primary/80 inline mr-1 cursor-pointer"
+                          onClick={() => setModalOpen(type)}
+                        >
+                          {a.title}
+                        </button>
+                        metnini okudum ve onaylıyorum {a.isRequired ? " *" : ""}
+                      </span>
+                    </div>
+                  );
+                })}
                 {Object.entries(fields)
                   .filter(([k]) => k.startsWith("agreement_"))
                   .map(([k, v]) => (
@@ -373,6 +387,26 @@ export default function RegisterPage() {
           </Button>
         </CardFooter>
       </Card>
+      
+      <AgreementModal
+        isOpen={modalOpen !== null}
+        onClose={() => setModalOpen(null)}
+        onAccept={() => {
+          if (modalOpen === "terms") {
+            const agreement = agreements.find(a => !a.title.toLowerCase().includes("kvkk"));
+            if (agreement) {
+              setAcceptedAgreements(prev => ({ ...prev, [agreement.id]: true }));
+            }
+          } else if (modalOpen === "kvkk") {
+            const agreement = agreements.find(a => a.title.toLowerCase().includes("kvkk"));
+            if (agreement) {
+              setAcceptedAgreements(prev => ({ ...prev, [agreement.id]: true }));
+            }
+          }
+        }}
+        title={modalOpen === "terms" ? "Kullanım Koşulları" : "KVKK Aydınlatma Metni"}
+        type={modalOpen ?? "terms"}
+      />
     </AuthShell>
   );
 }

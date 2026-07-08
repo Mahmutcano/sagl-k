@@ -73,6 +73,7 @@ func validateRegister(req *authsvc.RegisterInitRequest) validate.Errors {
 	validate.Password(&errs, "password", req.Password)
 	validate.DateOfBirth(&errs, "dateOfBirth", req.DateOfBirth)
 	validate.Gender(&errs, "gender", req.Gender)
+	validate.MatchGenderTCKN(&errs, "nationalIdentifier", "gender", req.NationalIdentifier, req.Gender)
 	if req.Nationality == "" {
 		req.Nationality = "TR"
 	}
@@ -93,11 +94,16 @@ func (h *AuthHandler) InitiateRegister(w http.ResponseWriter, r *http.Request) {
 		validate.Fail(w, errs)
 		return
 	}
-	if err := h.svc.InitiateRegister(r.Context(), req); err != nil {
+	code, err := h.svc.InitiateRegister(r.Context(), req)
+	if err != nil {
 		response.Fail(w, http.StatusBadRequest, "AUTH021", response.SafeMessage(err, "Kayıt başlatılamadı. Bilgilerinizi kontrol edin."))
 		return
 	}
-	response.OK(w, map[string]bool{"sent": true})
+	res := map[string]interface{}{"sent": true}
+	if h.svc.IsMock() {
+		res["code"] = code
+	}
+	response.OK(w, res)
 }
 
 type completeRegisterBody struct {
@@ -140,9 +146,12 @@ func (h *AuthHandler) InitiateForgotPassword(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	req.PhoneNumber = validate.NormalizePhoneTR(req.PhoneNumber)
-	// Always succeed to prevent phone enumeration.
-	_ = h.svc.InitiateForgotPassword(r.Context(), req.PhoneNumber)
-	response.OK(w, map[string]bool{"sent": true})
+	code, err := h.svc.InitiateForgotPassword(r.Context(), req.PhoneNumber)
+	res := map[string]interface{}{"sent": true}
+	if err == nil && h.svc.IsMock() {
+		res["code"] = code
+	}
+	response.OK(w, res)
 }
 
 func (h *AuthHandler) CompleteForgotPassword(w http.ResponseWriter, r *http.Request) {

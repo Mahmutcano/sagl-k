@@ -50,6 +50,9 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
     gender: 0,
   });
 
+  const [draftReport, setDraftReport] = useState<string | null>(null);
+  const [finalReport, setFinalReport] = useState<{ reportJson: any; createdAt: string } | null>(null);
+
   const catalog = useApplicationCatalog(1, professionCode, true);
 
   const loadData = useCallback(async (token: string) => {
@@ -78,6 +81,29 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
           gender: appData.representedPerson.gender || 0,
         });
       }
+
+      // Load draft report if it exists
+      api<{ data?: string }>(API.applications.reportDraft(params.id), {}, token)
+        .then((draft) => {
+          if (draft && draft.data && draft.data !== "{}") {
+            setDraftReport(draft.data);
+          } else {
+            setDraftReport(null);
+          }
+        })
+        .catch(() => setDraftReport(null));
+
+      // Load final report if it exists
+      api<{ reportJson: any; createdAt: string }>(API.applications.report(params.id), {}, token)
+        .then((final) => {
+          if (final && final.reportJson) {
+            setFinalReport(final);
+          } else {
+            setFinalReport(null);
+          }
+        })
+        .catch(() => setFinalReport(null));
+
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Veriler yüklenemedi.");
     } finally {
@@ -339,6 +365,53 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
                 </CardFooter>
               </form>
             </Card>
+
+            {/* Doctor Reports Card */}
+            {(draftReport || finalReport) && (
+              <Card className="shadow-md border-slate-200">
+                <CardHeader>
+                  <CardTitle className="text-base text-primary">Uzman Hekim Raporları</CardTitle>
+                  <CardDescription>
+                    Hekim tarafından hazırlanan taslak veya onaylanmış tıbbi görüş raporları.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  {finalReport && (
+                    <div className="border border-emerald-100 bg-emerald-50/20 rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <Badge variant="default" className="bg-emerald-600">Onaylanmış Nihai Rapor</Badge>
+                        <span className="text-xs text-muted-foreground font-mono">
+                          {new Date(finalReport.createdAt).toLocaleString("tr-TR")}
+                        </span>
+                      </div>
+                      <div className="text-sm bg-white border rounded-md p-3 whitespace-pre-wrap font-sans text-slate-800">
+                        {typeof finalReport.reportJson === "string" 
+                          ? finalReport.reportJson 
+                          : finalReport.reportJson.conclusion || JSON.stringify(finalReport.reportJson, null, 2)}
+                      </div>
+                    </div>
+                  )}
+
+                  {draftReport && (
+                    <div className="border border-amber-100 bg-amber-50/10 rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <Badge variant="secondary" className="bg-amber-500 text-white">Taslak Rapor (Kaydedilmiş)</Badge>
+                      </div>
+                      <div className="text-sm bg-white border rounded-md p-3 whitespace-pre-wrap font-sans text-slate-800">
+                        {(() => {
+                          try {
+                            const parsed = JSON.parse(draftReport);
+                            return parsed.conclusion || parsed.report || draftReport;
+                          } catch {
+                            return draftReport;
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Right Column: Status Change History (takes 1 col) */}

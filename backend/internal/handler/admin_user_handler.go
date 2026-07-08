@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -43,11 +44,28 @@ func (h *AdminUserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := h.db.Pool.Query(r.Context(), `
+	var errs validate.Errors
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	pageSize, _ := strconv.Atoi(r.URL.Query().Get("pageSize"))
+	page, pageSize = validate.Paging(&errs, page, pageSize)
+	roleFilter := strings.TrimSpace(r.URL.Query().Get("role"))
+
+	var totalCount int
+	countSQL := "SELECT COUNT(*) FROM users"
+	if roleFilter != "" {
+		countSQL += " WHERE role = '" + roleFilter + "'"
+	}
+	_ = h.db.Pool.QueryRow(r.Context(), countSQL).Scan(&totalCount)
+
+	query := `
 		SELECT id, first_name, last_name, email, phone_number, national_identifier, role, is_active, created_at
-		FROM users
-		ORDER BY created_at DESC
-	`)
+		FROM users`
+	if roleFilter != "" {
+		query += ` WHERE role = '` + roleFilter + `'`
+	}
+	query += ` ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+
+	rows, err := h.db.Pool.Query(r.Context(), query, pageSize, page*pageSize)
 	if err != nil {
 		response.Fail(w, http.StatusInternalServerError, "ADM090", "Kullanıcılar listelenemedi.")
 		return
@@ -68,7 +86,54 @@ func (h *AdminUserHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		users = append(users, u)
 	}
 
-	response.OK(w, users)
+	response.OK(w, map[string]interface{}{
+		"items":      users,
+		"totalCount": totalCount,
+		"page":       page,
+		"pageSize":   pageSize,
+	})
+}
+
+func (h *AdminUserHandler) ToggleActive(w http.ResponseWriter, r *http.Request) {
+	claims := authmw.ClaimsFromContext(r.Context())
+	if claims == nil {
+		response.Fail(w, http.StatusUnauthorized, "AUTH001", "Oturum gerekli.")
+		return
+	}
+	targetID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Fail(w, http.StatusBadRequest, "ADM096", "Geçersiz kullanıcı ID.")
+		return
+	}
+
+	var req struct {
+		IsActive bool `json:"isActive"`
+	}
+	if !validate.DecodeJSON(w, r, &req) {
+		return
+	}
+
+	_, err = h.db.Pool.Exec(r.Context(), `UPDATE users SET is_active = $1, updated_at = now() WHERE id = $2`, req.IsActive, targetID)
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, "ADM097", "Kullanıcı durumu güncellenemedi.")
+		return
+	}
+
+	// If deactivating a doctor, also deactivate care_provider
+	if !req.IsActive {
+		_, _ = h.db.Pool.Exec(r.Context(), `UPDATE care_providers SET is_active = false WHERE user_id = $1`, targetID)
+	} else {
+		_, _ = h.db.Pool.Exec(r.Context(), `UPDATE care_providers SET is_active = true WHERE user_id = $1`, targetID)
+	}
+
+	h.audit.Log(r.Context(), &claims.UserID, "admin_toggle_active", "users", &targetID, map[string]interface{}{
+		"isActive": req.IsActive,
+	})
+
+	response.OK(w, map[string]interface{}{
+		"message":  "Kullanıcı durumu güncellendi.",
+		"isActive": req.IsActive,
+	})
 }
 
 func (h *AdminUserHandler) GetUser(w http.ResponseWriter, r *http.Request) {

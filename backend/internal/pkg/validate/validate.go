@@ -275,6 +275,20 @@ func Gender(errs *Errors, field string, value int) {
 	}
 }
 
+func MatchGenderTCKN(errs *Errors, idField, genderField, tckn string, gender int) {
+	tckn = strings.TrimSpace(tckn)
+	if len(tckn) != 11 {
+		return
+	}
+	digit10 := int(tckn[9] - '0')
+	isMale := digit10%2 != 0
+	if isMale && gender != 1 {
+		errs.Add(genderField, "mismatch", "T.C. Kimlik Numarası (10. hanesi tek) Erkek cinsiyeti ile eşleşmelidir.")
+	} else if !isMale && gender != 2 {
+		errs.Add(genderField, "mismatch", "T.C. Kimlik Numarası (10. hanesi çift) Kadın cinsiyeti ile eşleşmelidir.")
+	}
+}
+
 func OTP(errs *Errors, field, value string) {
 	value = strings.TrimSpace(value)
 	if value == "" {

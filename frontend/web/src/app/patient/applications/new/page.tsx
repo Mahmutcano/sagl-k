@@ -46,6 +46,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ArrowLeft } from "lucide-react";
 
 type InpatientResult = {
   isInpatient: boolean;
@@ -395,8 +396,11 @@ export default function NewApplicationPage() {
           : "Erciyes Üniversitesi Tıp Fakültesi — yakın bilgisi ve yatan hasta kontrolü"
       }
       actions={
-        <Button variant="outline" size="sm" asChild>
-          <Link href={ROUTES.patient.applications}>Geri</Link>
+        <Button variant="outline" size="sm" asChild className="gap-1.5">
+          <Link href={ROUTES.patient.applications}>
+            <ArrowLeft className="h-4 w-4" />
+            Geri
+          </Link>
         </Button>
       }
     >
@@ -545,7 +549,9 @@ export default function NewApplicationPage() {
                   setRelativeFields({});
                   setError("");
                 }}
+                className="gap-1.5"
               >
+                <ArrowLeft className="h-4 w-4" />
                 Geri
               </Button>
             </CardFooter>
@@ -696,7 +702,9 @@ export default function NewApplicationPage() {
                     setStep(forRelative ? "relative" : "who");
                     setStatus(null);
                   }}
+                  className="gap-1.5"
                 >
+                  <ArrowLeft className="h-4 w-4" />
                   Geri
                 </Button>
               ) : null}
@@ -741,7 +749,8 @@ export default function NewApplicationPage() {
               <Button type="submit" disabled={submitting}>
                 {submitting ? "Kaydediliyor..." : "Devam et — form önizleme (Adım 3)"}
               </Button>
-              <Button type="button" variant="ghost" onClick={() => setStep("details")}>
+              <Button type="button" variant="ghost" onClick={() => setStep("details")} className="gap-1.5">
+                <ArrowLeft className="h-4 w-4" />
                 Geri — bölüm seçimi
               </Button>
             </CardFooter>
@@ -778,7 +787,8 @@ export default function NewApplicationPage() {
             <Button type="button" variant="outline" onClick={() => setStep("survey")}>
               Düzenle
             </Button>
-            <Button type="button" variant="ghost" onClick={() => setStep("details")}>
+            <Button type="button" variant="ghost" onClick={() => setStep("details")} className="gap-1.5">
+              <ArrowLeft className="h-4 w-4" />
               Geri — bölüm seçimi
             </Button>
           </CardFooter>
@@ -823,7 +833,8 @@ export default function NewApplicationPage() {
             />
           </CardContent>
           <CardFooter className="border-t">
-            <Button type="button" variant="ghost" onClick={() => setStep("preview")}>
+            <Button type="button" variant="ghost" onClick={() => setStep("preview")} className="gap-1.5">
+              <ArrowLeft className="h-4 w-4" />
               Geri — form önizleme (Adım 3)
             </Button>
           </CardFooter>

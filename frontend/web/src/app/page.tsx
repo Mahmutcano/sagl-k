@@ -65,10 +65,10 @@ export default function HomePage() {
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <Button size="lg" className="h-11 px-8 text-base" asChild>
+                <Button size="lg" className="w-full sm:w-auto" asChild>
                   <Link href={ROUTES.patient.register}>Hemen başvur</Link>
                 </Button>
-                <Button variant="outline" size="lg" className="h-11 px-8 text-base" asChild>
+                <Button variant="outline" size="lg" className="w-full sm:w-auto" asChild>
                   <Link href={ROUTES.patient.login}>Başvurularım</Link>
                 </Button>
               </div>

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -82,10 +83,14 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResult, er
 	}, nil
 }
 
-func (s *Service) InitiateRegister(ctx context.Context, req RegisterInitRequest) error {
+func (s *Service) IsMock() bool {
+	return s.cfg.SMS.Provider == "" || s.cfg.SMS.Provider == "mock"
+}
+
+func (s *Service) InitiateRegister(ctx context.Context, req RegisterInitRequest) (string, error) {
 	hash, err := password.Hash(req.Password)
 	if err != nil {
-		return err
+		return "", err
 	}
 	pending := map[string]interface{}{
 		"hash": hash, "req": req,
@@ -93,19 +98,22 @@ func (s *Service) InitiateRegister(ctx context.Context, req RegisterInitRequest)
 	raw, _ := json.Marshal(pending)
 	code, err := s.notify.SendSMS(ctx, req.PhoneNumber, "register_otp", "Kayıt doğrulama", nil, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
+
+	// Send simultaneous Email verification code
+	emailBody := fmt.Sprintf("Kayıt doğrulama kodunuz: %s\n\nLütfen bu kodu kayıt ekranına girerek işleminizi tamamlayın.", code)
+	_ = s.notify.SendEmail(ctx, req.Email, "Kayıt Doğrulama Kodu", "register_otp", emailBody, nil)
+
 	_, err = s.db.Pool.Exec(ctx, `
-		INSERT INTO verification_tokens (phone_number, token, purpose, expires_at)
-		VALUES ($1, $2, 'register', $3)
-	`, req.PhoneNumber, code, time.Now().Add(10*time.Minute))
+		INSERT INTO verification_tokens (phone_number, email, token, purpose, expires_at)
+		VALUES ($1, $2, $3, 'register', $4)
+	`, req.PhoneNumber, req.Email, code, time.Now().Add(10*time.Minute))
 	if err != nil {
-		return err
+		return "", err
 	}
-	// store pending registration in token metadata via separate temp table would be better;
-	// simplified: re-submit on complete with same payload
 	_ = raw
-	return nil
+	return code, nil
 }
 
 func (s *Service) CompleteRegister(ctx context.Context, phone, code string, req RegisterInitRequest) (*LoginResult, error) {
@@ -178,16 +186,28 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (*LoginResul
 	}, nil
 }
 
-func (s *Service) InitiateForgotPassword(ctx context.Context, phone string) error {
+func (s *Service) InitiateForgotPassword(ctx context.Context, phone string) (string, error) {
+	var email string
+	_ = s.db.Pool.QueryRow(ctx, "SELECT email FROM users WHERE phone_number = $1 AND is_active = true", phone).Scan(&email)
+
 	code, err := s.notify.SendSMS(ctx, phone, "forgot_password", "Şifre sıfırlama", nil, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
+
+	if email != "" {
+		emailBody := fmt.Sprintf("Şifre sıfırlama kodunuz: %s\n\nLütfen bu kodu şifre sıfırlama ekranına girerek işleminizi tamamlayın.", code)
+		_ = s.notify.SendEmail(ctx, email, "Şifre Sıfırlama Kodu", "forgot_password", emailBody, nil)
+	}
+
 	_, err = s.db.Pool.Exec(ctx, `
-		INSERT INTO verification_tokens (phone_number, token, purpose, expires_at)
-		VALUES ($1, $2, 'forgot_password', $3)
-	`, phone, code, time.Now().Add(10*time.Minute))
-	return err
+		INSERT INTO verification_tokens (phone_number, email, token, purpose, expires_at)
+		VALUES ($1, $2, $3, 'forgot_password', $4)
+	`, phone, email, code, time.Now().Add(10*time.Minute))
+	if err != nil {
+		return "", err
+	}
+	return code, nil
 }
 
 func (s *Service) CompleteForgotPassword(ctx context.Context, phone, code, newPassword string) error {

@@ -25,8 +25,8 @@ type FieldProps = {
 
 export function FormField({ id, label, hint, error, className, children }: FieldProps) {
   return (
-    <div className={cn("grid gap-2", className)}>
-      <Label htmlFor={id}>{label}</Label>
+    <div className={cn("flex flex-col gap-1", className)}>
+      <Label htmlFor={id} className="font-semibold text-foreground leading-none">{label}</Label>
       {children}
       {error ? (
         <p id={`${id}-error`} className="text-sm text-destructive" role="alert">

@@ -6,8 +6,8 @@ import { AppLogo } from "@/components/AppLogo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+import { LogOut, ArrowRight } from "lucide-react";
 
 export type NavItem = {
   href: string;
@@ -65,7 +65,8 @@ export function AppShellLayout({
                 {roleBadge}
               </Badge>
             ) : null}
-            <Button variant="outline" size="sm" onClick={() => void onLogout()}>
+            <Button variant="destructive" size="sm" onClick={() => void onLogout()} className="gap-1.5">
+              <LogOut className="h-4 w-4" />
               Çıkış
             </Button>
           </div>
@@ -112,9 +113,7 @@ export function ListLinkCard({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             {badge}
-            <span className="text-muted-foreground text-lg opacity-0 transition-opacity group-hover:opacity-100">
-              →
-            </span>
+            <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           </div>
         </div>
       </div>
