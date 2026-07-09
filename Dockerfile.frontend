@@ -40,6 +40,7 @@ RUN set -eux; \
     elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm build; \
     else npm run build; \
     fi; \
+    mkdir -p /out; \
     cp -r .next/standalone /out/standalone; \
     cp -r .next/static /out/static; \
     cp -r public /out/public 2>/dev/null || mkdir -p /out/public
