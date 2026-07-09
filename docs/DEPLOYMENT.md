@@ -38,27 +38,34 @@ CORS_ALLOWED_ORIGINS=https://www.ornek.edu.tr,https://staging.ornek.edu.tr
 
 ### Docker
 
-**Build context mutlaka `backend/` klasörü olmalı** (repo kökünden değil):
-
+**Seçenek A** — build context `backend/`:
 ```bash
-cd backend
-docker build -t mcp-api .
-docker run -p 8080:8080 --env-file .env -v mcp-uploads:/data/uploads mcp-api
+cd backend && docker build -t mcp-api .
 ```
 
-Repo kökünden build etmeyin (`docker build -f backend/Dockerfile .` → `COPY migrations` hatası).
-
-Migration (container içinden):
+**Seçenek B** — build context repo kökü:
+```bash
+docker build -f Dockerfile.backend -t mcp-api .
+```
 
 ```bash
-docker run --rm --env-file .env mcp-api /app/migrate
+docker run -p 8080:8080 --env-file backend/.env -v mcp-uploads:/data/uploads mcp-api
+docker run --rm --env-file backend/.env mcp-api /app/migrate
 ```
 
 Kök `docker-compose.yml` yalnızca **postgres + api** içindir; frontend dahil değildir.
 
-### Railway / Render
-- **Root directory:** `backend` (önemli — monorepo kökü değil)
-- **Dockerfile:** `Dockerfile` (veya `backend/Dockerfile` yalnızca root=backend ise)
+### Railway
+
+`go.mod not found` → Root Directory ile Dockerfile eşleşmiyor.
+
+| Root Directory | Dockerfile path |
+|----------------|-----------------|
+| `backend` | `Dockerfile` |
+| `.` (repo kökü) | `Dockerfile.backend` |
+
+**Yanlış:** Root=`.` + Dockerfile=`backend/Dockerfile` → `go.mod` bulunamaz.
+
 - **Health check:** `GET /health`
 - Platform `PORT` değişkenini otomatik verir (API buna bağlanır).
 

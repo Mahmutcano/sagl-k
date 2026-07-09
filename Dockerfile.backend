@@ -1,12 +1,15 @@
+# Backend API — monorepo KÖKÜNDEN build (Railway root = repo kökü ise bunu kullanın)
+#
+#   docker build -f Dockerfile.backend -t mcp-api .
+#
+# Railway: Dockerfile path = Dockerfile.backend , Root Directory = . (boş / repo kökü)
+
 FROM golang:1.22-alpine AS builder
-# Build context = backend/ klasörü olmalı:
-#   cd backend && docker build -t mcp-api .
-# Monorepo kökünden build için repo kökündeki Dockerfile.backend kullanın.
 WORKDIR /app
 RUN apk add --no-cache git
-COPY go.mod go.sum* ./
+COPY backend/go.mod backend/go.sum* ./
 RUN go mod download 2>/dev/null || true
-COPY . .
+COPY backend/ .
 RUN go mod tidy && \
     CGO_ENABLED=0 GOOS=linux go build -o /api ./cmd/api && \
     CGO_ENABLED=0 GOOS=linux go build -o /migrate ./cmd/migrate
