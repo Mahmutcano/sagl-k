@@ -1,11 +1,8 @@
-# Railway — backend servisi (bu klasörü root olarak seçtiyseniz)
 [build]
 builder = "DOCKERFILE"
-# Root Directory = backend iken:
 dockerfilePath = "Dockerfile"
-# Root Directory = repo kökü iken railway.toml (kök) veya dockerfilePath = "backend/Dockerfile"
 
 [deploy]
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE"

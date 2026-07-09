@@ -55,7 +55,16 @@ docker run --rm --env-file backend/.env mcp-api /app/migrate
 
 Kök `docker-compose.yml` yalnızca **postgres + api** içindir; frontend dahil değildir.
 
-### Railway
+### Railway (backend servisi)
+
+Repo’da **iki ayrı Railway service** kullanın. Kök `railway.toml` yoktur; karışıklığı önlemek için servis başına config:
+
+| Ayar | Değer |
+|------|--------|
+| **Config file** | `railway.backend.toml` (repo kökü) veya `backend/railway.toml` |
+| **Root Directory** | `.` veya `backend` |
+| **Dockerfile** | `Dockerfile.backend` (kök) veya `Dockerfile` (`backend/`) |
+| **Health check** | `/health` |
 
 `go.mod not found` → Root Directory ile Dockerfile eşleşmiyor.
 
@@ -64,10 +73,12 @@ Kök `docker-compose.yml` yalnızca **postgres + api** içindir; frontend dahil 
 | `backend` | `Dockerfile` |
 | `.` (repo kökü) | `Dockerfile.backend` |
 
-**Yanlış:** Root=`.` + Dockerfile=`backend/Dockerfile` → `go.mod` bulunamaz.
+**Yanlış:** Root=`.` + Dockerfile=`backend/Dockerfile` → `go.mod` bulunamaz.  
+**Yanlış:** Frontend servisinde backend `railway.toml` kullanmak → health check `/health` backend’e gider, frontend fail eder.
 
-- **Health check:** `GET /health`
-- Platform `PORT` değişkenini otomatik verir (API buna bağlanır).
+Zorunlu env: `DATABASE_URL`, `JWT_SECRET`. DB bağlanamazsa process ayağa kalkmaz ve health check düşer.
+
+Platform `PORT` değişkenini otomatik verir (API buna bağlanır).
 
 ### Migration
 
@@ -108,10 +119,17 @@ docker run -p 3000:3000 -e PORT=3000 mcp-web
 - **Environment:** `NEXT_PUBLIC_API_URL=https://api.ornek.edu.tr`
 - Build: `npm run build` / `next build`
 
-### Railway (frontend)
-- **Root directory:** `frontend/web`
-- **Dockerfile:** `frontend/web/Dockerfile`
-- Build arg / env: `NEXT_PUBLIC_API_URL`
+### Railway (frontend servisi)
+
+| Ayar | Değer |
+|------|--------|
+| **Config file** | `railway.frontend.toml` (repo kökü) veya `frontend/web/railway.toml` |
+| **Root Directory** | `.` veya `frontend/web` |
+| **Dockerfile** | `Dockerfile.frontend` (kök) veya `Dockerfile` (`frontend/web/`) |
+| **Health check** | `/health` (Next.js route) |
+| **Build arg / env** | `NEXT_PUBLIC_API_URL=https://api...` |
+
+İlk build’de `NEXT_PUBLIC_API_URL` set edilmeli; aksi halde tarayıcı yerel proxy bekler.
 
 ---
 
@@ -146,6 +164,8 @@ cd frontend/web && npm run dev
 
 | Belirti | Çözüm |
 |---------|--------|
+| Health check failed (frontend) | Ayrı service + `railway.frontend.toml`; path `/health`; `HOSTNAME=0.0.0.0` (Dockerfile’da) |
+| Health check failed (backend) | `DATABASE_URL` / `JWT_SECRET`; Deploy Logs’ta crash; path `/health` |
 | CORS hatası | Backend `PORTAL_URL` = frontend origin; gerekirse `CORS_ALLOWED_ORIGINS` |
 | API 404 / network | `NEXT_PUBLIC_API_URL` yanlış veya trailing `/` |
 | Ödeme / upload | Backend `UPLOAD_DIR` kalıcı volume değil |
@@ -155,7 +175,8 @@ cd frontend/web && npm run dev
 
 ## 6. İlgili dosyalar
 
-- [`backend/Dockerfile`](../backend/Dockerfile)
-- [`frontend/web/Dockerfile`](../frontend/web/Dockerfile)
+- [`backend/Dockerfile`](../backend/Dockerfile) · [`Dockerfile.backend`](../Dockerfile.backend)
+- [`frontend/web/Dockerfile`](../frontend/web/Dockerfile) · [`Dockerfile.frontend`](../Dockerfile.frontend)
+- [`railway.backend.toml`](../railway.backend.toml) · [`railway.frontend.toml`](../railway.frontend.toml)
 - [`docker-compose.yml`](../docker-compose.yml) — yerel postgres + api
 - [`PROJECT_DOCUMENTATION.md`](./PROJECT_DOCUMENTATION.md) — mimari ve API

@@ -1,9 +1,9 @@
-# Railway — backend servisi (repo KÖKÜ root ise)
+# Railway — BACKEND servisi (ayrı service oluşturun)
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile.backend"
 
 [deploy]
 healthcheckPath = "/health"
-healthcheckTimeout = 30
+healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE"
