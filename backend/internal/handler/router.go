@@ -57,6 +57,7 @@ func NewRouter(d Deps) http.Handler {
 		"http://localhost:3000",
 		"http://127.0.0.1:3000",
 	}
+	origins = append(origins, d.Cfg.CORSOrigins...)
 	seen := make(map[string]struct{}, len(origins))
 	unique := make([]string, 0, len(origins))
 	for _, o := range origins {

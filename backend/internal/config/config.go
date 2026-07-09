@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -15,6 +16,7 @@ type Config struct {
 	PortalURL     string
 	DoctorURL     string
 	AdminURL      string
+	CORSOrigins   []string
 	SMS           SMSConfig
 	Email         EmailConfig
 	Param         ParamConfig
@@ -78,13 +80,14 @@ type BizimHesapConfig struct {
 func Load() Config {
 	return Config{
 		DatabaseURL:   getEnv("DATABASE_URL", "postgres://mcp:mcp_secret@localhost:5432/medical_consultation?sslmode=disable"),
-		APIPort:       getEnv("API_PORT", "8080"),
+		APIPort:       getEnv("PORT", getEnv("API_PORT", "8080")),
 		JWTSecret:     getEnv("JWT_SECRET", "dev-secret-change-in-production-min-32-chars"),
 		JWTAccessTTL:  parseDuration(getEnv("JWT_ACCESS_TTL", "24h"), 24*time.Hour),
 		JWTRefreshTTL: parseDuration(getEnv("JWT_REFRESH_TTL", "720h"), 720*time.Hour),
-	PortalURL:     getEnv("PORTAL_URL", "http://localhost:3000"),
+		PortalURL:     getEnv("PORTAL_URL", "http://localhost:3000"),
 		DoctorURL:     getEnv("DOCTOR_URL", "http://localhost:3000"),
 		AdminURL:      getEnv("ADMIN_URL", "http://localhost:3000"),
+		CORSOrigins:   parseCSV(getEnv("CORS_ALLOWED_ORIGINS", "")),
 		SMS: SMSConfig{
 			Provider: getEnv("SMS_PROVIDER", "mock"),
 			Username: os.Getenv("SMS_USERNAME"),
@@ -172,4 +175,19 @@ func parseDuration(raw string, fallback time.Duration) time.Duration {
 		return fallback
 	}
 	return d
+}
+
+func parseCSV(raw string) []string {
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	parts := strings.Split(raw, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
