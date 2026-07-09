@@ -1,24 +1,32 @@
-# Backend API — monorepo KÖKÜNDEN build (Railway root = repo kökü ise bunu kullanın)
-#
-#   docker build -f Dockerfile.backend -t mcp-api .
-#
-# Railway: Dockerfile path = Dockerfile.backend , Root Directory = . (boş / repo kökü)
+# Backend API — repo kökünden: docker build -f Dockerfile.backend .
+# İçerik backend/Dockerfile ile aynı (monorepo + backend context uyumlu)
 
 FROM golang:1.22-alpine AS builder
-WORKDIR /app
 RUN apk add --no-cache git
-COPY backend/go.mod backend/go.sum* ./
-RUN go mod download 2>/dev/null || true
-COPY backend/ .
-RUN go mod tidy && \
-    CGO_ENABLED=0 GOOS=linux go build -o /api ./cmd/api && \
-    CGO_ENABLED=0 GOOS=linux go build -o /migrate ./cmd/migrate
+WORKDIR /workspace
+COPY . /workspace
+RUN set -eux; \
+    if [ -f go.mod ]; then \
+      BUILD_DIR=/workspace; \
+    elif [ -f backend/go.mod ]; then \
+      BUILD_DIR=/workspace/backend; \
+    else \
+      echo "ERROR: go.mod not found"; \
+      ls -la /workspace; \
+      exit 1; \
+    fi; \
+    cd "$BUILD_DIR"; \
+    go mod download 2>/dev/null || true; \
+    go mod tidy; \
+    CGO_ENABLED=0 GOOS=linux go build -o /api ./cmd/api; \
+    CGO_ENABLED=0 GOOS=linux go build -o /migrate ./cmd/migrate; \
+    cp -r migrations /migrations
 
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tzdata
 WORKDIR /app
 COPY --from=builder /api /app/api
 COPY --from=builder /migrate /app/migrate
-COPY --from=builder /app/migrations /app/migrations
+COPY --from=builder /migrations /app/migrations
 EXPOSE 8080
 CMD ["/app/api"]
