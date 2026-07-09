@@ -21,17 +21,20 @@ RUN set -eux; \
     elif [ -f package-lock.json ]; then npm ci; \
     else npm install; \
     fi; \
-    echo "$WEB_DIR" > /web_dir
+    echo "$WEB_DIR" > /web_dir; \
+    cp -a "$WEB_DIR/node_modules" /opt/node_modules
 
 FROM node:20-alpine AS builder
 RUN corepack enable
 WORKDIR /workspace
 COPY . /workspace
 COPY --from=deps /web_dir /web_dir
+COPY --from=deps /opt/node_modules /opt/node_modules
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN set -eux; \
     WEB_DIR=$(cat /web_dir); \
+    cp -a /opt/node_modules "$WEB_DIR/node_modules"; \
     cd "$WEB_DIR"; \
     if [ -f yarn.lock ]; then yarn build; \
     elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm build; \
