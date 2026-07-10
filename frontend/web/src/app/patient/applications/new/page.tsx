@@ -34,6 +34,7 @@ import {
   type ApplicationSurveyAnswers,
 } from "@/lib/applicationSurvey";
 import { type ApplicationDetail, type PaymentReceipt, isPatientEditableStatus, resolveEditStep } from "@/lib/application";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -608,7 +609,7 @@ function NewApplicationContent() {
                   variant="ghost"
                   onClick={() => {
                     setStep(forRelative ? "relative" : "who");
-                    setStatus(null);
+                    setApplicationStatus(null);
                   }}
                   className={formStepButtonClass("gap-1.5")}
                 >
@@ -827,7 +828,7 @@ function NewApplicationContent() {
                 setStep("who");
                 setForRelative(false);
                 setRelative(emptyRelative);
-                setStatus(null);
+                setApplicationStatus(null);
                 setProfessionCode("");
                 setProfessionName("");
                 setCareProviderId("");
