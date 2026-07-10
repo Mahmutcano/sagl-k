@@ -2,9 +2,10 @@
 
 import { ROUTES } from "@/lib/routes";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ArrowRight, Check, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { ApiError, api, persistAuth, type AuthUser } from "@/lib/api";
 import { API } from "@/lib/endpoints";
 import {
@@ -14,6 +15,7 @@ import {
   validateRegister,
   type FieldErrors,
 } from "@/lib/validation";
+import { cn } from "@/lib/utils";
 import { AuthShell } from "@/components/AuthShell";
 import { BirthDateSelect, FormAlert, FormSelect, TextInput } from "@/components/FormField";
 import { Button } from "@/components/ui/button";
@@ -26,7 +28,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 
 type LoginResult = {
   accessToken: string;
@@ -48,6 +49,90 @@ function formatPhoneInput(value: string): string {
   return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7, 9)} ${digits.slice(9)}`;
 }
 
+function RegisterSteps({ current }: { current: "form" | "otp" }) {
+  const steps = [
+    { id: "form", label: "Bilgiler" },
+    { id: "otp", label: "SMS doğrulama" },
+  ] as const;
+
+  return (
+    <ol className="mb-1 flex items-center gap-2" aria-label="Kayıt adımları">
+      {steps.map((step, index) => {
+        const active = step.id === current;
+        const done = current === "otp" && step.id === "form";
+        return (
+          <li key={step.id} className="flex min-w-0 flex-1 items-center gap-2">
+            <div
+              className={cn(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold transition-colors",
+                done && "bg-primary text-primary-foreground",
+                active && "bg-primary text-primary-foreground ring-4 ring-primary/15",
+                !done && !active && "bg-slate-100 text-slate-500"
+              )}
+            >
+              {done ? <Check className="h-4 w-4" strokeWidth={2.5} /> : index + 1}
+            </div>
+            <span
+              className={cn(
+                "truncate text-xs font-semibold sm:text-sm",
+                active || done ? "text-foreground" : "text-muted-foreground"
+              )}
+            >
+              {step.label}
+            </span>
+            {index < steps.length - 1 ? (
+              <div
+                className={cn(
+                  "mx-1 hidden h-px flex-1 sm:block",
+                  done ? "bg-primary/40" : "bg-slate-200"
+                )}
+              />
+            ) : null}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function PasswordHints({ password }: { password: string }) {
+  const checks = useMemo(
+    () => [
+      { ok: password.length >= 8, label: "En az 8 karakter" },
+      { ok: /[A-Z]/.test(password), label: "Büyük harf" },
+      { ok: /[a-z]/.test(password), label: "Küçük harf" },
+      { ok: /\d/.test(password), label: "Rakam" },
+    ],
+    [password]
+  );
+
+  if (!password) return null;
+
+  return (
+    <ul className="mt-2 grid grid-cols-2 gap-1.5">
+      {checks.map((c) => (
+        <li
+          key={c.label}
+          className={cn(
+            "flex items-center gap-1.5 text-xs font-medium",
+            c.ok ? "text-emerald-700" : "text-muted-foreground"
+          )}
+        >
+          <span
+            className={cn(
+              "flex h-4 w-4 items-center justify-center rounded-full",
+              c.ok ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400"
+            )}
+          >
+            <Check className="h-2.5 w-2.5" strokeWidth={3} />
+          </span>
+          {c.label}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [step, setStep] = useState<"form" | "otp">("form");
@@ -62,8 +147,8 @@ export default function RegisterPage() {
     gender: 0,
   });
   const [code, setCode] = useState("");
-  /** Mock/stage SMS: API returns code when SMS_PROVIDER=mock */
   const [mockSmsCode, setMockSmsCode] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [agreements, setAgreements] = useState<Agreement[]>([]);
   const [acceptedAgreements, setAcceptedAgreements] = useState<Record<string, boolean>>({});
   const [fields, setFields] = useState<FieldErrors>({});
@@ -73,6 +158,13 @@ export default function RegisterPage() {
 
   function update<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+    if (fields[key]) {
+      setFields((prev) => {
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+    }
   }
 
   useEffect(() => {
@@ -129,7 +221,11 @@ export default function RegisterPage() {
         }),
       });
       setMockSmsCode(res?.code?.trim() ?? "");
+      setCode("");
+      setFields({});
+      setFormError("");
       setStep("otp");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       if (err instanceof ApiError) {
         if (Object.keys(err.fields).length) {
@@ -140,7 +236,7 @@ export default function RegisterPage() {
           setFormError(err.message);
         }
       } else {
-        setFormError("Sunucuya bağlanılamadı. Backend çalışıyor mu? (port 8080)");
+        setFormError("Sunucuya bağlanılamadı. Lütfen daha sonra tekrar deneyin.");
       }
     } finally {
       setLoading(false);
@@ -188,44 +284,78 @@ export default function RegisterPage() {
 
   if (step === "otp") {
     return (
-      <AuthShell badge="Hasta">
-        <Card className="large-form w-full shadow-premium-lg">
-          <CardHeader>
-            <CardTitle>SMS doğrulama</CardTitle>
-            <CardDescription>
-              <span className="font-medium">{formatPhoneInput(normalizePhoneTR(form.phoneNumber))}</span>{" "}
-              numarasına gönderilen kodu girin.
-            </CardDescription>
+      <AuthShell badge="Hasta" wide>
+        <Card className="large-form w-full border-slate-200/60 bg-card/90 shadow-premium-lg backdrop-blur-md">
+          <CardHeader className="space-y-4">
+            <RegisterSteps current="otp" />
+            <div className="space-y-1.5 text-center sm:text-left">
+              <CardTitle>Telefonunuzu doğrulayın</CardTitle>
+              <CardDescription>
+                <span className="font-semibold text-foreground">
+                  {formatPhoneInput(normalizePhoneTR(form.phoneNumber))}
+                </span>{" "}
+                numarasına gönderilen 6 haneli kodu girin.
+              </CardDescription>
+            </div>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleComplete} className="flex flex-col gap-4" noValidate>
               {formError ? <FormAlert title="Doğrulama hatası" message={formError} /> : null}
+
+              <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/[0.04] px-3.5 py-3 text-sm text-foreground/80">
+                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                <p>
+                  Kod birkaç dakika içinde gelir. Gelmezse bilgilerinizi kontrol edip yeniden
+                  deneyebilirsiniz.
+                </p>
+              </div>
+
               <TextInput
                 id="code"
                 label="Doğrulama kodu"
-                hint="4–8 haneli SMS kodu"
+                hint="SMS ile gelen kod"
                 inputMode="numeric"
                 maxLength={8}
                 autoComplete="one-time-code"
-                placeholder="••••••"
+                autoFocus
+                placeholder="6 haneli kod"
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
                 error={fields.code}
               />
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Doğrulanıyor..." : "Kaydı tamamla"}
+
+              <Button type="submit" className="w-full gap-2" disabled={loading || code.length < 4}>
+                {loading ? "Doğrulanıyor..." : (
+                  <>
+                    Kaydı tamamla
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
               </Button>
+
               {mockSmsCode ? (
                 <p className="rounded-md border border-dashed border-amber-500/50 bg-amber-50 px-3 py-2 text-center text-sm text-amber-950">
                   Test SMS kodu:{" "}
-                  <span className="font-mono text-base font-semibold tracking-widest">{mockSmsCode}</span>
+                  <span className="font-mono text-base font-semibold tracking-widest">
+                    {mockSmsCode}
+                  </span>
                 </p>
               ) : null}
             </form>
           </CardContent>
-          <CardFooter className="border-t">
-            <Button variant="ghost" size="sm" onClick={() => setStep("form")}>
-              Bilgileri düzenle
+          <CardFooter className="border-t border-slate-100/80">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-auto px-0 text-muted-foreground"
+              onClick={() => {
+                setStep("form");
+                setCode("");
+                setFormError("");
+                setFields({});
+              }}
+            >
+              ← Bilgileri düzenle
             </Button>
           </CardFooter>
         </Card>
@@ -234,19 +364,25 @@ export default function RegisterPage() {
   }
 
   return (
-    <AuthShell badge="Hasta">
-      <Card className="large-form w-full max-w-xl mx-auto shadow-premium-lg">
-        <CardHeader>
-          <CardTitle>Hesap oluştur</CardTitle>
-          <CardDescription>Tüm alanlar doğrulanır; SMS ile telefonunuzu onaylarsınız.</CardDescription>
+    <AuthShell badge="Hasta" wide>
+      <Card className="large-form w-full border-slate-200/60 bg-card/90 shadow-premium-lg backdrop-blur-md">
+        <CardHeader className="space-y-4">
+          <RegisterSteps current="form" />
+          <div className="space-y-1.5">
+            <CardTitle>Hasta hesabı oluştur</CardTitle>
+            <CardDescription>
+              Bilgilerinizi girin; ardından telefonunuza gelen SMS kodu ile kaydı tamamlayın.
+            </CardDescription>
+          </div>
         </CardHeader>
+
         <CardContent>
-          <form onSubmit={handleInitiate} className="flex flex-col gap-5" noValidate>
+          <form onSubmit={handleInitiate} className="flex flex-col gap-6" noValidate>
             {formError ? <FormAlert title="Kayıt hatası" message={formError} /> : null}
 
-            <fieldset className="space-y-4">
-              <legend className="text-sm font-medium mb-1">Kimlik bilgileri</legend>
-              <div className="grid gap-4 grid-cols-2 min-w-0">
+            <section className="space-y-4">
+              <h2 className="text-sm font-bold tracking-tight text-foreground">Kimlik bilgileri</h2>
+              <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
                 <TextInput
                   id="firstName"
                   label="Ad"
@@ -267,19 +403,21 @@ export default function RegisterPage() {
               <TextInput
                 id="nationalIdentifier"
                 label="TC Kimlik No"
-                hint="11 haneli, algoritma kontrollü"
+                hint="11 haneli kimlik numaranız"
                 inputMode="numeric"
                 maxLength={11}
                 value={form.nationalIdentifier}
-                onChange={(e) => update("nationalIdentifier", e.target.value)}
+                onChange={(e) =>
+                  update("nationalIdentifier", e.target.value.replace(/\D/g, "").slice(0, 11))
+                }
                 error={fields.nationalIdentifier}
               />
-              <BirthDateSelect
-                value={form.dateOfBirth}
-                onChange={(iso) => update("dateOfBirth", iso)}
-                error={fields.dateOfBirth}
-              />
-              <div className="max-w-xs">
+              <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-[1.4fr_1fr] sm:items-start">
+                <BirthDateSelect
+                  value={form.dateOfBirth}
+                  onChange={(iso) => update("dateOfBirth", iso)}
+                  error={fields.dateOfBirth}
+                />
                 <FormSelect
                   id="gender"
                   label="Cinsiyet"
@@ -293,23 +431,21 @@ export default function RegisterPage() {
                   ]}
                 />
               </div>
-            </fieldset>
+            </section>
 
-            <div className="relative py-1">
-              <Separator />
-              <span className="bg-background text-muted-foreground absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 px-2 text-xs whitespace-nowrap">
+            <div className="h-px bg-slate-200/80" />
+
+            <section className="space-y-4">
+              <h2 className="text-sm font-bold tracking-tight text-foreground">
                 İletişim ve güvenlik
-              </span>
-            </div>
-
-            <fieldset className="space-y-4">
-              <div className="grid gap-4 grid-cols-2 min-w-0">
+              </h2>
+              <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
                 <TextInput
                   id="phoneNumber"
-                  label="Telefon"
+                  label="Cep telefonu"
                   inputMode="tel"
                   autoComplete="tel"
-                  placeholder="0538 443 97 01"
+                  placeholder="05XX XXX XX XX"
                   value={form.phoneNumber}
                   onChange={(e) => update("phoneNumber", formatPhoneInput(e.target.value))}
                   error={fields.phoneNumber}
@@ -327,85 +463,129 @@ export default function RegisterPage() {
                   fieldClassName="min-w-0"
                 />
               </div>
-              <TextInput
-                id="password"
-                label="Şifre"
-                type="password"
-                hint="En az 8 karakter, büyük/küçük harf ve rakam"
-                autoComplete="new-password"
-                value={form.password}
-                onChange={(e) => update("password", e.target.value)}
-                error={fields.password}
-              />
-            </fieldset>
+
+              <div className="relative">
+                <TextInput
+                  id="password"
+                  label="Şifre"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  value={form.password}
+                  onChange={(e) => update("password", e.target.value)}
+                  error={fields.password}
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 top-[2.35rem] z-10 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+                <PasswordHints password={form.password} />
+              </div>
+            </section>
 
             {agreements.length > 0 ? (
-              <fieldset id="agreements" className="space-y-3 rounded-lg border p-4">
-                <legend className="px-1 text-sm font-medium text-foreground">Sözleşmeler</legend>
+              <section
+                id="agreements"
+                className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/60 p-4"
+              >
+                <h2 className="text-sm font-bold tracking-tight text-foreground">Sözleşmeler</h2>
+                <p className="text-xs text-muted-foreground">
+                  Devam etmek için metinleri okuyup onaylamanız gerekir.
+                </p>
                 {agreements.map((a) => {
                   const isKVKK = a.title.toLowerCase().includes("kvkk");
                   const type = isKVKK ? "kvkk" : "terms";
+                  const accepted = acceptedAgreements[a.id] ?? false;
                   return (
-                    <div key={a.id} className="flex items-start gap-2.5 text-sm py-1">
-                      <input
-                        type="checkbox"
-                        className="mt-1 shrink-0 cursor-not-allowed"
-                        checked={acceptedAgreements[a.id] ?? false}
-                        readOnly
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setModalOpen(type);
-                        }}
-                      />
-                      <span className="text-foreground/80">
-                        <button
-                          type="button"
-                          className="text-primary font-semibold underline hover:text-primary/80 inline mr-1 cursor-pointer"
-                          onClick={() => setModalOpen(type)}
-                        >
-                          {a.title}
-                        </button>
-                        metnini okudum ve onaylıyorum {a.isRequired ? " *" : ""}
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => setModalOpen(type)}
+                      className={cn(
+                        "flex w-full items-start gap-3 rounded-lg border bg-white px-3 py-3 text-left text-sm transition-colors",
+                        accepted
+                          ? "border-emerald-200 bg-emerald-50/50"
+                          : "border-slate-200 hover:border-primary/30 hover:bg-primary/[0.02]",
+                        fields[`agreement_${a.id}`] && "border-destructive/40"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border",
+                          accepted
+                            ? "border-emerald-600 bg-emerald-600 text-white"
+                            : "border-slate-300 bg-white"
+                        )}
+                      >
+                        {accepted ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
                       </span>
-                    </div>
+                      <span className="text-foreground/85 leading-snug">
+                        <span className="font-semibold text-primary underline-offset-2">
+                          {a.title}
+                        </span>{" "}
+                        metnini okudum ve onaylıyorum
+                        {a.isRequired ? " *" : ""}
+                      </span>
+                    </button>
                   );
                 })}
                 {Object.entries(fields)
                   .filter(([k]) => k.startsWith("agreement_"))
                   .map(([k, v]) => (
-                    <p key={k} className="text-destructive text-xs">
+                    <p key={k} className="text-destructive text-xs font-medium">
                       {v}
                     </p>
                   ))}
-              </fieldset>
+              </section>
             ) : null}
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Gönderiliyor..." : "SMS kodu gönder"}
-            </Button>
+            <div className="sticky bottom-0 z-10 -mx-1 bg-gradient-to-t from-card via-card to-transparent pt-2 pb-[max(0.25rem,env(safe-area-inset-bottom,0px))] sm:static sm:bg-none sm:p-0">
+              <Button type="submit" className="w-full gap-2 shadow-sm" disabled={loading}>
+                {loading ? "SMS gönderiliyor..." : (
+                  <>
+                    SMS kodu gönder
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </div>
           </form>
         </CardContent>
-        <CardFooter className="border-t flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+
+        <CardFooter className="flex flex-col gap-2 border-t border-slate-100/80 bg-slate-50/30 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-muted-foreground text-sm">Zaten hesabınız var mı?</p>
           <Button variant="outline" size="sm" asChild>
             <Link href={ROUTES.patient.login}>Hasta girişi</Link>
           </Button>
         </CardFooter>
       </Card>
-      
+
       <AgreementModal
         isOpen={modalOpen !== null}
         onClose={() => setModalOpen(null)}
         onAccept={() => {
           if (modalOpen === "terms") {
-            const agreement = agreements.find(a => !a.title.toLowerCase().includes("kvkk"));
+            const agreement = agreements.find((a) => !a.title.toLowerCase().includes("kvkk"));
             if (agreement) {
-              setAcceptedAgreements(prev => ({ ...prev, [agreement.id]: true }));
+              setAcceptedAgreements((prev) => ({ ...prev, [agreement.id]: true }));
+              setFields((prev) => {
+                const next = { ...prev };
+                delete next[`agreement_${agreement.id}`];
+                return next;
+              });
             }
           } else if (modalOpen === "kvkk") {
-            const agreement = agreements.find(a => a.title.toLowerCase().includes("kvkk"));
+            const agreement = agreements.find((a) => a.title.toLowerCase().includes("kvkk"));
             if (agreement) {
-              setAcceptedAgreements(prev => ({ ...prev, [agreement.id]: true }));
+              setAcceptedAgreements((prev) => ({ ...prev, [agreement.id]: true }));
+              setFields((prev) => {
+                const next = { ...prev };
+                delete next[`agreement_${agreement.id}`];
+                return next;
+              });
             }
           }
         }}

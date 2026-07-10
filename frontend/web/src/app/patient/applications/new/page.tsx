@@ -34,7 +34,6 @@ import {
   type ApplicationSurveyAnswers,
 } from "@/lib/applicationSurvey";
 import { type ApplicationDetail, type PaymentReceipt, isPatientEditableStatus, resolveEditStep } from "@/lib/application";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,21 +48,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { FormStepFooter, formStepButtonClass } from "@/components/FormStepFooter";
 import { ArrowLeft } from "lucide-react";
 
-type InpatientResult = {
-  isInpatient: boolean;
-  canApply: boolean;
-  message: string;
-  blockMessage: string;
-  protocolNo?: string;
-  wardName?: string;
-  source: string;
-};
-
 type Step =
   | "who"
   | "relative"
-  | "erciyes"
-  | "blocked"
   | "details"
   | "survey"
   | "payment"
@@ -87,9 +74,7 @@ function NewApplicationContent() {
   const [forRelative, setForRelative] = useState(false);
   const [relative, setRelative] = useState<RepresentedPersonInput>(emptyRelative);
   const [relativeFields, setRelativeFields] = useState<FieldErrors>({});
-  const [status, setStatus] = useState<InpatientResult | null>(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const [professionCode, setProfessionCode] = useState("");
@@ -166,56 +151,24 @@ function NewApplicationContent() {
     }
   }, [careProviderId, catalog.providers]);
 
-  async function runErciyesCheck(isForRelative: boolean, nationalIdentifier?: string) {
-    const token = getToken();
-    if (!token) return;
-    setLoading(true);
-    setError("");
-    setStatus(null);
-    try {
-      const body: Record<string, unknown> = { isForRelative };
-      if (nationalIdentifier) body.nationalIdentifier = nationalIdentifier;
-      const res = await api<InpatientResult>(
-        API.erciyes.inpatientStatus,
-        { method: "POST", body: JSON.stringify(body) },
-        token
-      );
-      setStatus(res);
-      setStep(res.canApply ? "details" : "blocked");
-    } catch (err) {
-      setError(
-        err instanceof ApiError
-          ? err.message
-          : "Erciyes hasta bilgi sistemine ulaşılamadı."
-      );
-      setStep(isForRelative ? "relative" : "who");
-    } finally {
-      setLoading(false);
-    }
-  }
-
   function chooseSelf() {
     setForRelative(false);
     setRelative(emptyRelative);
     setRelativeFields({});
-    setStep("erciyes");
-    void runErciyesCheck(false);
+    setStep("details");
   }
 
   function chooseRelative() {
     setForRelative(true);
-    setStatus(null);
     setStep("relative");
   }
 
   function submitRelative(e: FormEvent) {
     e.preventDefault();
-    // Başvuran TC çakışması sunucuda da kontrol edilir.
     const fields = validateRepresentedPerson(relative);
     setRelativeFields(fields);
     if (hasErrors(fields)) return;
-    setStep("erciyes");
-    void runErciyesCheck(true, relative.nationalIdentifier.trim());
+    setStep("details");
   }
 
   function updateRelative<K extends keyof RepresentedPersonInput>(
@@ -358,16 +311,7 @@ function NewApplicationContent() {
       setStep("preview");
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.code === "ERC002") {
-          setStatus({
-            isInpatient: true,
-            canApply: false,
-            message: err.message,
-            blockMessage: err.message,
-            source: "live",
-          });
-          setStep("blocked");
-        } else if (Object.keys(err.fields).length) {
+        if (Object.keys(err.fields).length) {
           const mapped: FieldErrors = {};
           const surveyMapped: FieldErrors = {};
           for (const [k, v] of Object.entries(err.fields)) {
@@ -428,7 +372,7 @@ function NewApplicationContent() {
       description={
         editId
           ? "Kaldığınız adımdan devam edin — bölüm, şikayet, önizleme ve ödeme"
-          : "Erciyes Üniversitesi Tıp Fakültesi — yakın bilgisi ve yatan hasta kontrolü"
+          : "Erciyes Üniversitesi Tıp Fakültesi — yeni danışmanlık başvurusu"
       }
       actions={
         <Button variant="outline" size="sm" asChild className="gap-1.5">
@@ -481,7 +425,7 @@ function NewApplicationContent() {
               <CardDescription>Kendi adınıza tıbbi danışmanlık başvurusu</CardDescription>
             </CardHeader>
             <CardContent>
-              <Badge className="px-3 py-1 text-xs">Erciyes HIS kontrolü</Badge>
+              <Badge className="px-3 py-1 text-xs">Kendi başvurum</Badge>
             </CardContent>
           </Card>
           <Card
@@ -515,8 +459,7 @@ function NewApplicationContent() {
             <CardHeader>
               <CardTitle>Yakın (hasta) bilgileri</CardTitle>
               <CardDescription>
-                Temsil edilen kişinin kimlik bilgilerini girin. Bu bilgiler başvuruya kaydedilir ve
-                Erciyes yatan hasta kontrolünde kullanılır.
+                Temsil edilen kişinin kimlik bilgilerini girin. Bu bilgiler başvuruya kaydedilir.
               </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -576,7 +519,7 @@ function NewApplicationContent() {
               />
             </CardContent>
             <FormStepFooter>
-              <Button type="submit" className={formStepButtonClass()}>Kaydet ve kontrol et</Button>
+              <Button type="submit" className={formStepButtonClass()}>Devam et</Button>
               <Button
                 type="button"
                 variant="ghost"
@@ -595,74 +538,6 @@ function NewApplicationContent() {
         </Card>
       )}
 
-      {(step === "erciyes" || loading) && (
-        <Card className="max-w-lg">
-          <CardContent className="space-y-2 pt-6">
-            <Skeleton className="h-5 w-1/2" />
-            <p className="text-muted-foreground text-sm">
-              Erciyes hasta bilgi sistemi sorgulanıyor
-              {forRelative
-                ? ` (${relative.nationalIdentifier || "yakın TC"})...`
-                : "..."}
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {step === "blocked" && status && (
-        <Card className="max-w-xl">
-          <CardHeader>
-            <CardTitle>Başvuru yapılamaz</CardTitle>
-            <CardDescription>
-              Erciyes Üniversitesi Tıp Fakültesi Hastanesi — yatan hasta
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <FormAlert title="Uyarı" message={status.blockMessage || status.message} />
-            {forRelative ? (
-              <p className="text-sm">
-                <span className="text-muted-foreground">Yakın: </span>
-                {relative.firstName} {relative.lastName} ({relative.nationalIdentifier})
-              </p>
-            ) : null}
-            {status.wardName || status.protocolNo ? (
-              <ul className="text-sm space-y-1">
-                {status.protocolNo ? (
-                  <li>
-                    <span className="text-muted-foreground">Protokol: </span>
-                    {status.protocolNo}
-                  </li>
-                ) : null}
-                {status.wardName ? (
-                  <li>
-                    <span className="text-muted-foreground">Servis: </span>
-                    {status.wardName}
-                  </li>
-                ) : null}
-              </ul>
-            ) : null}
-          </CardContent>
-          <FormStepFooter>
-            {forRelative ? (
-              <Button
-                type="button"
-                variant="outline"
-                className={formStepButtonClass()}
-                onClick={() => {
-                  setStep("relative");
-                  setStatus(null);
-                }}
-              >
-                Yakın bilgisini düzenle
-              </Button>
-            ) : null}
-            <Button asChild className={formStepButtonClass()}>
-              <Link href={ROUTES.patient.applications}>Başvurularıma dön</Link>
-            </Button>
-          </FormStepFooter>
-        </Card>
-      )}
-
       {step === "details" && (
         <Card className="max-w-4xl w-full application-form-card large-form shadow-md border-slate-200">
           <form onSubmit={continueToSurvey} noValidate>
@@ -674,14 +549,6 @@ function NewApplicationContent() {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              {status ? (
-                <Alert>
-                  <AlertTitle>Erciyes HIS</AlertTitle>
-                  <AlertDescription>
-                    <p>{status.message}</p>
-                  </AlertDescription>
-                </Alert>
-              ) : null}
               {forRelative ? (
                 <div className="rounded-lg border p-3 text-sm space-y-1">
                   <div className="font-medium">Kayıtlı yakın bilgisi</div>

@@ -191,7 +191,6 @@ Tüm API'ler `/api/v1` ön eki altındadır.
 ## 6. Entegrasyonlar ve Dış Sistemler
 
 ### Erciyes HBYS (Hastane Bilgi Yönetim Sistemi) Entegrasyonu
-- **Yatan Hasta Kontrolü**: Hekimlerin yatan hastaları doğrudan fiziksel muayene etmesi gerektiğinden, platform üzerinden yatan hastaların ikinci görüş talebinde bulunması engellenir. TC Kimlik No ile sorgulama yapılır.
 - **PACS Linki**: Erciyes radyoloji veritabanına bağlanarak hastanın taranmış radyolojik görüntülerini inceleme ekranında hekime doğrudan sunar.
 
 ### Ödeme Entegrasyonu

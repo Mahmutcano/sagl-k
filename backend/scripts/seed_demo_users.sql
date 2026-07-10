@@ -3,7 +3,7 @@
 -- Doctor: TC 20000000114 / Doctor123!
 
 INSERT INTO hospitals (code, name, target_institution, settings)
-VALUES ('erciyes', 'Erciyes Üniversitesi Tıp Fakültesi', 1, '{"inpatient_warning":true}')
+VALUES ('erciyes', 'Erciyes Üniversitesi Tıp Fakültesi', 1, '{}')
 ON CONFLICT (code) DO NOTHING;
 
 INSERT INTO users (

@@ -36,7 +36,6 @@ export const API = {
     notes: (id: string) => `/api/v1/applications/${id}/notes`,
   },
   erciyes: {
-    inpatientStatus: "/api/v1/integrations/erciyes/inpatient-status",
     pacsUrl: "/api/v1/integrations/erciyes/pacs-url",
   },
   admin: {

@@ -10,16 +10,14 @@ import (
 	"github.com/google/uuid"
 	"medical-consultation-platform/backend/internal/domain"
 	"medical-consultation-platform/backend/internal/repository"
-	"medical-consultation-platform/backend/internal/service/erciyes"
 )
 
 type Service struct {
-	db      *repository.DB
-	erciyes *erciyes.Service
+	db *repository.DB
 }
 
-func NewService(db *repository.DB, erciyesSvc *erciyes.Service) *Service {
-	return &Service{db: db, erciyes: erciyesSvc}
+func NewService(db *repository.DB) *Service {
+	return &Service{db: db}
 }
 
 type StartApplicationRequest struct {
@@ -40,20 +38,6 @@ type SurveyPayload struct {
 }
 
 func (s *Service) Start(ctx context.Context, ownerID uuid.UUID, req StartApplicationRequest) (uuid.UUID, error) {
-	// Erciyes HIS: block applications for currently admitted patients.
-	if s.erciyes != nil && s.erciyes.AppliesTo(req.TargetInstitution) {
-		nid, err := s.resolvePatientNationalID(ctx, ownerID, req)
-		if err != nil {
-			return uuid.Nil, err
-		}
-		if _, err := s.erciyes.EnsureNotInpatient(req.TargetInstitution, nid); err != nil {
-			if errors.Is(err, erciyes.ErrInpatientBlocked) {
-				return uuid.Nil, fmt.Errorf("%w: %s", erciyes.ErrInpatientBlocked, erciyes.BlockMessage(req.IsForRelative))
-			}
-			return uuid.Nil, err
-		}
-	}
-
 	tx, err := s.db.Pool.Begin(ctx)
 	if err != nil {
 		return uuid.Nil, err
@@ -273,21 +257,6 @@ func nullIfEmpty(s string) *string {
 		return nil
 	}
 	return &s
-}
-
-func (s *Service) resolvePatientNationalID(ctx context.Context, ownerID uuid.UUID, req StartApplicationRequest) (string, error) {
-	if req.IsForRelative && req.RepresentedPerson != nil {
-		if nid, ok := req.RepresentedPerson["nationalIdentifier"].(string); ok && nid != "" {
-			return nid, nil
-		}
-		return "", errors.New("yakın adına başvuruda TC Kimlik Numarası zorunludur")
-	}
-	var nid *string
-	err := s.db.Pool.QueryRow(ctx, `SELECT national_identifier FROM users WHERE id = $1`, ownerID).Scan(&nid)
-	if err != nil || nid == nil || *nid == "" {
-		return "", errors.New("kullanıcı TC Kimlik Numarası bulunamadı")
-	}
-	return *nid, nil
 }
 
 func representedString(m map[string]interface{}, keys ...string) string {

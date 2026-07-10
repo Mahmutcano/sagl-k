@@ -67,9 +67,6 @@ Bir hastanın başvuru yapıp raporunu almasına kadar geçen süreç şu an iç
 
 ## 4. Diğer Önemli Detaylar ve Teknolojik Kolaylıklar
 
-### 🚫 Yatan Hasta Engeli
-Eğer bir hasta hali hazırda Erciyes Üniversitesi Tıp Fakültesi hastanesinde yatılı tedavi görüyorsa, sistem bunu otomatik olarak algılar ve bu platform üzerinden danışmanlık talep etmesini engeller. Çünkü yatan hastalar zaten hastanede doğrudan hekim gözetimindedir.
-
 ### 🖼️ Film ve Görüntüleme (PACS) Entegrasyonu
 Hastaların büyük boyutlu röntgen veya MR dosyalarını bilgisayarlarından yüklemeye çalışmaları çok zordur. Sistemimiz sayesinde, hasta sadece kimlik numarasını girdiğinde, doktor kendi inceleme ekranındaki özel bir bağlantı vasıtasıyla hastanın Erciyes Üniversitesi sistemindeki eski radyoloji görüntülerine doğrudan erişebilir.
 

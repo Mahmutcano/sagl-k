@@ -147,7 +147,6 @@ func NewRouter(d Deps) http.Handler {
 		})
 
 		api.Route("/integrations/erciyes", func(er chi.Router) {
-			er.With(authmw.Auth(d.JWT)).Post("/inpatient-status", erciyesH.CheckInpatient)
 			er.With(authmw.Auth(d.JWT)).Get("/pacs-url", erciyesH.PACSLink)
 			er.With(authmw.Auth(d.JWT), authmw.RequireRole("admin", "developer")).Get("/health", erciyesH.Health)
 		})

@@ -46,7 +46,7 @@ func main() {
 	notify := notifysvc.NewService(cfg, db, sms, em)
 	auth := authsvc.NewService(cfg, db, jwt, notify)
 	erciyesSvc := erciyes.NewService(cfg)
-	app := appsvc.NewService(db, erciyesSvc)
+	app := appsvc.NewService(db)
 	payStore := paysvc.NewStore(db)
 	param := paysvc.NewParamProvider(cfg.Param)
 	requireCard := strings.EqualFold(cfg.Param.Mode, "live") || strings.EqualFold(cfg.Param.Mode, "test")

@@ -188,12 +188,7 @@ func (h *ApplicationHandler) StartApplication(w http.ResponseWriter, r *http.Req
 	}
 	id, err := h.app.Start(r.Context(), claims.UserID, req)
 	if err != nil {
-		code, msg, status := mapErciyesStartError(err)
-		if code == "ERC099" || status == http.StatusBadRequest {
-			response.Fail(w, http.StatusBadRequest, "APP011", response.SafeMessage(err, "Başvuru oluşturulamadı."))
-			return
-		}
-		response.Fail(w, status, code, msg)
+		response.Fail(w, http.StatusBadRequest, "APP011", response.SafeMessage(err, "Başvuru oluşturulamadı."))
 		return
 	}
 	response.OK(w, map[string]string{"applicationId": id.String()})

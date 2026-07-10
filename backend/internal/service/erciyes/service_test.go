@@ -1,51 +1,33 @@
 package erciyes
 
 import (
-	"errors"
 	"testing"
 
 	"medical-consultation-platform/backend/internal/config"
 )
 
-func TestMockInpatientByNationalIDSuffix(t *testing.T) {
+func TestMockLookupPatient(t *testing.T) {
 	svc := NewService(config.Config{
-		PACSBaseURL: "https://pacs.example.com",
 		Erciyes:     config.ErciyesConfig{Mode: "mock", TargetInstitution: 1},
+		PACSBaseURL: "https://pacs.example.com",
 	})
-
-	in, err := svc.CheckInpatient("10000000140")
+	out, err := svc.LookupPatient("10000000146")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !in.IsInpatient {
-		t.Fatal("expected inpatient for TC ending with 0")
-	}
-
-	out, err := svc.CheckInpatient("10000000146")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out.IsInpatient {
-		t.Fatal("expected not inpatient")
+	if !out.Found || out.NationalIdentifier != "10000000146" {
+		t.Fatalf("unexpected patient summary: %+v", out)
 	}
 }
 
-func TestEnsureNotInpatientBlocksErciyesOnly(t *testing.T) {
+func TestAppliesToErciyesOnly(t *testing.T) {
 	svc := NewService(config.Config{
 		Erciyes: config.ErciyesConfig{Mode: "mock", TargetInstitution: 1},
 	})
-
-	_, err := svc.EnsureNotInpatient(1, "10000000140")
-	if !errors.Is(err, ErrInpatientBlocked) {
-		t.Fatalf("want ErrInpatientBlocked, got %v", err)
+	if !svc.AppliesTo(1) {
+		t.Fatal("expected AppliesTo(1)")
 	}
-
-	// Other institution skips HIS.
-	st, err := svc.EnsureNotInpatient(2, "10000000140")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if st.IsInpatient {
-		t.Fatal("non-erciyes institution should not flag inpatient")
+	if svc.AppliesTo(2) {
+		t.Fatal("expected not AppliesTo(2)")
 	}
 }

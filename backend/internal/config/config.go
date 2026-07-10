@@ -30,19 +30,17 @@ type Config struct {
 
 // ErciyesConfig connects to Erciyes University Hospital HIS web services.
 type ErciyesConfig struct {
-	Mode               string // mock | live
-	BaseURL            string
-	Username           string
-	Password           string
-	APIKey             string
-	Protocol           string // json | soap
-	InpatientPath      string
-	PatientPath        string
-	SOAPAction         string
-	SOAPNamespace      string
-	Timeout            time.Duration
-	TargetInstitution  int
-	BlockOnUnavailable bool
+	Mode              string // mock | live
+	BaseURL           string
+	Username          string
+	Password          string
+	APIKey            string
+	Protocol          string // json | soap
+	PatientPath       string
+	SOAPAction        string
+	SOAPNamespace     string
+	Timeout           time.Duration
+	TargetInstitution int
 }
 
 type SMSConfig struct {
@@ -121,19 +119,17 @@ func Load() Config {
 		DefaultPaymentProvider: getEnv("DEFAULT_PAYMENT_PROVIDER", "param"),
 		UploadDir:              getEnv("UPLOAD_DIR", "./uploads"),
 		Erciyes: ErciyesConfig{
-			Mode:               getEnv("ERCIYES_MODE", "mock"),
-			BaseURL:            os.Getenv("ERCIYES_BASE_URL"),
-			Username:           os.Getenv("ERCIYES_USERNAME"),
-			Password:           os.Getenv("ERCIYES_PASSWORD"),
-			APIKey:             os.Getenv("ERCIYES_API_KEY"),
-			Protocol:           getEnv("ERCIYES_PROTOCOL", "json"),
-			InpatientPath:      getEnv("ERCIYES_INPATIENT_PATH", "/api/hasta/yatis-durumu"),
-			PatientPath:        getEnv("ERCIYES_PATIENT_PATH", "/api/hasta/sorgula"),
-			SOAPAction:         os.Getenv("ERCIYES_SOAP_ACTION"),
-			SOAPNamespace:      getEnv("ERCIYES_SOAP_NAMESPACE", "http://erciyes.edu.tr/his"),
-			Timeout:            parseDuration(getEnv("ERCIYES_TIMEOUT", "10s"), 10*time.Second),
-			TargetInstitution:  getEnvInt("ERCIYES_TARGET_INSTITUTION", 1),
-			BlockOnUnavailable: getEnv("ERCIYES_BLOCK_ON_UNAVAILABLE", "true") == "true",
+			Mode:              getEnv("ERCIYES_MODE", "mock"),
+			BaseURL:           os.Getenv("ERCIYES_BASE_URL"),
+			Username:          os.Getenv("ERCIYES_USERNAME"),
+			Password:          os.Getenv("ERCIYES_PASSWORD"),
+			APIKey:            os.Getenv("ERCIYES_API_KEY"),
+			Protocol:          getEnv("ERCIYES_PROTOCOL", "json"),
+			PatientPath:       getEnv("ERCIYES_PATIENT_PATH", "/api/hasta/sorgula"),
+			SOAPAction:        os.Getenv("ERCIYES_SOAP_ACTION"),
+			SOAPNamespace:     getEnv("ERCIYES_SOAP_NAMESPACE", "http://erciyes.edu.tr/his"),
+			Timeout:           parseDuration(getEnv("ERCIYES_TIMEOUT", "10s"), 10*time.Second),
+			TargetInstitution: getEnvInt("ERCIYES_TARGET_INSTITUTION", 1),
 		},
 	}
 }
