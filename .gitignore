@@ -1,5 +1,13 @@
 .env
 .env.local
+.env.stage
+.env.*.local
 backend/.env
+frontend/web/.env
+frontend/web/.env.local
+frontend/web/node_modules/
+frontend/web/.next/
 backend/uploads/
 uploads/
+.DS_Store
+*.log

@@ -15,7 +15,7 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load()
+	loadEnvFiles("../.env.stage", "../.env", ".env")
 	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
 	if dsn == "" {
 		log.Fatal("DATABASE_URL is required")
@@ -206,4 +206,12 @@ func columnExists(ctx context.Context, pool *pgxpool.Pool, table, column string)
 		)
 	`, table, column).Scan(&ok)
 	return ok, err
+}
+
+func loadEnvFiles(paths ...string) {
+	for _, path := range paths {
+		if err := godotenv.Load(path); err == nil {
+			log.Printf("loaded env: %s", path)
+		}
+	}
 }

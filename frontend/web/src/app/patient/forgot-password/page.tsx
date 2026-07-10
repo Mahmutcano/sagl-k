@@ -31,6 +31,7 @@ export default function ForgotPasswordPage() {
   const [step, setStep] = useState<"phone" | "reset">("phone");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [code, setCode] = useState("");
+  const [mockSmsCode, setMockSmsCode] = useState("");
   const [password, setPassword] = useState("");
   const [fields, setFields] = useState<FieldErrors>({});
   const [formError, setFormError] = useState("");
@@ -47,10 +48,11 @@ export default function ForgotPasswordPage() {
 
     setLoading(true);
     try {
-      await api(API.auth.forgotInitiate, {
+      const res = await api<{ sent?: boolean; code?: string }>(API.auth.forgotInitiate, {
         method: "POST",
         body: JSON.stringify({ phoneNumber: normalizePhoneTR(phoneNumber) }),
       });
+      setMockSmsCode(res?.code?.trim() ?? "");
       setStep("reset");
     } catch (err) {
       if (err instanceof ApiError && Object.keys(err.fields).length) {
@@ -129,6 +131,12 @@ export default function ForgotPasswordPage() {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Kaydediliyor..." : "Şifreyi güncelle"}
               </Button>
+              {mockSmsCode ? (
+                <p className="rounded-md border border-dashed border-amber-500/50 bg-amber-50 px-3 py-2 text-center text-sm text-amber-950">
+                  Test SMS kodu:{" "}
+                  <span className="font-mono text-base font-semibold tracking-widest">{mockSmsCode}</span>
+                </p>
+              ) : null}
             </form>
           </CardContent>
           <CardFooter className="border-t">

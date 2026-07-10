@@ -318,7 +318,7 @@ Frontend uygulaması **`http://localhost:3000`** portunda yayına girecektir. Ta
 
 ## 8. Hazır Test Hesapları
 
-Geliştirme ve test süreçlerinde kullanabileceğiniz önceden tanımlanmış kullanıcı hesapları aşağıdadır:
+Geliştirme, staging ve test süreçlerinde kullanabileceğiniz önceden tanımlanmış kullanıcı hesapları aşağıdadır:
 
 - **Yönetici (Admin)**:
   - T.C. Kimlik No: `10000000146`
@@ -328,6 +328,20 @@ Geliştirme ve test süreçlerinde kullanabileceğiniz önceden tanımlanmış k
   - Şifre: `Doctor123!`
 - **Hasta (Patient)**:
   - Kayıt olmak için arayüzdeki `/patient/register` (Kayıt Ol) sayfasını kullanabilir veya mevcut bir hasta TC'si ile giriş yapabilirsiniz.
+
+### Staging ortamına seed
+
+Stage DB'ye aynı demo kullanıcıları eklemek için (`.env.stage` içindeki `DATABASE_URL` kullanılır):
+
+```bash
+cd backend
+go run ./cmd/migrate   # tablolar yoksa önce migration
+go run ./cmd/seed      # admin + doktor demo hesapları
+```
+
+Staging giriş adresleri:
+- Frontend: `https://stage-erciyes.tibbidanismanlik.com`
+- API: `https://apistage.tibbidanismanlik.com`
 
 ---
 

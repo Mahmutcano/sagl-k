@@ -62,6 +62,8 @@ export default function RegisterPage() {
     gender: 0,
   });
   const [code, setCode] = useState("");
+  /** Mock/stage SMS: API returns code when SMS_PROVIDER=mock */
+  const [mockSmsCode, setMockSmsCode] = useState("");
   const [agreements, setAgreements] = useState<Agreement[]>([]);
   const [acceptedAgreements, setAcceptedAgreements] = useState<Record<string, boolean>>({});
   const [fields, setFields] = useState<FieldErrors>({});
@@ -116,7 +118,7 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await api(API.auth.registerInitiate, {
+      const res = await api<{ sent?: boolean; code?: string }>(API.auth.registerInitiate, {
         method: "POST",
         body: JSON.stringify({
           ...form,
@@ -126,6 +128,7 @@ export default function RegisterPage() {
           nationality: "TR",
         }),
       });
+      setMockSmsCode(res?.code?.trim() ?? "");
       setStep("otp");
     } catch (err) {
       if (err instanceof ApiError) {
@@ -192,10 +195,6 @@ export default function RegisterPage() {
             <CardDescription>
               <span className="font-medium">{formatPhoneInput(normalizePhoneTR(form.phoneNumber))}</span>{" "}
               numarasına gönderilen kodu girin.
-              <span className="mt-2 block text-xs text-muted-foreground">
-                Geliştirme modunda SMS simüle edilir; kod backend terminal logunda{" "}
-                <code className="rounded bg-muted px-1">[SMS MOCK]</code> satırında görünür.
-              </span>
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -216,6 +215,12 @@ export default function RegisterPage() {
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? "Doğrulanıyor..." : "Kaydı tamamla"}
               </Button>
+              {mockSmsCode ? (
+                <p className="rounded-md border border-dashed border-amber-500/50 bg-amber-50 px-3 py-2 text-center text-sm text-amber-950">
+                  Test SMS kodu:{" "}
+                  <span className="font-mono text-base font-semibold tracking-widest">{mockSmsCode}</span>
+                </p>
+              ) : null}
             </form>
           </CardContent>
           <CardFooter className="border-t">
