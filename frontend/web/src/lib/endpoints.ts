@@ -34,6 +34,8 @@ export const API = {
     reportPreview: (id: string) => `/api/v1/applications/${id}/report/preview`,
     conclude: (id: string) => `/api/v1/applications/${id}/conclude`,
     notes: (id: string) => `/api/v1/applications/${id}/notes`,
+    messages: (id: string) => `/api/v1/applications/${id}/messages`,
+    chatWs: "/api/v1/ws/chat",
   },
   erciyes: {
     pacsUrl: "/api/v1/integrations/erciyes/pacs-url",

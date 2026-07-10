@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  // reicon-react is pure ESM; transpile so webpack resolves createIcon default export
+  transpilePackages: ["reicon-react"],
   async rewrites() {
     // Yerel geliştirme: boş NEXT_PUBLIC_API_URL ile /api proxy kullanılır.
     // Ayrı deploy: NEXT_PUBLIC_API_URL set edin; rewrite devre dışı kalır.

@@ -39,6 +39,10 @@ func (s *Service) Update(ctx context.Context, appID, ownerID uuid.UUID, req Upda
 		return ErrNotEditable
 	}
 
+	if err := s.checkDuplicateApplication(ctx, ownerID, req.CareProviderID, req.ProfessionCode, &appID); err != nil {
+		return err
+	}
+
 	tx, err := s.db.Pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -119,15 +123,33 @@ func (s *Service) Update(ctx context.Context, appID, ownerID uuid.UUID, req Upda
 
 func (s *Service) DeleteUnpaid(ctx context.Context, appID, ownerID uuid.UUID) error {
 	var statusCode int
+	var appNumber *string
 	err := s.db.Pool.QueryRow(ctx, `
-		SELECT status_code FROM applications WHERE id = $1 AND owner_user_id = $2
-	`, appID, ownerID).Scan(&statusCode)
+		SELECT status_code, application_number FROM applications WHERE id = $1 AND owner_user_id = $2
+	`, appID, ownerID).Scan(&statusCode, &appNumber)
 	if err != nil {
 		return errors.New("başvuru bulunamadı")
 	}
 	if statusCode != domain.StatusPaymentPending {
 		return ErrNotCancellable
 	}
-	_, err = s.db.Pool.Exec(ctx, `DELETE FROM applications WHERE id = $1`, appID)
-	return err
+
+	tx, err := s.db.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if appNumber != nil && *appNumber != "" {
+		_, _ = tx.Exec(ctx, `
+			INSERT INTO recycled_application_numbers (number) VALUES ($1)
+			ON CONFLICT (number) DO NOTHING
+		`, *appNumber)
+	}
+
+	_, err = tx.Exec(ctx, `DELETE FROM applications WHERE id = $1`, appID)
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }

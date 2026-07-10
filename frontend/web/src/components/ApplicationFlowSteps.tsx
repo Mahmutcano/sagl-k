@@ -21,49 +21,57 @@ export function ApplicationFlowSteps({ current, paymentComplete, compact }: Prop
   const currentIndex = FLOW_STEPS.findIndex((s) => s.key === current);
 
   return (
-    <nav aria-label="Başvuru adımları" className="mb-4 sm:mb-6">
-      <ol className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-0">
+    <nav aria-label="Başvuru adımları" className="mb-5 sm:mb-6">
+      <ol className="flex w-full items-stretch gap-0 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {FLOW_STEPS.map((step, index) => {
           const done =
             index < currentIndex || (paymentComplete && step.key === "payment");
           const active =
             step.key === current && !(paymentComplete && step.key === "payment");
+
           return (
             <li
               key={step.key}
               className={cn(
-                "flex min-w-0 flex-1 items-center gap-2 text-sm",
-                index < FLOW_STEPS.length - 1 && "sm:pr-2"
+                "relative flex min-w-[4.75rem] flex-1 items-center justify-center gap-2 rounded-lg px-2 py-2.5 sm:min-w-0 sm:px-3",
+                active && "bg-primary text-primary-foreground",
+                done && !active && "bg-slate-50",
+                !done && !active && "text-slate-500"
               )}
             >
-              <div className="flex min-w-0 flex-1 flex-col items-center gap-1 sm:flex-row sm:gap-2">
-                <span
-                  className={cn(
-                    "flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
-                    done && "border-primary bg-primary text-primary-foreground",
-                    active && "border-primary bg-primary/10 text-primary ring-2 ring-primary/30",
-                    !done && !active && "border-muted-foreground/30 text-muted-foreground"
-                  )}
-                  aria-current={active ? "step" : undefined}
-                >
-                  {done ? "✓" : index + 1}
-                </span>
-                <span
-                  className={cn(
-                    "text-center text-[11px] leading-tight sm:text-sm",
-                    active && "font-semibold text-foreground",
-                    !active && "text-muted-foreground"
-                  )}
-                >
-                  <span className="sm:hidden">{step.short}</span>
-                  <span className="hidden sm:inline">{compact ? step.short : step.label}</span>
-                </span>
-              </div>
+              <span
+                className={cn(
+                  "flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+                  active && "bg-white/20 text-primary-foreground",
+                  done && !active && "bg-primary text-primary-foreground",
+                  !done && !active && "bg-slate-100 text-slate-500"
+                )}
+                aria-current={active ? "step" : undefined}
+              >
+                {done && !active ? "✓" : index + 1}
+              </span>
+              <span
+                className={cn(
+                  "truncate text-[11px] font-medium leading-tight sm:text-sm",
+                  active && "font-semibold text-primary-foreground",
+                  done && !active && "text-slate-700",
+                  !done && !active && "text-slate-500"
+                )}
+              >
+                {compact ? (
+                  step.short
+                ) : (
+                  <>
+                    <span className="sm:hidden">{step.short}</span>
+                    <span className="hidden sm:inline">{step.label}</span>
+                  </>
+                )}
+              </span>
               {index < FLOW_STEPS.length - 1 ? (
-                <div
+                <span
                   className={cn(
-                    "hidden h-px flex-1 sm:block",
-                    done ? "bg-primary" : "bg-border"
+                    "pointer-events-none absolute -right-px top-1/2 hidden h-4 w-px -translate-y-1/2 sm:block",
+                    active || done ? "bg-transparent" : "bg-slate-200"
                   )}
                   aria-hidden
                 />
@@ -81,12 +89,12 @@ export function ApplicationFlowHint({ current }: { current: FlowStepKey }) {
   const step = FLOW_STEPS[index];
   const next = FLOW_STEPS[index + 1];
   return (
-    <p className="text-muted-foreground rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs sm:text-sm">
-      <span className="font-medium text-foreground">Adım {index + 1}/4 — {step?.label}</span>
+    <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 sm:text-sm">
+      <span className="font-medium text-slate-800">Adım {index + 1}/4 — {step?.label}</span>
       {next ? (
         <>
           {" · "}
-          Sıradaki: <span className="font-medium text-foreground">{next.label}</span>
+          Sıradaki: <span className="font-medium text-slate-800">{next.label}</span>
         </>
       ) : (
         <> · Son adım</>

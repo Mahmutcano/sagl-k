@@ -34,6 +34,7 @@ import {
   type ApplicationSurveyAnswers,
 } from "@/lib/applicationSurvey";
 import { type ApplicationDetail, type PaymentReceipt, isPatientEditableStatus, resolveEditStep } from "@/lib/application";
+import { redirectIfDuplicateApplication } from "@/lib/applicationDuplicate";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -224,7 +225,9 @@ function NewApplicationContent() {
         setError("");
       })
       .catch((err) => {
-        setError(err instanceof ApiError ? err.message : "Bölüm ve doktor kaydedilemedi.");
+        if (!redirectIfDuplicateApplication(err, router)) {
+          setError(err instanceof ApiError ? err.message : "Bölüm ve doktor kaydedilemedi.");
+        }
       })
       .finally(() => setSubmitting(false));
   }
@@ -333,6 +336,7 @@ function NewApplicationContent() {
       }
       setStep("preview");
     } catch (err) {
+      if (redirectIfDuplicateApplication(err, router)) return;
       if (err instanceof ApiError) {
         if (Object.keys(err.fields).length) {
           const mapped: FieldErrors = {};
@@ -607,6 +611,7 @@ function NewApplicationContent() {
                 disabled={catalog.loadingProfessions}
               />
               <FormSelect
+                key={`provider-${professionCode}`}
                 id="careProviderId"
                 label="Uzman hekim"
                 hint="Başvurunuzun iletileceği uzman hekimi seçiniz"

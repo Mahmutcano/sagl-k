@@ -41,7 +41,7 @@ export function PasswordInput({
         />
         <button
           type="button"
-          className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="absolute right-2 top-1/2 z-10 -translate-y-1/2 rounded p-1.5 text-slate-500"
           onClick={() => setVisible((v) => !v)}
           aria-label={visible ? "Şifreyi gizle" : "Şifreyi göster"}
           tabIndex={0}

@@ -17,6 +17,7 @@ import (
 	"medical-consultation-platform/backend/internal/repository"
 	appsvc "medical-consultation-platform/backend/internal/service/application"
 	authsvc "medical-consultation-platform/backend/internal/service/auth"
+	chatsvc "medical-consultation-platform/backend/internal/service/chat"
 	"medical-consultation-platform/backend/internal/service/erciyes"
 	notifysvc "medical-consultation-platform/backend/internal/service/notification"
 	invoicesvc "medical-consultation-platform/backend/internal/service/invoice"
@@ -47,6 +48,7 @@ func main() {
 	auth := authsvc.NewService(cfg, db, jwt, notify)
 	erciyesSvc := erciyes.NewService(cfg)
 	app := appsvc.NewService(db)
+	chat := chatsvc.NewService(db)
 	payStore := paysvc.NewStore(db)
 	param := paysvc.NewParamProvider(cfg.Param)
 	requireCard := strings.EqualFold(cfg.Param.Mode, "live") || strings.EqualFold(cfg.Param.Mode, "test")
@@ -61,6 +63,7 @@ func main() {
 		JWT:     jwt,
 		Auth:    auth,
 		App:     app,
+		Chat:    chat,
 		Notify:  notify,
 		Payment: payment,
 		Invoice: invoiceSvc,

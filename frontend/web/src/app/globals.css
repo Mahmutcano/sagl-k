@@ -214,83 +214,90 @@ html {
   margin-top: 0.5rem !important;
 }
 
-/* Perfectly proportioned sizes for inputs, buttons, and selects in large-form */
+/* Form controls — gri zemin, kurumsal */
 .large-form input,
 .large-form textarea,
 .large-form button[role="combobox"],
 .large-form select {
-  font-size: 1.05rem !important;
-  line-height: 1.5rem !important;
-  border-radius: 0.75rem !important;
+  font-size: 0.9375rem !important;
+  line-height: 1.4rem !important;
+  border-radius: 0.5rem !important;
   border-width: 1px !important;
-  border-color: var(--border) !important;
-  transition: all 0.2s ease-in-out !important;
+  border-color: oklch(90% 0.008 230deg) !important;
+  background-color: oklch(96.5% 0.004 230deg) !important;
+  box-shadow: none !important;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease !important;
 }
 
 .large-form input {
-  height: 3.25rem !important; /* 52px - premium input height */
-  padding-left: 1.25rem !important;
-  padding-right: 1.25rem !important;
+  height: 2.75rem !important;
+  padding-left: 0.875rem !important;
+  padding-right: 0.875rem !important;
 }
 
 .large-form button[role="combobox"] {
-  height: 3.25rem !important; /* 52px */
-  padding-left: 1.25rem !important;
-  padding-right: 1.25rem !important;
+  height: 2.75rem !important;
+  padding-left: 0.875rem !important;
+  padding-right: 0.875rem !important;
 }
 
 .large-form textarea {
-  padding: 1rem 1.25rem !important;
-  min-height: 120px !important;
+  padding: 0.75rem 0.875rem !important;
+  min-height: 110px !important;
 }
 
 .large-form input:focus,
 .large-form textarea:focus,
 .large-form button[role="combobox"]:focus-within,
 .large-form select:focus {
+  background-color: #fff !important;
   border-color: var(--primary) !important;
-  box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 12%, transparent) !important;
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 15%, transparent) !important;
   outline: none !important;
 }
 
 .large-form label {
-  font-size: 1rem !important;
-  font-weight: 600 !important;
-  color: var(--foreground) !important;
-  margin-bottom: 0px !important;
-  letter-spacing: -0.01em;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  color: oklch(40% 0.02 230deg) !important;
+  margin-bottom: 0 !important;
+  letter-spacing: 0;
 }
 
 .large-form [id$="-hint"] {
-  font-size: 0.9rem !important;
-  line-height: 1.35rem !important;
-  margin-top: 0.35rem !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.25rem !important;
+  margin-top: 0.25rem !important;
 }
 
 .large-form [id$="-error"] {
-  font-size: 0.9rem !important;
-  font-weight: 600 !important;
-  margin-top: 0.35rem !important;
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  margin-top: 0.25rem !important;
   color: var(--error) !important;
 }
 
 .large-form .grid {
-  gap: 1.75rem !important;
+  gap: 1.25rem !important;
 }
 
-/* Beautiful form action buttons */
-.large-form button:not(.h-auto) {
-  height: 3.25rem !important; /* Matches input height perfectly at 52px */
-  font-size: 1.05rem !important;
-  font-weight: 700 !important;
-  padding-left: 2rem !important;
-  padding-right: 2rem !important;
-  border-radius: 0.75rem !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+/* Action buttons only — password eye toggle excluded via aria-label */
+.large-form form > button:not([aria-label]),
+.large-form .form-step-footer button,
+.large-form [class*="CardFooter"] > button,
+.large-form [class*="CardFooter"] a {
+  height: 2.75rem !important;
+  font-size: 0.9375rem !important;
+  font-weight: 600 !important;
+  padding-left: 1.25rem !important;
+  padding-right: 1.25rem !important;
+  border-radius: 0.5rem !important;
+  transform: none !important;
 }
 
-.large-form button:not(.h-auto):hover {
-  transform: translateY(-1px);
+.large-form form > button:not([aria-label]):hover,
+.large-form .form-step-footer button:hover {
+  transform: none !important;
 }
 
 @media (max-width: 639px) {

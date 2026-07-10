@@ -1,81 +1,163 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import { ROUTES } from "@/lib/routes";
 import { AppLogo } from "@/components/AppLogo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  ArrowRight,
+  Building,
+  Card,
+  ChatRound,
+  ClipboardCheck,
+  DocumentText2,
+  Health,
+  Hospital,
+  ProfileAdd2,
+  ShieldCheck,
+  type IconComponent,
+} from "@/components/icons/reicon";
 
-const FEATURES = [
-  { title: "Uzman değerlendirme", desc: "Branş doktorlarından ikinci görüş" },
-  { title: "Güvenli süreç", desc: "KVKK uyumlu, uçtan uca şifreli erişim" },
-  { title: "Online takip", desc: "Başvuru, ödeme ve rapor tek panelde" },
+const WORKFLOW: {
+  step: string;
+  title: string;
+  desc: string;
+  Icon: IconComponent;
+}[] = [
+  {
+    step: "01",
+    title: "Kayıt ve giriş",
+    desc: "Hasta hesabınızı oluşturun veya mevcut hesabınızla giriş yapın.",
+    Icon: ProfileAdd2,
+  },
+  {
+    step: "02",
+    title: "Bölüm ve uzman seçimi",
+    desc: "Danışmak istediğiniz bölümü ve uzman hekimi seçerek başvurunuzu başlatın.",
+    Icon: Health,
+  },
+  {
+    step: "03",
+    title: "Şikayet ve belgeler",
+    desc: "Tıbbi öykünüzü, şikayetlerinizi ve varsa raporlarınızı güvenle yükleyin.",
+    Icon: DocumentText2,
+  },
+  {
+    step: "04",
+    title: "Önizleme ve ödeme",
+    desc: "Form özetinizi onaylayın, güvenli ödeme ile başvurunuzu tamamlayın.",
+    Icon: Card,
+  },
+  {
+    step: "05",
+    title: "Uzman değerlendirme",
+    desc: "Seçtiğiniz uzman hekim başvurunuzu inceler; gerekirse mesajlaşma ile iletişim kurulur.",
+    Icon: ChatRound,
+  },
+  {
+    step: "06",
+    title: "Rapor ve takip",
+    desc: "Sonuç raporunuza panelinizden ulaşın; süreci baştan sona takip edin.",
+    Icon: ClipboardCheck,
+  },
 ];
 
-const STEPS = [
-  { n: "1", title: "Giriş & başvuru", desc: "Hesabınıza girin, talebinizi iletin" },
-  { n: "2", title: "Ödeme", desc: "Güvenli ödeme ile süreci başlatın" },
-  { n: "3", title: "Değerlendirme", desc: "Uzman ekibimiz dosyanızı inceler" },
-  { n: "4", title: "Rapor", desc: "Sonuç ve öneriler size ulaşır" },
+const HOW_TO = [
+  {
+    q: "Kimler başvurabilir?",
+    a: "18 yaş üstü bireyler kendi adına; yakınları için de temsilci olarak başvuru oluşturabilir.",
+  },
+  {
+    q: "Hangi belgeler gerekli?",
+    a: "Şikayet ve öykü metinleri zorunludur. PDF, JPEG veya PNG formatında tıbbi belgeler isteğe bağlı eklenebilir.",
+  },
+  {
+    q: "Ödeme ne zaman yapılır?",
+    a: "Form önizlemesini onayladıktan sonra, başvurunun son adımında güvenli ödeme ekranında yapılır.",
+  },
+  {
+    q: "Doktorla nasıl iletişim kurarım?",
+    a: "Ödeme tamamlandıktan sonra başvuru detay ekranındaki mesajlaşma bölümünden uzman hekiminize yazabilirsiniz.",
+  },
+  {
+    q: "Raporuma nasıl ulaşırım?",
+    a: "Değerlendirme tamamlandığında Sonuçlarım ve başvuru detayı ekranlarından raporunuza erişebilirsiniz.",
+  },
+];
+
+const TRUST: { title: string; desc: string; Icon: IconComponent }[] = [
+  { title: "Kurumsal altyapı", desc: "Erciyes Üniversitesi Hastanesi güvencesi", Icon: Building },
+  { title: "KVKK uyumlu", desc: "Uçtan uca şifreli, güvenli veri işleme", Icon: ShieldCheck },
+  { title: "Uzman kadro", desc: "Branş hekimlerinden ikinci görüş", Icon: Hospital },
 ];
 
 export default function HomePage() {
   return (
     <div className="landing-page flex min-h-svh flex-col bg-background text-foreground">
-      <header className="sticky top-0 z-20 border-b border-border/50 bg-background/95 backdrop-blur-md pt-[env(safe-area-inset-top,0px)]">
+      <header className="sticky top-0 z-20 border-b border-border/60 bg-background/95 backdrop-blur-md pt-[env(safe-area-inset-top,0px)]">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:h-16 sm:px-8">
           <AppLogo href="/" showText={false} className="min-[420px]:hidden" />
           <AppLogo href="/" className="hidden min-[420px]:flex" />
+          <nav className="hidden items-center gap-6 text-sm font-medium md:flex">
+            <a href="#surec" className="text-muted-foreground hover:text-foreground">
+              Süreç
+            </a>
+            <a href="#nasil-kullanilir" className="text-muted-foreground hover:text-foreground">
+              Nasıl kullanılır?
+            </a>
+          </nav>
           <Button size="sm" className="h-10 shrink-0 px-5 text-sm font-semibold" asChild>
-            <Link href={ROUTES.patient.login}>Giriş</Link>
+            <Link href={ROUTES.patient.login}>Hasta girişi</Link>
           </Button>
         </div>
       </header>
 
       <main className="relative flex-1 pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] md:pb-0">
-        <div className="landing-glow pointer-events-none absolute inset-0" aria-hidden />
+        {/* Hero — full-bleed görseller, yüz yok; üniforma + belgeler */}
+        <section className="relative min-h-[min(92svh,760px)] overflow-hidden border-b border-border/50">
+          <div className="absolute inset-0" aria-hidden>
+            <Image
+              src="/images/hero-medical-desk.jpg"
+              alt=""
+              fill
+              priority
+              className="object-cover object-center"
+              sizes="100vw"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-background via-background/92 to-background/35 sm:via-background/88 sm:to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/40" />
+          </div>
 
-        {/* Hero: text first, doctor below (mobile) / right (desktop) */}
-        <section className="relative mx-auto max-w-6xl px-4 pt-8 sm:px-8 sm:pt-12 lg:pt-14">
-          <div className="grid items-end gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-12 xl:gap-16">
-            {/* Copy — always first */}
-            <div className="flex flex-col justify-center space-y-5 sm:space-y-6 lg:pb-10">
-              <Badge variant="outline" className="w-fit text-[11px] sm:text-xs">
-                Erciyes Üniversitesi Hastanesi
+          <div className="relative mx-auto grid min-h-[min(92svh,760px)] max-w-6xl items-end gap-8 px-4 pb-10 pt-12 sm:px-8 sm:pb-14 sm:pt-16 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-center lg:gap-10 lg:pb-16">
+            <div className="relative z-10 max-w-xl space-y-6 lg:pb-8">
+              <Badge variant="outline" className="border-primary/30 bg-background/80 text-xs backdrop-blur-sm">
+                Erciyes Üniversitesi Hastanesi · Tıbbi Danışmanlık
               </Badge>
-
-              <div className="space-y-3 sm:space-y-4">
-                <h1 className="max-w-xl text-[1.75rem] font-bold leading-[1.18] tracking-tight sm:text-4xl lg:text-[2.75rem]">
-                  Uzman görüşü,
-                  <span className="landing-gradient-text block">evden tek tıkla</span>
-                </h1>
-                <p className="text-muted-foreground max-w-md text-[15px] font-medium leading-relaxed sm:text-base lg:text-lg">
-                  Tıbbi danışmanlık ve ikinci görüş başvurunuzu oluşturun, süreci takip edin,
-                  raporunuza güvenle ulaşın.
-                </p>
-              </div>
-
-              <div className="hidden space-y-3 md:block">
-                <Button size="lg" className="h-12 min-w-[220px] px-8 text-base font-semibold shadow-sm" asChild>
-                  <Link href={ROUTES.patient.login}>Hemen başvur</Link>
-                </Button>
-                <p className="text-muted-foreground text-sm">
-                  Hesabınız yok mu? Giriş ekranından kayıt olabilirsiniz.
-                </p>
-                <p className="text-muted-foreground text-xs">
-                  Sağlık personeli misiniz?{" "}
-                  <Link
-                    href={ROUTES.doctor.login}
-                    className="font-medium text-foreground/80 underline-offset-2 hover:underline"
-                  >
-                    Doktor girişi
+              <h1 className="text-3xl font-bold leading-tight tracking-tight sm:text-4xl lg:text-5xl">
+                Uzman görüşü ve ikinci görüş,
+                <span className="landing-gradient-text block">tek platformda</span>
+              </h1>
+              <p className="text-muted-foreground max-w-lg text-base leading-relaxed sm:text-lg">
+                Başvurunuzu oluşturun, belgelerinizi paylaşın, güvenli ödeme ile süreci başlatın
+                ve uzman hekim değerlendirmenizi çevrimiçi takip edin.
+              </p>
+              <div className="hidden flex-wrap gap-3 md:flex">
+                <Button size="lg" className="h-12 px-8 font-semibold shadow-sm" asChild>
+                  <Link href={ROUTES.patient.login} className="inline-flex items-center gap-2">
+                    Hemen başvur
+                    <ArrowRight size={18} weight="Outline" color="currentColor" />
                   </Link>
-                </p>
+                </Button>
+                <Button size="lg" variant="outline" className="h-12 bg-background/70 backdrop-blur-sm" asChild>
+                  <a href="#nasil-kullanilir">Nasıl kullanılır?</a>
+                </Button>
               </div>
-
               <ul className="flex flex-wrap gap-2 pt-1">
-                {["256-bit güvenlik", "7/24 başvuru", "Uzman kadro"].map((t) => (
+                {["Kurumsal süreç", "Güvenli ödeme", "Çevrimiçi takip"].map((t) => (
                   <li key={t}>
-                    <Badge variant="secondary" className="text-[11px] font-medium sm:text-xs">
+                    <Badge variant="secondary" className="bg-background/80 text-xs font-medium backdrop-blur-sm">
                       {t}
                     </Badge>
                   </li>
@@ -83,107 +165,227 @@ export default function HomePage() {
               </ul>
             </div>
 
-            {/* Doctor — below text on mobile, right on desktop; head fully visible */}
-            <div className="landing-hero-photo relative mx-auto w-full max-w-md justify-self-end lg:mx-0 lg:max-w-none">
-              <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-muted/40 sm:aspect-[3/4] lg:aspect-[4/5] lg:min-h-[480px]">
+            {/* Sağ / alt: üniforma + belge görselleri (yüz yok) */}
+            <div className="relative z-10 mx-auto w-full max-w-md justify-self-end lg:mx-0 lg:max-w-none">
+              <div className="relative aspect-[3/4] overflow-hidden rounded-2xl shadow-2xl ring-1 ring-black/5 sm:aspect-[4/5] lg:min-h-[420px]">
                 <Image
-                  src="/images/doctor-hero.jpg"
-                  alt="Dosyaları elinde tutan deneyimli uzman hekim"
+                  src="/images/hero-coat-documents.jpg"
+                  alt="Üniformalı uzman hekim, elinde tıbbi belgeler"
                   fill
                   priority
-                  className="object-cover object-[center_12%]"
+                  className="object-cover object-center"
                   sizes="(max-width: 1024px) 90vw, 42vw"
                 />
                 <div
-                  className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/35 via-transparent to-transparent"
+                  className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-900/25 via-transparent to-transparent"
                   aria-hidden
                 />
+              </div>
+              <div className="absolute -bottom-4 -left-3 hidden w-[48%] overflow-hidden rounded-xl shadow-xl ring-1 ring-black/10 sm:block lg:-left-8">
+                <div className="relative aspect-[4/3]">
+                  <Image
+                    src="/images/hero-doctor-docs.jpg"
+                    alt="Tıbbi dosya ve üniforma detayı"
+                    fill
+                    className="object-cover object-[center_85%]"
+                    sizes="220px"
+                  />
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Features — clean rows, no heavy cards */}
-        <section className="relative mx-auto mt-12 max-w-6xl border-t border-border/60 px-4 pt-10 sm:mt-16 sm:px-8 sm:pt-12">
-          <div className="grid gap-8 sm:grid-cols-3 sm:gap-6 lg:gap-10">
-            {FEATURES.map((f, i) => (
-              <div
-                key={f.title}
-                className={
-                  i > 0
-                    ? "border-t border-border/50 pt-8 sm:border-l sm:border-t-0 sm:pt-0 sm:pl-6 lg:pl-10"
-                    : ""
-                }
-              >
-                <h2 className="text-base font-semibold tracking-tight sm:text-lg">{f.title}</h2>
-                <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">{f.desc}</p>
-              </div>
-            ))}
+        {/* Güven */}
+        <section className="border-b border-border/50 bg-muted/20">
+          <div className="mx-auto grid max-w-6xl gap-6 px-4 py-10 sm:grid-cols-3 sm:px-8 sm:py-12">
+            {TRUST.map((item) => {
+              const Icon = item.Icon;
+              return (
+                <div key={item.title} className="flex gap-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border bg-background text-primary shadow-sm">
+                    <Icon size={22} weight="Outline" color="currentColor" />
+                  </div>
+                  <div>
+                    <h2 className="font-semibold">{item.title}</h2>
+                    <p className="text-muted-foreground mt-1 text-sm">{item.desc}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </section>
 
-        {/* Process summary */}
-        <section className="relative mx-auto max-w-6xl px-4 py-12 sm:px-8 sm:py-16">
-          <div className="mb-8 space-y-2 sm:mb-10 sm:text-center">
-            <h2 className="text-xl font-bold tracking-tight sm:text-2xl lg:text-3xl">Süreç özeti</h2>
-            <p className="text-muted-foreground max-w-lg text-sm font-medium sm:mx-auto">
-              Başvurudan rapora kadar süreç şöyle ilerler
+        {/* İş akışı */}
+        <section id="surec" className="mx-auto max-w-6xl px-4 py-12 sm:px-8 sm:py-16">
+          <div className="mb-10 max-w-2xl space-y-3">
+            <p className="text-primary text-sm font-semibold uppercase tracking-wider">İş akışı</p>
+            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              Başvurudan rapora kurumsal süreç
+            </h2>
+            <p className="text-muted-foreground text-sm sm:text-base">
+              Tüm adımlar hasta panelinde şeffaf biçimde ilerler; her aşamada ne yapmanız
+              gerektiği açıkça gösterilir.
             </p>
           </div>
 
-          <ol className="grid gap-0 sm:grid-cols-2 lg:grid-cols-4 lg:gap-0">
-            {STEPS.map((s, i) => (
-              <li
-                key={s.n}
-                className="relative flex gap-4 border-b border-border/50 py-5 last:border-b-0 sm:border-b-0 sm:px-4 sm:py-0 lg:px-5"
-              >
-                {i < STEPS.length - 1 ? (
-                  <span
-                    className="bg-border absolute top-8 left-[1.15rem] hidden h-[calc(100%-1rem)] w-px lg:left-auto lg:right-0 lg:top-5 lg:block lg:h-px lg:w-full"
-                    aria-hidden
-                  />
-                ) : null}
-                <span className="landing-step-num relative z-10 flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-background text-sm font-bold">
-                  {s.n}
-                </span>
-                <div className="min-w-0 space-y-1 pt-1">
-                  <h3 className="text-sm font-semibold sm:text-base">{s.title}</h3>
-                  <p className="text-muted-foreground text-sm leading-relaxed">{s.desc}</p>
-                </div>
-              </li>
-            ))}
+          <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {WORKFLOW.map((w) => {
+              const Icon = w.Icon;
+              return (
+                <li
+                  key={w.step}
+                  className="rounded-2xl border bg-card p-5 shadow-sm transition-shadow hover:shadow-md"
+                >
+                  <div className="mb-4 flex items-center justify-between">
+                    <span className="text-primary font-mono text-sm font-bold">{w.step}</span>
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Icon size={18} weight="Outline" color="currentColor" />
+                    </div>
+                  </div>
+                  <h3 className="font-semibold">{w.title}</h3>
+                  <p className="text-muted-foreground mt-2 text-sm leading-relaxed">{w.desc}</p>
+                </li>
+              );
+            })}
           </ol>
+        </section>
+
+        {/* Görsel şerit */}
+        <section className="border-y border-border/50 bg-slate-50/80">
+          <div className="mx-auto grid max-w-6xl gap-3 px-4 py-6 sm:grid-cols-3 sm:gap-4 sm:px-8 sm:py-8">
+            <div className="relative aspect-[16/10] overflow-hidden rounded-xl">
+              <Image
+                src="/images/hero-medical-desk.jpg"
+                alt="Tıbbi danışmanlık çalışma alanı"
+                fill
+                className="object-cover"
+                sizes="(max-width: 640px) 100vw, 33vw"
+              />
+            </div>
+            <div className="relative aspect-[16/10] overflow-hidden rounded-xl">
+              <Image
+                src="/images/hero-coat-documents.jpg"
+                alt="Üniforma ve başvuru dosyası"
+                fill
+                className="object-cover object-center"
+                sizes="(max-width: 640px) 100vw, 33vw"
+              />
+            </div>
+            <div className="relative aspect-[16/10] overflow-hidden rounded-xl">
+              <Image
+                src="/images/hero-doctor-docs.jpg"
+                alt="Belgeler ve hekim üniforması"
+                fill
+                className="object-cover object-[center_80%]"
+                sizes="(max-width: 640px) 100vw, 33vw"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Nasıl kullanılır */}
+        <section id="nasil-kullanilir" className="mx-auto max-w-6xl px-4 py-12 sm:px-8 sm:py-16">
+          <div className="mb-8 space-y-3 sm:mb-10">
+            <p className="text-primary text-sm font-semibold uppercase tracking-wider">Kullanım bilgisi</p>
+            <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">Nasıl kullanılır?</h2>
+            <p className="text-muted-foreground max-w-2xl text-sm sm:text-base">
+              Platformu ilk kez kullanacak hastalar için kısa rehber.
+            </p>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            {HOW_TO.map((item) => (
+              <div
+                key={item.q}
+                className="rounded-xl border border-border/70 bg-card px-5 py-4 shadow-sm"
+              >
+                <h3 className="font-semibold text-foreground">{item.q}</h3>
+                <p className="text-muted-foreground mt-2 text-sm leading-relaxed">{item.a}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-10 rounded-2xl border border-primary/20 bg-primary/[0.04] p-6 sm:p-8">
+            <h3 className="text-lg font-semibold">Hızlı başlangıç</h3>
+            <ol className="text-muted-foreground mt-4 grid gap-3 text-sm sm:grid-cols-2">
+              <li className="flex items-start gap-2">
+                <CheckMark />
+                Giriş yapın veya kayıt olun
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckMark />
+                Yeni başvuru oluşturun
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckMark />
+                Bölüm ve doktor seçin
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckMark />
+                Formu doldurup ödemeyi tamamlayın
+              </li>
+            </ol>
+            <Button className="mt-6" asChild>
+              <Link href={ROUTES.patient.login} className="inline-flex items-center gap-2">
+                Başvuruya başla
+                <ArrowRight size={16} weight="Outline" color="currentColor" />
+              </Link>
+            </Button>
+          </div>
         </section>
       </main>
 
-      {/* Mobile sticky CTA */}
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border/70 bg-background/95 px-4 pt-3 backdrop-blur-md md:hidden pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
         <Button size="lg" className="h-12 w-full text-base font-semibold shadow-md" asChild>
           <Link href={ROUTES.patient.login}>Hemen başvur</Link>
         </Button>
-        <p className="text-muted-foreground mt-2 text-center text-xs leading-snug">
-          Hesabınız yoksa giriş ekranından kayıt olabilirsiniz
-        </p>
       </div>
 
-      <footer className="mt-auto hidden border-t bg-muted/20 md:block">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-6 text-center sm:flex-row sm:px-8 sm:text-left">
-          <p className="text-muted-foreground text-xs font-medium">
+      <footer className="mt-auto border-t bg-slate-900 text-slate-300">
+        <div className="mx-auto max-w-6xl px-4 py-10 sm:px-8">
+          <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-3">
+              <AppLogo href="/" className="[&_span]:text-white" />
+              <p className="max-w-sm text-sm leading-relaxed text-slate-400">
+                Erciyes Üniversitesi Hastanesi bünyesinde uzaktan tıbbi danışmanlık ve ikinci
+                görüş hizmeti.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-8 text-sm">
+              <div className="space-y-2">
+                <p className="font-semibold text-white">Hasta</p>
+                <Link href={ROUTES.patient.login} className="block hover:text-white">
+                  Giriş
+                </Link>
+                <Link href={ROUTES.patient.register} className="block hover:text-white">
+                  Kayıt
+                </Link>
+              </div>
+              <div className="space-y-2">
+                <p className="font-semibold text-white">Kurum</p>
+                <Link href={ROUTES.doctor.login} className="block hover:text-white">
+                  Doktor girişi
+                </Link>
+                <Link href={ROUTES.admin.login} className="block text-slate-500 hover:text-white">
+                  Yönetim
+                </Link>
+              </div>
+            </div>
+          </div>
+          <p className="mt-8 border-t border-slate-800 pt-6 text-center text-xs text-slate-500 sm:text-left">
             © {new Date().getFullYear()} Erciyes Üniversitesi · Tıbbi Danışmanlık Platformu
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-5 text-xs font-medium">
-            <Link href={ROUTES.patient.login} className="font-semibold text-foreground hover:underline">
-              Hasta girişi
-            </Link>
-            <Link href={ROUTES.doctor.login} className="text-muted-foreground hover:text-foreground">
-              Doktor girişi
-            </Link>
-            <Link href={ROUTES.admin.login} className="text-muted-foreground/70 hover:text-foreground">
-              Yönetim
-            </Link>
-          </div>
         </div>
       </footer>
     </div>
+  );
+}
+
+function CheckMark() {
+  return (
+    <span className="mt-0.5 inline-flex text-primary">
+      <ShieldCheck size={16} weight="Outline" color="currentColor" />
+    </span>
   );
 }

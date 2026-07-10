@@ -15,6 +15,7 @@ import (
 	"medical-consultation-platform/backend/internal/repository"
 	appsvc "medical-consultation-platform/backend/internal/service/application"
 	authsvc "medical-consultation-platform/backend/internal/service/auth"
+	chatsvc "medical-consultation-platform/backend/internal/service/chat"
 	"medical-consultation-platform/backend/internal/service/erciyes"
 	notifysvc "medical-consultation-platform/backend/internal/service/notification"
 	invoicesvc "medical-consultation-platform/backend/internal/service/invoice"
@@ -28,6 +29,7 @@ type Deps struct {
 	JWT     *jwtmgr.Manager
 	Auth    *authsvc.Service
 	App     *appsvc.Service
+	Chat    *chatsvc.Service
 	Notify  *notifysvc.Service
 	Payment *paysvc.Service
 	Invoice *invoicesvc.Service
@@ -84,6 +86,7 @@ func NewRouter(d Deps) http.Handler {
 	erciyesH := NewErciyesHandler(d.Erciyes, d.DB)
 	profileH := NewProfileHandler(d.DB, d.Notify, d.Audit, d.Cfg.OTPTTL)
 	adminUserH := NewAdminUserHandler(d.DB, d.Audit)
+	chatH := NewChatHandler(d.Chat, d.DB, d.JWT)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -135,6 +138,9 @@ func NewRouter(d Deps) http.Handler {
 
 			ar.With(authmw.RequireRole("nurse", "doctor", "admin", "developer")).Post("/{id}/notes", appH.AddNote)
 			ar.With(authmw.RequireRole("nurse", "doctor", "admin", "developer")).Get("/{id}/notes", appH.NoteHistory)
+
+			ar.Get("/{id}/messages", chatH.ListMessages)
+			ar.Post("/{id}/messages", chatH.SendMessage)
 
 			ar.With(authmw.RequireRole("nurse", "admin", "developer")).Post("/{id}/assess", appH.AssessApplication)
 			ar.With(authmw.RequireRole("nurse", "admin", "developer")).Post("/{id}/send-to-doctor", appH.CompleteNurseAssessment)
@@ -192,6 +198,8 @@ func NewRouter(d Deps) http.Handler {
 			ar.Delete("/titles/{id}", adminH.DeleteTitle)
 		})
 	})
+
+	r.Get("/api/v1/ws/chat", chatH.WebSocket)
 
 	return r
 }

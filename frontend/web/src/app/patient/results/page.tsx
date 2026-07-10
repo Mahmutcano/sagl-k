@@ -62,18 +62,15 @@ export default function ResultsPage() {
           description="Başvurunuz hekim tarafından değerlendirilip sonuç raporu hazırlandığında burada listelenecektir."
         />
       ) : (
-        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-          <div className="divide-y">
-            {items.map((item) => (
+        <ul className="grid gap-3">
+          {items.map((item) => (
+            <li key={item.applicationId}>
               <PatientApplicationRow
-                key={item.applicationId}
                 item={item}
-                deleting={false}
-                onDelete={() => {}}
               />
-            ))}
-          </div>
-        </div>
+            </li>
+          ))}
+        </ul>
       )}
     </PatientAppShell>
   );

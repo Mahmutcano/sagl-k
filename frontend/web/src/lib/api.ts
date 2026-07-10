@@ -25,12 +25,19 @@ export type ApiEnvelope<T> = {
 export class ApiError extends Error {
   code: string;
   fields: FieldErrors;
+  details?: Record<string, unknown>;
 
-  constructor(message: string, code = "ERROR", fields: FieldErrors = {}) {
+  constructor(
+    message: string,
+    code = "ERROR",
+    fields: FieldErrors = {},
+    details?: Record<string, unknown>
+  ) {
     super(message);
     this.name = "ApiError";
     this.code = code;
     this.fields = fields;
+    this.details = details;
   }
 }
 let refreshPromise: Promise<string | null> | null = null;
@@ -103,10 +110,15 @@ export async function api<T>(
     const fields = body.details?.fields
       ? errorsToMap(body.details.fields)
       : {};
+    const extra =
+      body.details && typeof body.details === "object" && !Array.isArray(body.details)
+        ? (body.details as Record<string, unknown>)
+        : undefined;
     throw new ApiError(
       body.responseMessage || "İstek başarısız oldu.",
       body.responseCode || "ERROR",
-      fields
+      fields,
+      extra
     );
   }
   return body.result as T;

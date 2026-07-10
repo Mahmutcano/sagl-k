@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useClientUser } from "@/hooks/useClientUser";
-import { logoutTo, roleLabel } from "@/lib/auth";
+import { logoutTo, roleLabel, userDisplayName } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
+import { api, getToken } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { AppLogo } from "@/components/AppLogo";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,20 @@ export function AdminAppShell({ children, title, description, actions }: AppShel
   const pathname = usePathname();
   const user = useClientUser();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [displayName, setDisplayName] = useState("");
+
+  useEffect(() => {
+    const token = getToken();
+    if (!token) return;
+    api<{ firstName?: string; lastName?: string }>("/api/v1/profile", {}, token)
+      .then((p) => {
+        const name = [p.firstName, p.lastName].filter(Boolean).join(" ").trim();
+        if (name) setDisplayName(name);
+      })
+      .catch(() => {});
+  }, []);
+
+  const sidebarName = displayName || userDisplayName(user) || "Yönetici";
 
   const navItems = [
     { href: ROUTES.admin.home, label: "Başvurular", icon: Home, exact: true },
@@ -117,19 +132,23 @@ export function AdminAppShell({ children, title, description, actions }: AppShel
       </nav>
 
       <div className="shrink-0 border-t border-slate-200 p-3 bg-slate-50/50 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
-        <div className="mb-3 flex items-center gap-3 px-1">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-slate-100 text-xs font-bold text-slate-700">
-            {user?.role ? roleLabel(user.role).slice(0, 2).toUpperCase() : "AD"}
+        <Link
+          href={ROUTES.admin.profile}
+          onClick={() => setMobileOpen(false)}
+          className="mb-3 flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-slate-100"
+        >
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border bg-primary/10 text-xs font-bold text-primary">
+            {sidebarName.slice(0, 2).toUpperCase()}
           </div>
-          <div className="min-w-0">
-            <span className="block truncate text-xs font-bold uppercase text-slate-800">
-              {user?.role ? roleLabel(user.role) : "Yönetici"}
+          <div className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold text-slate-800">
+              {sidebarName}
             </span>
-            <span className="block truncate text-[10px] text-slate-500">
-              {user?.id ? `ID: ${user.id.slice(0, 8)}` : "Sistem Yetkilisi"}
+            <span className="block truncate text-[11px] text-slate-500">
+              {user?.role ? roleLabel(user.role) : "Profil ayarları"}
             </span>
           </div>
-        </div>
+        </Link>
         <Button
           onClick={handleLogout}
           variant="destructive"

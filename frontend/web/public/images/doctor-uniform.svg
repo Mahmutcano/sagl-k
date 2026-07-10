@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500" fill="none" role="img" aria-label="Önlüklü hekim, elinde belge">
+  <defs>
+    <linearGradient id="coat" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f8fafc"/>
+      <stop offset="100%" stop-color="#dbeafe"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="500" fill="#eef4fb"/>
+  <ellipse cx="200" cy="470" rx="140" ry="18" fill="#cbd5e1" opacity=".45"/>
+  <path d="M95 500h210l-18-210c0-0 12-38 48-38h0c36 0 48 38 48 38l-18 210H95z" fill="url(#coat)" stroke="#94a3b8" stroke-width="2"/>
+  <path d="M120 252h160l-8 170H128l-8-170z" fill="#ffffff" stroke="#cbd5e1"/>
+  <path d="M155 500V290c0-18 14-32 32-32h26c18 0 32 14 32 32v210" fill="#e2e8f0" stroke="#94a3b8"/>
+  <rect x="168" y="318" width="64" height="88" rx="6" fill="#fff" stroke="#64748b" stroke-width="2"/>
+  <line x1="178" y1="338" x2="222" y2="338" stroke="#94a3b8" stroke-width="3"/>
+  <line x1="178" y1="358" x2="222" y2="358" stroke="#cbd5e1" stroke-width="3"/>
+  <line x1="178" y1="378" x2="210" y2="378" stroke="#cbd5e1" stroke-width="3"/>
+  <circle cx="200" cy="248" r="52" fill="#f1f5f9" stroke="#94a3b8" stroke-width="2"/>
+  <path d="M148 248c0-28 23-52 52-52s52 24 52 52" fill="#e2e8f0"/>
+  <rect x="0" y="0" width="400" height="130" fill="#eef4fb"/>
+</svg>

@@ -25,8 +25,10 @@ type FieldProps = {
 
 export function FormField({ id, label, hint, error, className, children }: FieldProps) {
   return (
-    <div className={cn("flex flex-col gap-1", className)}>
-      <Label htmlFor={id} className="font-semibold text-foreground leading-none">{label}</Label>
+    <div className={cn("flex flex-col gap-2", className)}>
+      <Label htmlFor={id} className="text-sm font-medium text-slate-700 leading-none">
+        {label}
+      </Label>
       {children}
       {error ? (
         <p id={`${id}-error`} className="text-sm text-destructive" role="alert">
@@ -264,11 +266,14 @@ export function FormSelect({
   onChange,
   name,
 }: SelectProps) {
+  const realOptions = options.filter((o) => o.value !== "");
+  const selectValue = value && value !== "" ? value : undefined;
+
   return (
     <FormField id={id} label={label} hint={hint} error={error} className={fieldClassName}>
       <Select
-        value={value}
-        defaultValue={defaultValue}
+        value={selectValue}
+        defaultValue={defaultValue && defaultValue !== "" ? defaultValue : undefined}
         disabled={disabled}
         onValueChange={(v) =>
           onChange?.({ target: { value: v, name: name ?? id } })
@@ -277,9 +282,9 @@ export function FormSelect({
         <SelectTrigger id={id} aria-invalid={error ? true : undefined} className="min-w-0 w-full">
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent>
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
+        <SelectContent position="popper" className="z-[200]">
+          {realOptions.map((o) => (
+            <SelectItem key={`${id}-${o.value}`} value={o.value}>
               {o.label}
             </SelectItem>
           ))}

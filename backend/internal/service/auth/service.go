@@ -56,14 +56,14 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResult, er
 	if strings.TrimSpace(req.Password) == "" {
 		return nil, errors.New("invalid credentials")
 	}
-	var hash, role string
+	var hash, role, firstName, lastName string
 	var userID uuid.UUID
 	var isDoctor, isNurse, isDeveloper bool
 	err := s.db.Pool.QueryRow(ctx, `
-		SELECT id, password_hash, role,
+		SELECT id, password_hash, role, first_name, last_name,
 			role = 'doctor', role = 'nurse', is_developer
 		FROM users WHERE national_identifier = $1 AND is_active = true
-	`, req.NationalIdentifier).Scan(&userID, &hash, &role, &isDoctor, &isNurse, &isDeveloper)
+	`, req.NationalIdentifier).Scan(&userID, &hash, &role, &firstName, &lastName, &isDoctor, &isNurse, &isDeveloper)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
 	}
@@ -78,6 +78,7 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResult, er
 		IsTfaNeeded:  false,
 		User: map[string]interface{}{
 			"id": userID.String(), "role": role,
+			"firstName": firstName, "lastName": lastName,
 			"isDoctor": isDoctor, "isNurse": isNurse, "isDeveloper": isDeveloper,
 		},
 	}, nil

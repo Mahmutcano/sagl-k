@@ -17,7 +17,6 @@ import {
 	isSurveyComplete,
 	type ApplicationAttachment,
 	type ApplicationDetail,
-	type ApplicationNote,
 	type FinalReport,
 } from "@/lib/application";
 import {
@@ -25,10 +24,11 @@ import {
 	downloadApplicationAttachment,
 	parseSurveyData,
 } from "@/lib/applicationSurvey";
-import { FormAlert, FormField } from "@/components/FormField";
+import { FormAlert } from "@/components/FormField";
 import { ApplicationPreviewPanel } from "@/components/ApplicationPreviewPanel";
 import { PatientReportPanel } from "@/components/PatientReportPanel";
 import { ApplicationFlowSteps } from "@/components/ApplicationFlowSteps";
+import { ApplicationChat } from "@/modules/chat/ApplicationChat";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,6 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { ArrowLeft } from "lucide-react";
 
@@ -55,25 +54,20 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
   const router = useRouter();
   const searchParams = useSearchParams();
   const [app, setApp] = useState<ApplicationDetail | null>(null);
-  const [notes, setNotes] = useState<ApplicationNote[]>([]);
   const [attachments, setAttachments] = useState<ApplicationAttachment[]>([]);
   const [report, setReport] = useState<FinalReport | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(true);
-  const [noteText, setNoteText] = useState("");
-  const [noteSaving, setNoteSaving] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   const load = useCallback(() => {
     return Promise.all([
       api<ApplicationDetail>(API.applications.detail(id), {}, token),
-      api<ApplicationNote[]>(API.applications.notes(id), {}, token).catch(() => []),
       api<ApplicationAttachment[]>(API.applications.attachments(id), {}, token).catch(() => []),
-    ]).then(async ([detail, noteList, attachmentList]) => {
+    ]).then(async ([detail, attachmentList]) => {
       setApp(detail);
-      setNotes(noteList ?? []);
       setAttachments(attachmentList ?? []);
       if (isConcludedStatus(detail.statusCode)) {
         setReportLoading(true);
@@ -116,27 +110,6 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
       router.push(backHref);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Başvuru iptal edilemedi.");
-    }
-  }
-
-  async function addNote(e: React.FormEvent) {
-    e.preventDefault();
-    if (!noteText.trim()) return;
-    setNoteSaving(true);
-    setError("");
-    try {
-      await api(API.applications.notes(id), {
-        method: "POST",
-        body: JSON.stringify({ content: noteText.trim() }),
-      }, token);
-      setNoteText("");
-      const noteList = await api<ApplicationNote[]>(API.applications.notes(id), {}, token);
-      setNotes(noteList ?? []);
-      setMsg("Notunuz eklendi.");
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Not eklenemedi.");
-    } finally {
-      setNoteSaving(false);
     }
   }
 
@@ -194,33 +167,32 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
 
   return (
     <div className="grid gap-6">
-      <div className="mobile-action-stack flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <Button variant="ghost" size="sm" asChild className="gap-1.5 w-full sm:w-auto justify-start sm:justify-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Button variant="ghost" size="sm" asChild className="w-fit gap-1.5 px-0 sm:px-3">
           <Link href={backHref}>
             <ArrowLeft className="h-4 w-4" />
             Listeye dön
           </Link>
         </Button>
-        <Badge variant={statusVariant(app.statusCode)} className="w-fit">
-          {STATUS_LABELS[app.statusCode] ?? `Durum ${app.statusCode}`}
-        </Badge>
-        {isPatientEditableStatus(app.statusCode) ? (
-          <>
-            <Button variant="outline" size="sm" asChild className="w-full sm:w-auto">
-              <Link href={ROUTES.patient.editApplication(id)}>Başvuruya devam et</Link>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {isPatientEditableStatus(app.statusCode) ? (
+            <>
+              <Button variant="outline" size="sm" asChild>
+                <Link href={ROUTES.patient.editApplication(id, "details")}>
+                  Bölüm / doktor
+                </Link>
+              </Button>
+              <Button size="sm" asChild>
+                <Link href={ROUTES.patient.editApplication(id)}>Başvuruya devam et</Link>
+              </Button>
+            </>
+          ) : null}
+          {isPatientCancellableStatus(app.statusCode) ? (
+            <Button variant="destructive" size="sm" type="button" onClick={cancelApplication}>
+              İptal et
             </Button>
-            <Button variant="secondary" size="sm" asChild className="w-full sm:w-auto">
-              <Link href={ROUTES.patient.editApplication(id, "details")}>
-                Bölüm ve doktoru değiştir
-              </Link>
-            </Button>
-          </>
-        ) : null}
-        {isPatientCancellableStatus(app.statusCode) ? (
-          <Button variant="destructive" size="sm" type="button" className="w-full sm:w-auto" onClick={cancelApplication}>
-            Başvuruyu iptal et
-          </Button>
-        ) : null}
+          ) : null}
+        </div>
       </div>
 
       {error ? <FormAlert title="Hata" message={error} /> : null}
@@ -237,21 +209,32 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
       ) : null}
 
       <Card>
-        <CardHeader>
-          <CardTitle>{app.professionName ?? "Başvuru"}</CardTitle>
-          <CardDescription>
-            Başvuru no: {applicationDisplayNumber(app)}
-            {app.isForRelative ? " · Yakın adına" : " · Kendi adıma"}
-          </CardDescription>
+        <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+          <div className="min-w-0 space-y-1">
+            <CardTitle>{app.professionName ?? "Başvuru"}</CardTitle>
+            <CardDescription>
+              Başvuru no: {applicationDisplayNumber(app)}
+              {app.isForRelative ? " · Yakın adına" : " · Kendi adıma"}
+            </CardDescription>
+          </div>
+          <Badge variant={statusVariant(app.statusCode)} className="shrink-0">
+            {STATUS_LABELS[app.statusCode] ?? `Durum ${app.statusCode}`}
+          </Badge>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 text-sm">
           <div>
-            <p className="text-muted-foreground">Branş kodu</p>
-            <p className="font-medium">{app.professionCode ?? "—"}</p>
+            <p className="text-muted-foreground">Uzman hekim</p>
+            <p className="font-medium">
+              {app.doctorName?.trim() ? app.doctorName : "Atanmadı"}
+            </p>
           </div>
           <div>
-            <p className="text-muted-foreground">Başvuru no</p>
-            <p className="font-medium font-mono text-xs break-all">{app.applicationId}</p>
+            <p className="text-muted-foreground">Başvuru tarihi</p>
+            <p className="font-medium">
+              {app.createdAt
+                ? new Date(app.createdAt).toLocaleDateString("tr-TR")
+                : "—"}
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -388,47 +371,11 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Notlar</CardTitle>
-          <CardDescription>Ekibinizle yazışma geçmişi</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          {notes.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Henüz not yok.</p>
-          ) : (
-            <ul className="grid gap-2">
-              {notes.map((n, i) => (
-                <li key={i} className="rounded-lg border px-3 py-2 text-sm">
-                  <p className="font-medium">{n.author}</p>
-                  <p className="text-muted-foreground text-xs">
-                    {n.createdAt ? new Date(n.createdAt).toLocaleString("tr-TR") : ""}
-                  </p>
-                  <p className="mt-1">{n.content}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-          <form onSubmit={addNote} className="flex flex-col gap-3">
-            <FormField id="note" label="Not ekle">
-              <Textarea
-                id="note"
-                rows={3}
-                value={noteText}
-                onChange={(e) => setNoteText(e.target.value)}
-                placeholder="Sorunuz veya ek bilginiz..."
-              />
-            </FormField>
-            <Button type="submit" size="sm" className="self-start" disabled={noteSaving}>
-              {noteSaving ? "Kaydediliyor..." : "Not gönder"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Button variant="outline" onClick={() => router.refresh()}>
-        Yenile
-      </Button>
+      <ApplicationChat
+        applicationId={id}
+        token={token}
+        enabled={app.statusCode >= 1 && !isConcludedStatus(app.statusCode)}
+      />
 
       <ConfirmModal
         isOpen={isConfirmOpen}

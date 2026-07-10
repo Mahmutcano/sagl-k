@@ -57,3 +57,7 @@ func ClaimsFromContext(ctx context.Context) *jwtmgr.Claims {
 	claims, _ := ctx.Value(UserClaimsKey).(*jwtmgr.Claims)
 	return claims
 }
+
+func ContextWithClaims(ctx context.Context, claims *jwtmgr.Claims) context.Context {
+	return context.WithValue(ctx, UserClaimsKey, claims)
+}

@@ -33,9 +33,11 @@ export function staffStatusLabel(code: number): string {
   return STAFF_STATUS_LABELS[code] ?? STATUS_LABELS[code] ?? `Durum ${code}`;
 }
 
-export function statusVariant(code: number): "default" | "secondary" | "outline" | "destructive" {
+export function statusVariant(
+  code: number
+): "default" | "secondary" | "outline" | "destructive" | "warning" {
   if (code === 6) return "default";
-  if (code === 0) return "outline";
+  if (code === 0) return "warning";
   if (code === 3 || code === 5 || code === 7) return "destructive";
   return "secondary";
 }
@@ -79,7 +81,9 @@ export type ApplicationDetail = {
   professionCode?: string | null;
   professionName?: string | null;
   careProviderId?: string | null;
+  doctorName?: string | null;
   patientName?: string | null;
+  createdAt?: string | null;
   isForRelative?: boolean;
   surveyData?: unknown;
   representedPerson?: {
@@ -219,6 +223,7 @@ export type PaymentReceipt = {
   authReference?: string;
   professionName?: string;
   doctorName?: string;
+  createdAt?: string;
   paidAt?: string;
   description: string;
   maskedCard?: string;

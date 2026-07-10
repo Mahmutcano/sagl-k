@@ -38,5 +38,6 @@ export const ROUTES = {
     users: "/admin/users",
     logs: "/admin/logs",
     titles: "/admin/titles",
+    profile: "/admin/profile",
   },
 } as const;

@@ -190,6 +190,14 @@ func (h *ApplicationHandler) StartApplication(w http.ResponseWriter, r *http.Req
 	}
 	id, err := h.app.Start(r.Context(), claims.UserID, req)
 	if err != nil {
+		var dup *appsvc.DuplicateConflict
+		if errors.As(err, &dup) {
+			response.FailWithDetails(w, http.StatusConflict, "APP040", dup.Message, map[string]interface{}{
+				"existingApplicationId": dup.ExistingApplicationID.String(),
+				"reason":                dup.Reason,
+			})
+			return
+		}
 		response.Fail(w, http.StatusBadRequest, "APP011", response.SafeMessage(err, "Başvuru oluşturulamadı."))
 		return
 	}
@@ -208,18 +216,26 @@ func (h *ApplicationHandler) ApplicationDetail(w http.ResponseWriter, r *http.Re
 	var statusCode int
 	var appNumber, ecommerce, professionCode, professionName *string
 	var careProviderID *uuid.UUID
+	var doctorName *string
 	var isForRelative bool
 	var surveyData []byte
+	var createdAt time.Time
 	var ownerFirst, ownerLast string
 	err = h.db.Pool.QueryRow(r.Context(), `
 		SELECT a.status_code, a.application_number, a.ecommerce_number, a.profession_code, a.profession_name,
-		       a.care_provider_id, a.is_for_relative, COALESCE(s.data, '{}'),
-		       u.first_name, u.last_name
+		       a.care_provider_id, a.is_for_relative, COALESCE(s.data, '{}'), a.created_at,
+		       u.first_name, u.last_name,
+		       COALESCE(
+		         NULLIF(TRIM(BOTH FROM CONCAT_WS(' ', NULLIF(cp.title, ''), NULLIF(cp.full_name, ''))), ''),
+		         NULLIF(TRIM(BOTH FROM CONCAT_WS(' ', NULLIF(du.first_name, ''), NULLIF(du.last_name, ''))), '')
+		       )
 		FROM applications a
 		JOIN users u ON u.id = a.owner_user_id
 		LEFT JOIN application_surveys s ON s.application_id = a.id
+		LEFT JOIN care_providers cp ON cp.id = a.care_provider_id
+		LEFT JOIN users du ON du.id = a.doctor_user_id
 		WHERE a.id = $1
-	`, appID).Scan(&statusCode, &appNumber, &ecommerce, &professionCode, &professionName, &careProviderID, &isForRelative, &surveyData, &ownerFirst, &ownerLast)
+	`, appID).Scan(&statusCode, &appNumber, &ecommerce, &professionCode, &professionName, &careProviderID, &isForRelative, &surveyData, &createdAt, &ownerFirst, &ownerLast, &doctorName)
 	if err != nil {
 		response.Fail(w, http.StatusNotFound, "APP021", "Başvuru bulunamadı.")
 		return
@@ -234,9 +250,14 @@ func (h *ApplicationHandler) ApplicationDetail(w http.ResponseWriter, r *http.Re
 		"isForRelative":     isForRelative,
 		"surveyData":        json.RawMessage(surveyData),
 		"patientName":       strings.TrimSpace(ownerFirst + " " + ownerLast),
+		"createdAt":         createdAt.UTC().Format(time.RFC3339),
+		"doctorName":        "",
 	}
 	if careProviderID != nil {
 		payload["careProviderId"] = careProviderID.String()
+	}
+	if doctorName != nil && strings.TrimSpace(*doctorName) != "" {
+		payload["doctorName"] = strings.TrimSpace(*doctorName)
 	}
 	if isForRelative {
 		var fn, ln string
@@ -495,6 +516,14 @@ func (h *ApplicationHandler) UpdateApplication(w http.ResponseWriter, r *http.Re
 			response.Fail(w, http.StatusConflict, "APP033", err.Error())
 			return
 		}
+		var dup *appsvc.DuplicateConflict
+		if errors.As(err, &dup) {
+			response.FailWithDetails(w, http.StatusConflict, "APP040", dup.Message, map[string]interface{}{
+				"existingApplicationId": dup.ExistingApplicationID.String(),
+				"reason":                dup.Reason,
+			})
+			return
+		}
 		response.Fail(w, http.StatusBadRequest, "APP032", response.SafeMessage(err, "Başvuru güncellenemedi."))
 		return
 	}
@@ -629,16 +658,19 @@ func (h *ApplicationHandler) PagingPatient(w http.ResponseWriter, r *http.Reques
 	}
 	offset := req.Page * req.PageSize
 	rows, err := h.db.Pool.Query(r.Context(), `
-		SELECT id::text, status_code, application_number, ecommerce_number, profession_name, created_at
-		FROM applications WHERE owner_user_id = $1
-		ORDER BY created_at DESC LIMIT $2 OFFSET $3
+		SELECT a.id::text, a.status_code, a.application_number, a.ecommerce_number, a.profession_name, a.created_at,
+		       CASE WHEN cp.full_name IS NOT NULL THEN TRIM(COALESCE(cp.title,'') || ' ' || cp.full_name) ELSE NULL END
+		FROM applications a
+		LEFT JOIN care_providers cp ON cp.id = a.care_provider_id
+		WHERE a.owner_user_id = $1
+		ORDER BY a.created_at DESC LIMIT $2 OFFSET $3
 	`, claims.UserID, req.PageSize, offset)
 	if err != nil {
 		response.Fail(w, http.StatusInternalServerError, "APP050", "Başvurular listelenemedi.")
 		return
 	}
 	defer rows.Close()
-	items := h.scanPagingRows(rows)
+	items := h.scanPatientPagingRows(rows)
 	response.OK(w, map[string]interface{}{"items": items, "page": req.Page, "pageSize": req.PageSize})
 }
 
@@ -801,6 +833,34 @@ func (h *ApplicationHandler) pagingByStatus(w http.ResponseWriter, r *http.Reque
 	defer rows.Close()
 	items := h.scanPagingRows(rows)
 	response.OK(w, map[string]interface{}{"items": items, "page": req.Page, "pageSize": req.PageSize})
+}
+
+func (h *ApplicationHandler) scanPatientPagingRows(rows interface {
+	Next() bool
+	Scan(dest ...interface{}) error
+}) []map[string]interface{} {
+	items := []map[string]interface{}{}
+	for rows.Next() {
+		var id string
+		var status int
+		var appNumber, ecommerce, profession, doctorName *string
+		var createdAt interface{}
+		if err := rows.Scan(&id, &status, &appNumber, &ecommerce, &profession, &createdAt, &doctorName); err != nil {
+			continue
+		}
+		item := map[string]interface{}{
+			"applicationId": id, "statusCode": status,
+			"applicationNumber": appNumber,
+			"ecommerceNumber":   ecommerce,
+			"professionName":    profession,
+			"createdAt":         createdAt,
+		}
+		if doctorName != nil && *doctorName != "" {
+			item["doctorName"] = strings.TrimSpace(*doctorName)
+		}
+		items = append(items, item)
+	}
+	return items
 }
 
 func (h *ApplicationHandler) scanPagingRows(rows interface {

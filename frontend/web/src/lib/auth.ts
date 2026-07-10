@@ -7,10 +7,18 @@ const USER_KEY = "authUser";
 export type AuthUser = {
   id: string;
   role: string;
+  firstName?: string;
+  lastName?: string;
   isDoctor?: boolean;
   isNurse?: boolean;
   isDeveloper?: boolean;
 };
+
+export function userDisplayName(user: AuthUser | null | undefined): string {
+  if (!user) return "";
+  const name = [user.firstName, user.lastName].filter(Boolean).join(" ").trim();
+  return name || roleLabel(user.role);
+}
 
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;

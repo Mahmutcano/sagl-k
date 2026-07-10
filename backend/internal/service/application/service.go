@@ -66,6 +66,10 @@ func (s *flexJSONString) UnmarshalJSON(b []byte) error {
 }
 
 func (s *Service) Start(ctx context.Context, ownerID uuid.UUID, req StartApplicationRequest) (uuid.UUID, error) {
+	if err := s.checkDuplicateApplication(ctx, ownerID, req.CareProviderID, req.ProfessionCode, nil); err != nil {
+		return uuid.Nil, err
+	}
+
 	tx, err := s.db.Pool.Begin(ctx)
 	if err != nil {
 		return uuid.Nil, err
@@ -94,7 +98,7 @@ func (s *Service) Start(ctx context.Context, ownerID uuid.UUID, req StartApplica
 	}
 
 	var appNumber string
-	err = tx.QueryRow(ctx, `SELECT 'BSV-' || LPAD(nextval('application_number_seq')::text, 6, '0')`).Scan(&appNumber)
+	appNumber, err = s.allocateApplicationNumber(ctx, tx)
 	if err != nil {
 		return uuid.Nil, err
 	}

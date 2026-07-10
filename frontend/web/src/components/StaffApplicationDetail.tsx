@@ -20,6 +20,7 @@ import { DoctorReportEditor } from "@/components/DoctorReportEditor";
 import { ApplicationPreviewPanel } from "@/components/ApplicationPreviewPanel";
 import { ApplicationPreviewModal } from "@/components/ApplicationPreviewModal";
 import { DoctorFlowSteps, type DoctorFlowStep } from "@/components/DoctorFlowSteps";
+import { ApplicationChat } from "@/modules/chat/ApplicationChat";
 import { FormAlert, FormField } from "@/components/FormField";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -255,6 +256,11 @@ export function StaffApplicationDetail({ id, token, backHref = ROUTES.doctor.das
       ) : null}
 
       {flowStep === "application" || !showReportEditor ? (
+        <>
+          {app && app.statusCode >= 1 && !isConcluded ? (
+            <ApplicationChat applicationId={id} token={token} enabled />
+          ) : null}
+
         <Card className="shadow-premium border-slate-200 bg-white">
           <CardHeader className="bg-slate-50/50 border-b py-3 px-4 sm:py-4 sm:px-6">
             <CardTitle className="text-sm font-bold text-slate-800">Dahili Ekip Notları</CardTitle>
@@ -295,6 +301,7 @@ export function StaffApplicationDetail({ id, token, backHref = ROUTES.doctor.das
             </form>
           </CardContent>
         </Card>
+        </>
       ) : null}
 
       <ApplicationPreviewModal
