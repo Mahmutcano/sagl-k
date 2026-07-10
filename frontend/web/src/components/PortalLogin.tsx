@@ -15,6 +15,7 @@ import { ROUTES } from "@/lib/routes";
 import { hasErrors, validateLogin, type FieldErrors } from "@/lib/validation";
 import { AuthShell } from "@/components/AuthShell";
 import { FormAlert, FormField } from "@/components/FormField";
+import { PasswordInput } from "@/components/PasswordInput";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -136,18 +137,17 @@ export function PortalLogin({ area }: { area: AppArea }) {
                 />
               </FormField>
 
-              <FormField id="password" label="Şifre" error={fields.password}>
-                <Input
-                  id="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="h-12 border-slate-200 bg-white text-base focus-visible:border-primary focus-visible:ring-primary sm:h-11 sm:text-sm"
-                  placeholder="••••••••"
-                />
-              </FormField>
+              <PasswordInput
+                id="password"
+                label="Şifre"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                error={fields.password}
+                className="h-12 border-slate-200 bg-white text-base focus-visible:border-primary focus-visible:ring-primary sm:h-11 sm:text-sm"
+                placeholder="••••••••"
+              />
 
               {(area === "patient" || area === "doctor") ? (
                 <div className="-mt-1 text-right">

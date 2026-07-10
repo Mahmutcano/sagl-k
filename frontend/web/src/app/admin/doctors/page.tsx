@@ -8,6 +8,7 @@ import { API } from "@/lib/endpoints";
 import { hasErrors, validatePersonName, type FieldErrors } from "@/lib/validation";
 import { AdminAppShell } from "@/components/AdminAppShell";
 import { FormAlert, FormSelect, TextInput } from "@/components/FormField";
+import { PasswordInput } from "@/components/PasswordInput";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -563,14 +564,14 @@ export default function AdminDoctorsPage() {
 
                 <div className="flex gap-2 items-end">
                   <div className="flex-1">
-                    <TextInput
+                    <PasswordInput
                       id="password"
                       label={editingId ? "Şifre Değiştir (İsteğe Bağlı)" : "Giriş Şifresi"}
-                      type="text"
                       placeholder={editingId ? "Aynı kalması için boş bırakın" : "Şifre girin veya sağdaki butona basın"}
                       value={form.password}
                       onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
                       error={fields.password}
+                      defaultVisible
                     />
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={generateRandomPassword} className="h-9 mb-0.5 font-bold gap-1 rounded-xl">

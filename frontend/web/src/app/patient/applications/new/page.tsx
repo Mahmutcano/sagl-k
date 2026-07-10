@@ -183,6 +183,7 @@ function NewApplicationContent() {
     e.preventDefault();
     const fields: FieldErrors = {};
     if (!professionCode) fields.professionCode = "Bölüm seçiniz.";
+    if (!careProviderId) fields.careProviderId = "Doktor seçimi zorunludur.";
     setDetailFields(fields);
     if (hasErrors(fields)) return;
 
@@ -209,7 +210,7 @@ function NewApplicationContent() {
         body: JSON.stringify({
           professionCode,
           professionName: profession?.name ?? professionName ?? professionCode,
-          careProviderId: careProviderId || undefined,
+          careProviderId,
           surveyData: {
             surveyName: "patient_intake",
             data: surveyAnswersToJSON(surveyAnswers),
@@ -237,6 +238,12 @@ function NewApplicationContent() {
   async function saveAndGoToPreview(e: FormEvent) {
     e.preventDefault();
     setSurveyFormError("");
+    if (!careProviderId) {
+      setDetailFields({ careProviderId: "Doktor seçimi zorunludur." });
+      setError("Lütfen bölüm adımından bir uzman hekim seçin.");
+      setStep("details");
+      return;
+    }
     const surveyErrs = validateApplicationSurvey(surveyAnswers);
     setSurveyFields(surveyErrs);
     const fileErr = validateSelectedFiles(pendingFiles);
@@ -267,7 +274,7 @@ function NewApplicationContent() {
       const updateBody = {
         professionCode,
         professionName: profession?.name ?? professionName ?? professionCode,
-        careProviderId: careProviderId || undefined,
+        careProviderId,
         ...surveyPayload,
         ...(forRelative
           ? {
@@ -300,14 +307,29 @@ function NewApplicationContent() {
           { method: "POST", body: JSON.stringify(body) },
           token
         );
+        if (!res?.applicationId) {
+          throw new ApiError("Başvuru oluşturuldu ancak kimlik alınamadı. Lütfen başvurularım sayfasını kontrol edin.", "APP011");
+        }
         applicationId = res.applicationId;
         setCreatedId(applicationId);
         setApplicationStatus(0);
       }
 
       if (pendingFiles.length > 0 && applicationId) {
-        await uploadApplicationAttachments(applicationId, pendingFiles, token);
-        setPendingFiles([]);
+        try {
+          await uploadApplicationAttachments(applicationId, pendingFiles, token);
+          setPendingFiles([]);
+        } catch (uploadErr) {
+          setCreatedId(applicationId);
+          const msg =
+            uploadErr instanceof ApiError
+              ? uploadErr.message
+              : "Dosyalar yüklenemedi. Başvuru kaydedildi; dosyaları tekrar ekleyebilirsiniz.";
+          setFileError(msg);
+          setSurveyFormError(`Başvuru kaydedildi ancak dosya yüklenemedi: ${msg}`);
+          setStep("survey");
+          return;
+        }
       }
       setStep("preview");
     } catch (err) {
@@ -336,10 +358,10 @@ function NewApplicationContent() {
           }
           setError(err.message);
         } else {
-          setError(err.message);
+          setError(err.message || "Başvuru kaydedilemedi.");
         }
       } else {
-        setError("Başvuru kaydedilemedi.");
+        setError(err instanceof Error ? err.message : "Başvuru kaydedilemedi.");
       }
     } finally {
       setSubmitting(false);
@@ -358,7 +380,7 @@ function NewApplicationContent() {
         : catalog.loadingProviders
           ? "Doktorlar yükleniyor..."
           : catalog.providers.length
-            ? "Doktor seçiniz (isteğe bağlı)"
+            ? "Doktor seçiniz"
             : "Bu bölümde atanabilir doktor yok",
     },
     ...catalog.providers.map((p) => ({
@@ -587,7 +609,7 @@ function NewApplicationContent() {
               <FormSelect
                 id="careProviderId"
                 label="Uzman hekim"
-                hint="İsteğe bağlı — tercih ettiğiniz hekimi seçebilirsiniz"
+                hint="Başvurunuzun iletileceği uzman hekimi seçiniz"
                 value={careProviderId}
                 onChange={(e) => setCareProviderId(e.target.value)}
                 error={detailFields.careProviderId}

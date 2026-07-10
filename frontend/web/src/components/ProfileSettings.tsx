@@ -10,6 +10,8 @@ import {
   BirthDateSelect,
   TextInput,
 } from "@/components/FormField";
+import { PasswordInput } from "@/components/PasswordInput";
+import { MessageModal } from "@/components/MessageModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { type FieldErrors } from "@/lib/validation";
@@ -219,11 +221,9 @@ export function ProfileSettings() {
   return (
     <div className="grid gap-6 max-w-4xl w-full mx-auto">
       {error ? <FormAlert title="Hata" message={error} /> : null}
-      {success ? (
-        <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg p-4 text-sm font-medium">
-          {success}
-        </div>
-      ) : null}
+              {success ? (
+                <MessageModal title="Başarılı" message={success} variant="success" onClose={() => setSuccess("")} />
+              ) : null}
 
       <div className="flex flex-col gap-6">
         {/* Personal Details Card */}
@@ -308,24 +308,24 @@ export function ProfileSettings() {
               <CardDescription>Güvenliğiniz için şifrenizi düzenli aralıklarla güncelleyin.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
-              {passError ? <p className="text-sm text-destructive font-medium sm:col-span-2">{passError}</p> : null}
+              {passError ? (
+                <MessageModal title="Şifre hatası" message={passError} variant="destructive" onClose={() => setPassError("")} />
+              ) : null}
               {passSuccess ? (
-                <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded p-2 font-medium sm:col-span-2">
-                  {passSuccess}
-                </p>
+                <MessageModal title="Başarılı" message={passSuccess} variant="success" onClose={() => setPassSuccess("")} />
               ) : null}
 
-              <TextInput
+              <PasswordInput
                 id="oldPassword"
                 label="Mevcut Şifre"
-                type="password"
+                autoComplete="current-password"
                 value={oldPassword}
                 onChange={(e) => setOldPassword(e.target.value)}
               />
-              <TextInput
+              <PasswordInput
                 id="newPassword"
                 label="Yeni Şifre"
-                type="password"
+                autoComplete="new-password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
               />

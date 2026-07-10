@@ -141,11 +141,13 @@ func (h *ApplicationHandler) StartApplication(w http.ResponseWriter, r *http.Req
 	if req.ProfessionName == "" {
 		errs.Add("professionName", "required", "Bölüm adı zorunludur.")
 	}
-	if req.CareProviderID != "" {
+	if req.CareProviderID == "" {
+		errs.Add("careProviderId", "required", "Doktor seçimi zorunludur.")
+	} else {
 		validate.UUID(&errs, "careProviderId", req.CareProviderID, "Doktor kimliği")
 	}
-	validate.SurveyData(&errs, "surveyData.data", req.SurveyData.Data)
-	validate.ApplicationSurveyAnswers(&errs, req.SurveyData.Data)
+	validate.SurveyData(&errs, "surveyData.data", req.SurveyData.Data.String())
+	validate.ApplicationSurveyAnswers(&errs, req.SurveyData.Data.String())
 	if req.IsForRelative {
 		if req.RepresentedPerson == nil {
 			errs.Add("representedPerson", "required", "Yakın adına başvuru için temsil edilen kişi bilgileri zorunludur.")
@@ -476,11 +478,13 @@ func (h *ApplicationHandler) UpdateApplication(w http.ResponseWriter, r *http.Re
 	if req.ProfessionName == "" {
 		errs.Add("professionName", "required", "Bölüm adı zorunludur.")
 	}
-	if req.CareProviderID != "" {
+	if req.CareProviderID == "" {
+		errs.Add("careProviderId", "required", "Doktor seçimi zorunludur.")
+	} else {
 		validate.UUID(&errs, "careProviderId", req.CareProviderID, "Doktor kimliği")
 	}
-	validate.SurveyData(&errs, "surveyData.data", req.SurveyData.Data)
-	validate.ApplicationSurveyAnswers(&errs, req.SurveyData.Data)
+	validate.SurveyData(&errs, "surveyData.data", req.SurveyData.Data.String())
+	validate.ApplicationSurveyAnswers(&errs, req.SurveyData.Data.String())
 	if errs.Has() {
 		validate.Fail(w, errs)
 		return

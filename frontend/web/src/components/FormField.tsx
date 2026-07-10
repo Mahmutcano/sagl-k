@@ -1,7 +1,7 @@
 "use client";
 
 import type { InputHTMLAttributes, ReactNode } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { MessageModal } from "@/components/MessageModal";
 import { CustomDatePicker } from "@/components/CustomDatePicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -192,10 +192,12 @@ export function FormAlert({
   message: string;
   variant?: "destructive" | "default";
 }) {
+  if (!message) return null;
   return (
-    <Alert variant={variant === "destructive" ? "destructive" : "default"}>
-      {title ? <AlertTitle>{title}</AlertTitle> : null}
-      <AlertDescription>{message}</AlertDescription>
-    </Alert>
+    <MessageModal
+      title={title}
+      message={message}
+      variant={variant === "destructive" ? "destructive" : "default"}
+    />
   );
 }

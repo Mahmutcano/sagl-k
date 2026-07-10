@@ -17,6 +17,7 @@ import {
 } from "@/lib/validation";
 import { AuthShell } from "@/components/AuthShell";
 import { FormAlert, TextInput } from "@/components/FormField";
+import { PasswordInput } from "@/components/PasswordInput";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -119,10 +120,9 @@ export default function ForgotPasswordPage() {
                 onChange={(e) => setCode(e.target.value)}
                 error={fields.code}
               />
-              <TextInput
+              <PasswordInput
                 id="password"
                 label="Yeni şifre"
-                type="password"
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

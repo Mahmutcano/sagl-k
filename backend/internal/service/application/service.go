@@ -32,9 +32,37 @@ type StartApplicationRequest struct {
 
 type SurveyPayload struct {
 	SurveyName string `json:"surveyName"`
-	Data       string `json:"data"`
+	// Data holds patient intake answers as a JSON object string.
+	// Accepts either a JSON string or a raw object from clients.
+	Data       flexJSONString `json:"data"`
 	// ReportJSON başvuru raporu içeriği (JSON). Base64 PDF kabul edilmez.
 	ReportJSON string `json:"reportJson"`
+}
+
+// flexJSONString unmarshals both `"{\"a\":1}"` and `{"a":1}` into a JSON text string.
+type flexJSONString string
+
+func (s flexJSONString) String() string { return string(s) }
+
+func (s *flexJSONString) UnmarshalJSON(b []byte) error {
+	if len(b) == 0 || string(b) == "null" {
+		*s = ""
+		return nil
+	}
+	if b[0] == '"' {
+		var str string
+		if err := json.Unmarshal(b, &str); err != nil {
+			return err
+		}
+		*s = flexJSONString(str)
+		return nil
+	}
+	// Raw object/array — keep canonical JSON text
+	if !json.Valid(b) {
+		return fmt.Errorf("invalid survey data json")
+	}
+	*s = flexJSONString(b)
+	return nil
 }
 
 func (s *Service) Start(ctx context.Context, ownerID uuid.UUID, req StartApplicationRequest) (uuid.UUID, error) {
@@ -88,8 +116,8 @@ func (s *Service) Start(ctx context.Context, ownerID uuid.UUID, req StartApplica
 	}
 
 	var surveyJSON json.RawMessage
-	if req.SurveyData.Data != "" {
-		surveyJSON = json.RawMessage(req.SurveyData.Data)
+	if req.SurveyData.Data.String() != "" {
+		surveyJSON = json.RawMessage(req.SurveyData.Data.String())
 	} else {
 		surveyJSON = json.RawMessage("{}")
 	}

@@ -1,3 +1,8 @@
+import { ApiError } from "@/lib/api";
+import { type FieldErrors } from "@/lib/validation";
+
+export type { FieldErrors };
+
 export const MIN_SURVEY_ANSWER_LEN = 10;
 export const MAX_SURVEY_ANSWER_LEN = 2000;
 
@@ -65,8 +70,6 @@ export const SURVEY_FIELDS: {
     rows: 3,
   },
 ];
-
-export type FieldErrors = Record<string, string>;
 
 function charCount(value: string): number {
   return Array.from(value).length;
@@ -177,14 +180,26 @@ export async function uploadApplicationAttachments(
   for (const file of files) {
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch(`${API_BASE}/api/v1/applications/${applicationId}/attachments`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    const body = await res.json().catch(() => ({}));
+    let res: Response;
+    try {
+      res = await fetch(`${API_BASE}/api/v1/applications/${applicationId}/attachments`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+    } catch {
+      throw new ApiError(`"${file.name}" yüklenirken bağlantı hatası oluştu.`, "NET002");
+    }
+    const body = (await res.json().catch(() => ({}))) as {
+      hasError?: boolean;
+      responseMessage?: string;
+      responseCode?: string;
+    };
     if (!res.ok || body.hasError) {
-      throw new Error(body.responseMessage || `"${file.name}" yüklenemedi.`);
+      throw new ApiError(
+        body.responseMessage || `"${file.name}" yüklenemedi.`,
+        body.responseCode || "APP148"
+      );
     }
   }
 }

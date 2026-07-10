@@ -15,6 +15,7 @@ import {
   BirthDateSelect,
   TextInput,
 } from "@/components/FormField";
+import { PasswordInput } from "@/components/PasswordInput";
 import type { FieldErrors } from "@/lib/validation";
 
 type UserListItem = {
@@ -323,10 +324,9 @@ export default function AdminUsersPage() {
 
                 <div className="sm:col-span-2 border-t pt-4 mt-2">
                   <h4 className="text-sm font-semibold mb-2">Şifre Değiştir (Admin Yetkisiyle)</h4>
-                  <TextInput
+                  <PasswordInput
                     id="edit-password"
                     label="Yeni Şifre"
-                    type="password"
                     hint="Boş bırakırsanız mevcut şifre korunur."
                     value={editForm.password}
                     onChange={(e) => setEditForm((prev) => ({ ...prev, password: e.target.value }))}

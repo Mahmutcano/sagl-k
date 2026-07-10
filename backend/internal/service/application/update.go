@@ -80,8 +80,8 @@ func (s *Service) Update(ctx context.Context, appID, ownerID uuid.UUID, req Upda
 	}
 
 	var surveyJSON json.RawMessage
-	if req.SurveyData.Data != "" {
-		surveyJSON = json.RawMessage(req.SurveyData.Data)
+	if req.SurveyData.Data.String() != "" {
+		surveyJSON = json.RawMessage(req.SurveyData.Data.String())
 	} else {
 		surveyJSON = json.RawMessage("{}")
 	}

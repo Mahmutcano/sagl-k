@@ -5,7 +5,7 @@ import { ROUTES } from "@/lib/routes";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { ArrowRight, Check, ShieldCheck } from "lucide-react";
 import { ApiError, api, persistAuth, type AuthUser } from "@/lib/api";
 import { API } from "@/lib/endpoints";
 import {
@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils";
 import { AuthShell } from "@/components/AuthShell";
 import { BirthDateSelect, FormAlert, FormSelect, TextInput } from "@/components/FormField";
+import { PasswordInput } from "@/components/PasswordInput";
 import { Button } from "@/components/ui/button";
 import { AgreementModal } from "@/components/AgreementModal";
 import {
@@ -148,7 +149,6 @@ export default function RegisterPage() {
   });
   const [code, setCode] = useState("");
   const [mockSmsCode, setMockSmsCode] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [agreements, setAgreements] = useState<Agreement[]>([]);
   const [acceptedAgreements, setAcceptedAgreements] = useState<Record<string, boolean>>({});
   const [fields, setFields] = useState<FieldErrors>({});
@@ -464,24 +464,15 @@ export default function RegisterPage() {
                 />
               </div>
 
-              <div className="relative">
-                <TextInput
+              <div>
+                <PasswordInput
                   id="password"
                   label="Şifre"
-                  type={showPassword ? "text" : "password"}
                   autoComplete="new-password"
                   value={form.password}
                   onChange={(e) => update("password", e.target.value)}
                   error={fields.password}
                 />
-                <button
-                  type="button"
-                  className="absolute right-3 top-[2.35rem] z-10 rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-slate-100 hover:text-foreground"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
                 <PasswordHints password={form.password} />
               </div>
             </section>

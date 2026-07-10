@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,7 +21,12 @@ func NewLocal(root string) (*Local, error) {
 		root = "./uploads"
 	}
 	if err := os.MkdirAll(root, 0o750); err != nil {
-		return nil, err
+		fallback := filepath.Join(os.TempDir(), "medical-consultation-uploads")
+		log.Printf("[storage] upload dir %q unavailable (%v); falling back to %q", root, err, fallback)
+		if err2 := os.MkdirAll(fallback, 0o750); err2 != nil {
+			return nil, fmt.Errorf("upload dir hazırlanamadı: %w", err2)
+		}
+		root = fallback
 	}
 	return &Local{Root: root}, nil
 }
