@@ -108,7 +108,7 @@ export function AppShellLayout({
       {menuOpen ? (
         <div className="fixed inset-0 z-50 md:hidden">
           <div
-            className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/40"
             onClick={() => setMenuOpen(false)}
             aria-hidden
           />

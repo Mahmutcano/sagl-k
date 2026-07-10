@@ -149,18 +149,18 @@ export default function AdminTitlesPage() {
         </div>
       ) : null}
 
-      <Card className="shadow-premium border-slate-200/80 bg-white/95 rounded-2xl overflow-hidden">
-        <CardHeader className="bg-slate-50/50 border-b flex flex-row items-center justify-between py-5 px-6">
-          <div>
-            <CardTitle className="text-base text-slate-800 font-bold">Unvan Listesi</CardTitle>
+      <Card className="shadow-premium overflow-hidden rounded-xl border-slate-200/80 bg-white/95 sm:rounded-2xl">
+        <CardHeader className="flex flex-col gap-3 border-b bg-slate-50/50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
+          <div className="min-w-0">
+            <CardTitle className="text-sm font-bold text-slate-800 sm:text-base">Unvan Listesi</CardTitle>
             <CardDescription className="text-xs">Sistemdeki doktorların seçim yapabileceği tüm unvanlar</CardDescription>
           </div>
-          <Button onClick={handleOpenAdd} size="sm" className="gap-1.5 shadow-sm">
+          <Button onClick={handleOpenAdd} size="sm" className="w-full gap-1.5 shadow-sm sm:w-auto">
             <Plus className="h-4 w-4" />
             Yeni Unvan Ekle
           </Button>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="admin-table-scroll p-0">
           {loading ? (
             <div className="p-8 space-y-3">
               <Skeleton className="h-10 w-full rounded-lg" />

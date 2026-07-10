@@ -160,8 +160,8 @@ export default function AdminLogsPage() {
       {error ? <FormAlert title="Hata" message={error} /> : null}
 
       {/* Premium Filter Bar */}
-      <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4 print:hidden">
-        <form onSubmit={handleSearchSubmit} className="flex-grow grid gap-4 sm:grid-cols-3 items-end bg-white border border-slate-200/80 rounded-2xl p-5 shadow-premium">
+      <div className="mb-4 flex min-w-0 flex-col justify-between gap-3 print:hidden md:mb-6 md:flex-row md:items-end">
+        <form onSubmit={handleSearchSubmit} className="admin-filter-bar min-w-0 flex-grow rounded-xl border border-slate-200/80 bg-white p-3 shadow-premium sm:rounded-2xl sm:p-5">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="search" className="text-xs font-bold text-slate-700 tracking-wide">Arama</label>
             <div className="relative">
@@ -232,8 +232,8 @@ export default function AdminLogsPage() {
             Toplam {totalCount} log kaydı bulundu.
           </div>
 
-          <div className="overflow-hidden rounded-2xl border bg-white shadow-premium">
-            <table className="w-full text-left text-sm border-collapse">
+          <div className="admin-table-scroll overflow-hidden rounded-xl border bg-white shadow-premium sm:rounded-2xl">
+            <table className="w-full min-w-[640px] border-collapse text-left text-sm">
               <thead>
                 <tr className="border-b bg-slate-50/50 font-bold text-slate-500 text-xs">
                   <th className="p-4 uppercase tracking-wider">Tarih</th>

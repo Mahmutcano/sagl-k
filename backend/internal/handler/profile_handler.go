@@ -45,38 +45,38 @@ func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var p ProfileResponse
-	var dob time.Time
-	var hasDob bool
-	var gender int
-	var hasGender bool
+	var dob *time.Time
+	var gender *int
+	var nationalID *string
+	var email *string
+	var phone *string
 
 	err := h.db.Pool.QueryRow(r.Context(), `
-		SELECT id, first_name, last_name, email, phone_number, national_identifier, date_of_birth, gender, role
+		SELECT id::text, first_name, last_name, email, phone_number, national_identifier, date_of_birth, gender, role::text
 		FROM users WHERE id = $1 AND is_active = true
-	`, claims.UserID).Scan(&p.ID, &p.FirstName, &p.LastName, &p.Email, &p.PhoneNumber, &p.NationalIdentifier, &dob, &gender, &p.Role)
-
+	`, claims.UserID).Scan(
+		&p.ID, &p.FirstName, &p.LastName, &email, &phone, &nationalID, &dob, &gender, &p.Role,
+	)
 	if err != nil {
 		response.Fail(w, http.StatusNotFound, "PROF001", "Kullanıcı profili bulunamadı.")
 		return
 	}
 
-	if !dob.IsZero() {
-		dobStr := dob.Format("2002-01-02") // database stored format
-		// Let's format it as YYYY-MM-DD
-		dobStr = dob.Format("2006-01-02")
+	if email != nil {
+		p.Email = *email
+	}
+	if phone != nil {
+		p.PhoneNumber = *phone
+	}
+	if nationalID != nil {
+		p.NationalIdentifier = *nationalID
+	}
+	if dob != nil && !dob.IsZero() {
+		dobStr := dob.Format("2006-01-02")
 		p.DateOfBirth = &dobStr
-		hasDob = true
 	}
-	if gender > 0 {
-		p.Gender = &gender
-		hasGender = true
-	}
-
-	if !hasDob {
-		p.DateOfBirth = nil
-	}
-	if !hasGender {
-		p.Gender = nil
+	if gender != nil && *gender > 0 {
+		p.Gender = gender
 	}
 
 	response.OK(w, p)

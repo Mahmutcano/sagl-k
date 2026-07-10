@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -11,17 +12,29 @@ type AppLogoProps = {
 export function AppLogo({ href = "/", className, showText = true, inverted = false }: AppLogoProps) {
   const content = (
     <>
-      <span
-        className={cn(
-          "flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold shadow-sm",
-          inverted ? "bg-primary-foreground/15 text-primary-foreground" : "bg-primary text-primary-foreground"
-        )}
-      >
-        TD
+      <span className="relative flex size-9 shrink-0 items-center justify-center sm:size-10">
+        <Image
+          src="/images/erciyes-logo.png"
+          alt="Erciyes Üniversitesi Hastaneleri"
+          width={40}
+          height={40}
+          className={cn("size-9 object-contain sm:size-10", inverted && "brightness-0 invert")}
+          priority
+        />
       </span>
       {showText ? (
-        <span className={cn("font-semibold tracking-tight", inverted && "text-primary-foreground")}>
-          Tıbbi Danışmanlık
+        <span className={cn("min-w-0 leading-tight", inverted && "text-primary-foreground")}>
+          <span className="block text-sm font-semibold tracking-tight sm:text-[15px]">
+            Tıbbi Danışmanlık
+          </span>
+          <span
+            className={cn(
+              "block text-[10px] font-medium sm:text-[11px]",
+              inverted ? "text-primary-foreground/75" : "text-muted-foreground"
+            )}
+          >
+            Erciyes Üniversitesi Hastaneleri
+          </span>
         </span>
       ) : null}
     </>

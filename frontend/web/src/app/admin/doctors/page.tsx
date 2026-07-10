@@ -314,9 +314,9 @@ export default function AdminDoctorsPage() {
       {error ? <FormAlert title="Hata" message={error} /> : null}
       {successMsg ? <FormAlert title="Başarılı" message={successMsg} variant="default" /> : null}
 
-      <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4 print:hidden">
+      <div className="mb-4 flex min-w-0 flex-col justify-between gap-3 print:hidden md:mb-6 md:flex-row md:items-end">
         {/* Premium Filter Area */}
-        <form onSubmit={handleSearchSubmit} className="flex-grow grid gap-4 sm:grid-cols-3 items-end bg-white border border-slate-200/80 rounded-2xl p-5 shadow-premium">
+        <form onSubmit={handleSearchSubmit} className="admin-filter-bar min-w-0 flex-grow rounded-xl border border-slate-200/80 bg-white p-3 shadow-premium sm:rounded-2xl sm:p-5">
           <div className="flex flex-col gap-1.5">
             <label htmlFor="search" className="text-xs font-bold text-slate-700 tracking-wide">Arama</label>
             <div className="relative">
@@ -368,8 +368,8 @@ export default function AdminDoctorsPage() {
         </p>
       ) : (
         <div className="flex flex-col gap-4">
-          <Card className="shadow-premium border-slate-200/80 bg-white/95 rounded-2xl overflow-hidden">
-            <CardContent className="p-0">
+          <Card className="shadow-premium overflow-hidden rounded-xl border-slate-200/80 bg-white/95 sm:rounded-2xl">
+            <CardContent className="admin-table-scroll p-0">
               <Table>
                 <TableHeader className="bg-slate-50/50">
                   <TableRow>

@@ -25,7 +25,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { LogIn, ArrowRight, Home } from "lucide-react";
+import { LogIn, ArrowRight, Home, UserPlus } from "lucide-react";
 
 type LoginResult = { accessToken: string; refreshToken?: string; user?: AuthUser };
 
@@ -42,7 +42,7 @@ const CONFIG: Record<
   patient: {
     badge: "Hasta",
     title: "Hasta Girişi",
-    subtitle: "Başvurularınızı görüntülemek ve yeni başvuru oluşturmak için giriş yapın.",
+    subtitle: "Başvuru yapmak veya başvurularınızı görmek için giriş yapın.",
     roleError: "Bu giriş yalnızca hasta hesapları içindir.",
   },
   doctor: {
@@ -108,21 +108,20 @@ export function PortalLogin({ area }: { area: AppArea }) {
 
   return (
     <AuthShell badge={cfg.badge}>
-      <div className="flex w-full flex-col gap-3">
-        <Card className="w-full border-slate-200/60 shadow-premium-lg bg-card/85 backdrop-blur-md rounded-2xl overflow-hidden">
-          <CardHeader className="space-y-1.5 pb-4 pt-6 px-6">
-            <CardTitle className="text-xl font-bold tracking-tight text-center">{cfg.title}</CardTitle>
-            <CardDescription className="text-muted-foreground text-xs text-center">{cfg.subtitle}</CardDescription>
+      <div className="flex w-full flex-col gap-4">
+        <Card className="w-full overflow-hidden rounded-2xl border-slate-200/60 bg-card/85 shadow-premium-lg backdrop-blur-md">
+          <CardHeader className="space-y-1.5 px-5 pb-4 pt-6 sm:px-6">
+            <CardTitle className="text-center text-xl font-bold tracking-tight sm:text-2xl">
+              {cfg.title}
+            </CardTitle>
+            <CardDescription className="text-center text-sm leading-relaxed">
+              {cfg.subtitle}
+            </CardDescription>
           </CardHeader>
-          <CardContent className="pb-4 px-6">
+          <CardContent className="px-5 pb-5 sm:px-6">
             <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-              {formError ? (
-                <FormAlert
-                  title="Giriş yapılamadı"
-                  message={formError}
-                />
-              ) : null}
-              
+              {formError ? <FormAlert title="Giriş yapılamadı" message={formError} /> : null}
+
               <FormField id="nationalIdentifier" label="TC Kimlik No" error={fields.nationalIdentifier}>
                 <Input
                   id="nationalIdentifier"
@@ -132,7 +131,7 @@ export function PortalLogin({ area }: { area: AppArea }) {
                   required
                   value={nationalId}
                   onChange={(e) => setNationalId(e.target.value)}
-                  className="h-10 border-slate-200 focus-visible:ring-primary focus-visible:border-primary bg-white"
+                  className="h-12 border-slate-200 bg-white text-base focus-visible:border-primary focus-visible:ring-primary sm:h-11 sm:text-sm"
                   placeholder="11 haneli TC kimlik numaranız"
                 />
               </FormField>
@@ -145,21 +144,32 @@ export function PortalLogin({ area }: { area: AppArea }) {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="h-10 border-slate-200 focus-visible:ring-primary focus-visible:border-primary bg-white"
+                  className="h-12 border-slate-200 bg-white text-base focus-visible:border-primary focus-visible:ring-primary sm:h-11 sm:text-sm"
                   placeholder="••••••••"
                 />
               </FormField>
 
-              {area === "patient" ? (
-                <div className="text-right -mt-2">
-                  <Button variant="link" size="sm" className="h-auto px-0 text-xs text-muted-foreground hover:text-primary transition-colors" asChild>
+              {(area === "patient" || area === "doctor") ? (
+                <div className="-mt-1 text-right">
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="h-auto min-h-11 px-0 text-sm text-muted-foreground hover:text-primary sm:min-h-0 sm:text-xs"
+                    asChild
+                  >
                     <Link href={ROUTES.patient.forgotPassword}>Şifremi unuttum</Link>
                   </Button>
                 </div>
               ) : null}
 
-              <Button type="submit" className="w-full h-10 gap-2 text-sm mt-1 shadow-sm hover:shadow-md transition-all" disabled={loading}>
-                {loading ? "Doğrulanıyor..." : (
+              <Button
+                type="submit"
+                className="mt-1 h-12 w-full gap-2 text-base font-semibold shadow-sm transition-all hover:shadow-md sm:h-11 sm:text-sm"
+                disabled={loading}
+              >
+                {loading ? (
+                  "Doğrulanıyor..."
+                ) : (
                   <>
                     Giriş Yap
                     <LogIn className="h-4 w-4" />
@@ -169,19 +179,28 @@ export function PortalLogin({ area }: { area: AppArea }) {
             </form>
           </CardContent>
 
-          <CardFooter className="flex-col items-center gap-3 border-t border-slate-100/80 bg-slate-50/40 py-4 px-6">
+          <CardFooter className="flex-col items-stretch gap-3 border-t border-slate-100/80 bg-slate-50/50 px-5 py-5 sm:px-6">
             {area === "patient" ? (
-              <p className="text-muted-foreground text-center text-xs">
-                Henüz hesabınız yok mu?{" "}
-                <Link
-                  href={ROUTES.patient.register}
-                  className="text-primary font-semibold underline-offset-4 hover:underline"
+              <div className="flex flex-col items-center gap-3 text-center">
+                <p className="text-sm font-medium text-slate-700">Hesabınız yok mu?</p>
+                <Button
+                  variant="outline"
+                  className="h-12 w-full gap-2 text-base font-semibold sm:h-11 sm:text-sm"
+                  asChild
                 >
-                  Kayıt olun
-                </Link>
-              </p>
+                  <Link href={ROUTES.patient.register}>
+                    <UserPlus className="h-4 w-4" />
+                    Kayıt ol
+                  </Link>
+                </Button>
+              </div>
             ) : (
-              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground text-xs gap-1.5" asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                asChild
+              >
                 <Link href={ROUTES.home}>
                   <Home className="h-3.5 w-3.5" />
                   Ana sayfa
@@ -191,25 +210,33 @@ export function PortalLogin({ area }: { area: AppArea }) {
           </CardFooter>
         </Card>
 
-        {/* Secondary Switch Link - Compact text link below the card */}
-        <div className="text-center mt-1">
+        <div className="px-1 pb-2 text-center">
           {area === "patient" ? (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Sağlık personeli misiniz?{" "}
-              <Link href={ROUTES.doctor.login} className="text-primary font-medium hover:underline inline-flex items-center gap-0.5">
-                Doktor Girişi <ArrowRight className="h-3 w-3" />
+              <Link
+                href={ROUTES.doctor.login}
+                className="inline-flex min-h-11 items-center gap-0.5 font-medium text-primary hover:underline sm:min-h-0"
+              >
+                Doktor girişi <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </p>
           ) : area === "doctor" ? (
-            <p className="text-xs text-muted-foreground">
-              Hasta girişi mi yapmak istiyorsunuz?{" "}
-              <Link href={ROUTES.patient.login} className="text-primary font-medium hover:underline inline-flex items-center gap-0.5">
-                Hasta Girişi <ArrowRight className="h-3 w-3" />
+            <p className="text-sm text-muted-foreground">
+              Hasta girişi mi?{" "}
+              <Link
+                href={ROUTES.patient.login}
+                className="inline-flex min-h-11 items-center gap-0.5 font-medium text-primary hover:underline sm:min-h-0"
+              >
+                Hasta girişi <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             </p>
           ) : area === "admin" ? (
-            <Link href={loginForArea("doctor")} className="text-xs text-primary font-medium hover:underline inline-flex items-center gap-0.5">
-              Doktor Girişi <ArrowRight className="h-3 w-3" />
+            <Link
+              href={loginForArea("doctor")}
+              className="inline-flex min-h-11 items-center gap-0.5 text-sm font-medium text-primary hover:underline sm:min-h-0"
+            >
+              Doktor girişi <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           ) : null}
         </div>

@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { STATUS_LABELS, statusVariant, applicationDisplayNumber } from "@/lib/application";
+import { Button } from "@/components/ui/button";
 import { ClipboardList, Hash, ShoppingBag, Calendar, ChevronRight, DollarSign, CreditCard, Clock, RefreshCw, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -117,56 +118,56 @@ export default function AdminDashboardPage() {
       {error ? <FormAlert title="Hata" message={error} /> : null}
 
       {/* Reports & Analytics Summary Dashboard */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-        <Card className="shadow-premium border-slate-200 bg-white/95 rounded-2xl overflow-hidden hover:-translate-y-0.5 transition-transform duration-200">
-          <CardContent className="p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Toplam Ciro</span>
-              <span className="text-xl font-black text-slate-900">
+      <div className="mb-2 grid grid-cols-2 gap-3 lg:grid-cols-4 sm:gap-4 sm:mb-4">
+        <Card className="shadow-premium overflow-hidden rounded-xl border-slate-200 bg-white/95 sm:rounded-2xl hover:-translate-y-0.5 transition-transform duration-200">
+          <CardContent className="flex items-center justify-between gap-2 p-3 sm:p-5">
+            <div className="min-w-0 space-y-0.5 sm:space-y-1">
+              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 sm:text-[11px]">Toplam Ciro</span>
+              <span className="block truncate text-base font-black text-slate-900 sm:text-xl">
                 {totalEarnings.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} ₺
               </span>
-              <span className="text-[10px] text-slate-500 font-semibold block">{paidCount} başarılı ödemeden</span>
+              <span className="hidden text-[10px] font-semibold text-slate-500 sm:block">{paidCount} başarılı ödemeden</span>
             </div>
-            <div className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl">
+            <div className="hidden shrink-0 rounded-2xl bg-emerald-50 p-3.5 text-emerald-600 sm:block">
               <DollarSign className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="shadow-premium border-slate-200 bg-white/95 rounded-2xl overflow-hidden hover:-translate-y-0.5 transition-transform duration-200">
-          <CardContent className="p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Başarılı Ödemeler</span>
-              <span className="text-xl font-black text-slate-900">{paidCount} Adet</span>
-              <span className="text-[10px] text-slate-500 font-semibold block">Hizmet bedeli tahsil edilen</span>
+        <Card className="shadow-premium overflow-hidden rounded-xl border-slate-200 bg-white/95 sm:rounded-2xl hover:-translate-y-0.5 transition-transform duration-200">
+          <CardContent className="flex items-center justify-between gap-2 p-3 sm:p-5">
+            <div className="min-w-0 space-y-0.5 sm:space-y-1">
+              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 sm:text-[11px]">Başarılı</span>
+              <span className="block text-base font-black text-slate-900 sm:text-xl">{paidCount} Adet</span>
+              <span className="hidden text-[10px] font-semibold text-slate-500 sm:block">Hizmet bedeli tahsil edilen</span>
             </div>
-            <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl">
+            <div className="hidden shrink-0 rounded-2xl bg-blue-50 p-3.5 text-blue-600 sm:block">
               <CreditCard className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="shadow-premium border-slate-200 bg-white/95 rounded-2xl overflow-hidden hover:-translate-y-0.5 transition-transform duration-200">
-          <CardContent className="p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">Bekleyen Ödemeler</span>
-              <span className="text-xl font-black text-slate-900">{pendingCount} Adet</span>
-              <span className="text-[10px] text-slate-500 font-semibold block">Ödeme onayı veya havale bekleyen</span>
+        <Card className="shadow-premium overflow-hidden rounded-xl border-slate-200 bg-white/95 sm:rounded-2xl hover:-translate-y-0.5 transition-transform duration-200">
+          <CardContent className="flex items-center justify-between gap-2 p-3 sm:p-5">
+            <div className="min-w-0 space-y-0.5 sm:space-y-1">
+              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 sm:text-[11px]">Bekleyen</span>
+              <span className="block text-base font-black text-slate-900 sm:text-xl">{pendingCount} Adet</span>
+              <span className="hidden text-[10px] font-semibold text-slate-500 sm:block">Ödeme onayı bekleyen</span>
             </div>
-            <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl">
+            <div className="hidden shrink-0 rounded-2xl bg-amber-50 p-3.5 text-amber-600 sm:block">
               <Clock className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="shadow-premium border-slate-200 bg-white/95 rounded-2xl overflow-hidden hover:-translate-y-0.5 transition-transform duration-200">
-          <CardContent className="p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <span className="text-[11px] font-extrabold text-slate-400 uppercase tracking-wider block">İade İşlemleri</span>
-              <span className="text-xl font-black text-slate-900">{refundCount} Adet</span>
-              <span className="text-[10px] text-slate-500 font-semibold block">İadesi tamamlanmış başvurular</span>
+        <Card className="shadow-premium overflow-hidden rounded-xl border-slate-200 bg-white/95 sm:rounded-2xl hover:-translate-y-0.5 transition-transform duration-200">
+          <CardContent className="flex items-center justify-between gap-2 p-3 sm:p-5">
+            <div className="min-w-0 space-y-0.5 sm:space-y-1">
+              <span className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 sm:text-[11px]">İade</span>
+              <span className="block text-base font-black text-slate-900 sm:text-xl">{refundCount} Adet</span>
+              <span className="hidden text-[10px] font-semibold text-slate-500 sm:block">İadesi tamamlanmış</span>
             </div>
-            <div className="p-3.5 bg-rose-50 text-rose-600 rounded-2xl">
+            <div className="hidden shrink-0 rounded-2xl bg-rose-50 p-3.5 text-rose-600 sm:block">
               <RefreshCw className="h-5 w-5" />
             </div>
           </CardContent>
@@ -174,22 +175,22 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Premium Filter Area */}
-      <Card className="shadow-premium border-slate-200/80 bg-white/95 rounded-2xl overflow-hidden mb-6 print:hidden">
-        <CardContent className="p-5 grid gap-4 md:grid-cols-3 items-end">
-          <div className="md:col-span-2 flex flex-col gap-1.5">
-            <label htmlFor="search" className="text-xs font-bold text-slate-700 tracking-wide">Arama</label>
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+      <Card className="shadow-premium mb-2 overflow-hidden rounded-xl border-slate-200/80 bg-white/95 sm:mb-4 sm:rounded-2xl print:hidden">
+        <CardContent className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-3 sm:gap-4 sm:p-5 items-end">
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <label htmlFor="search" className="text-xs font-bold tracking-wide text-slate-700">Arama</label>
+            <div className="relative min-w-0">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 id="search"
-                className="pl-10 h-10 border-slate-200 focus-visible:ring-primary/20 focus-visible:border-primary bg-white rounded-xl shadow-inner-sm"
-                placeholder="Hasta adı, Başvuru No veya E-Ticaret No yazın..."
+                className="h-10 rounded-xl border-slate-200 bg-white pl-10 shadow-inner-sm focus-visible:border-primary focus-visible:ring-primary/20"
+                placeholder="Hasta adı, başvuru no..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
           </div>
-          <div>
+          <div className="min-w-0">
             <FormSelect
               id="status-filter"
               label="Durum Filtresi"
@@ -207,21 +208,21 @@ export default function AdminDashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Applications List Table */}
-      <Card className="shadow-premium border-slate-200/80 bg-white/95 rounded-2xl overflow-hidden">
-        <CardHeader className="bg-slate-50/50 border-b flex flex-row items-center justify-between py-5 px-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-primary/10 rounded-xl">
+      {/* Applications List */}
+      <Card className="shadow-premium overflow-hidden rounded-xl border-slate-200/80 bg-white/95 sm:rounded-2xl">
+        <CardHeader className="flex flex-row items-center justify-between gap-3 border-b bg-slate-50/50 px-3 py-3 sm:px-6 sm:py-5">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+            <div className="hidden rounded-xl bg-primary/10 p-2 sm:block">
               <ClipboardList className="h-5 w-5 text-primary" />
             </div>
-            <div>
-              <CardTitle className="text-base text-slate-800 font-bold flex items-center gap-2">
+            <div className="min-w-0">
+              <CardTitle className="flex flex-wrap items-center gap-2 text-sm font-bold text-slate-800 sm:text-base">
                 Hasta Başvuruları
-                <span className="text-xs bg-slate-100 border border-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-semibold">
+                <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
                   {filteredApps.length}
                 </span>
               </CardTitle>
-              <CardDescription className="text-xs">
+              <CardDescription className="hidden text-xs sm:block">
                 Sistemdeki son görüş talepleri ve operasyonel işlem geçmişi
               </CardDescription>
             </div>
@@ -229,92 +230,155 @@ export default function AdminDashboardPage() {
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-8 space-y-3">
+            <div className="space-y-3 p-4 sm:p-8">
               <Skeleton className="h-10 w-full rounded-lg" />
               <Skeleton className="h-10 w-full rounded-lg" />
               <Skeleton className="h-10 w-full rounded-lg" />
             </div>
           ) : filteredApps.length === 0 ? (
-            <div className="p-16 text-center">
-              <ClipboardList className="h-10 w-10 text-slate-300 mx-auto mb-3" />
-              <p className="text-sm text-slate-500 font-medium font-sans">Filtrelere uygun başvuru kaydı bulunamadı.</p>
+            <div className="p-10 text-center sm:p-16">
+              <ClipboardList className="mx-auto mb-3 h-10 w-10 text-slate-300" />
+              {apps.length === 0 ? (
+                <div className="mx-auto max-w-md space-y-3">
+                  <p className="font-sans text-sm font-semibold text-slate-700">
+                    Henüz hasta başvurusu yok
+                  </p>
+                  <p className="font-sans text-sm text-slate-500">
+                    Bu normal. Panel çalışıyor; başvurular hastalar oluşturdukça burada listelenir.
+                    Sol menüden doktor, hastane, bölüm ve ödeme yönetimine geçebilirsiniz.
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={ROUTES.admin.doctors}>Doktorlar</Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={ROUTES.admin.hospitals}>Hastaneler</Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={ROUTES.admin.payments}>Ödemeler</Link>
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="font-sans text-sm font-medium text-slate-500">
+                  Filtrelere uygun başvuru kaydı bulunamadı.
+                </p>
+              )}
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-slate-50/30">
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="h-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider px-6">Hasta Adı</TableHead>
-                    <TableHead className="h-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider px-6">Başvuru Numarası</TableHead>
-                    <TableHead className="h-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider px-6">Referans No / ID</TableHead>
-                    <TableHead className="h-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider px-6">Oluşturulma</TableHead>
-                    <TableHead className="h-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider px-6">Durum</TableHead>
-                    <TableHead className="h-10 text-[11px] font-bold text-slate-400 uppercase tracking-wider px-6 text-right print:hidden"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredApps.map((a) => (
-                    <TableRow
-                      key={a.applicationId}
-                      onClick={() => router.push(ROUTES.admin.application(a.applicationId))}
-                      className="hover:bg-slate-50/60 transition-all duration-150 group cursor-pointer border-b last:border-0"
-                    >
-                      <TableCell className="py-4 px-6">
-                        <div className="flex items-center gap-3">
-                          <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold shadow-sm", getAvatarColor(a.patientName))}>
-                            {getInitials(a.patientName)}
-                          </div>
-                          <Link
-                            href={ROUTES.admin.application(a.applicationId)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="font-semibold text-slate-900 group-hover:text-primary transition-colors underline-offset-4 hover:underline font-sans"
-                          >
-                            {a.patientName}
-                          </Link>
+            <>
+              {/* Mobile cards */}
+              <div className="divide-y divide-slate-100 md:hidden">
+                {filteredApps.map((a) => (
+                  <button
+                    key={a.applicationId}
+                    type="button"
+                    onClick={() => router.push(ROUTES.admin.application(a.applicationId))}
+                    className="flex w-full flex-col gap-2 px-3 py-3 text-left active:bg-slate-50"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold", getAvatarColor(a.patientName))}>
+                          {getInitials(a.patientName)}
                         </div>
-                      </TableCell>
-                      <TableCell className="py-4 px-6">
-                        <span className="font-mono text-xs bg-slate-100/80 border border-slate-200/60 text-slate-700 px-2 py-0.5 rounded inline-flex items-center gap-1 font-semibold">
-                          <Hash className="h-3 w-3 text-slate-400" />
-                          {applicationDisplayNumber(a)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="py-4 px-6">
-                        {a.ecommerceNumber ? (
-                          <span className="font-mono text-xs bg-primary/5 border border-primary/10 text-primary px-2 py-0.5 rounded inline-flex items-center gap-1 font-semibold">
-                            <ShoppingBag className="h-3 w-3 text-primary/70" />
-                            {a.ecommerceNumber}
-                          </span>
-                        ) : (
-                          <span className="font-mono text-xs text-slate-400 bg-slate-50 border border-slate-200/40 px-2 py-0.5 rounded">
-                            {a.applicationId.slice(0, 8)}…
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="py-4 px-6 text-slate-500 text-xs font-medium font-sans">
-                        <span className="inline-flex items-center gap-1.5">
-                          <Calendar className="h-3.5 w-3.5 text-slate-400" />
-                          {a.createdAt ? new Date(a.createdAt).toLocaleString("tr-TR") : "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="py-4 px-6">
-                        <Badge variant={statusVariant(a.statusCode)}>
-                          {STATUS_LABELS[a.statusCode] ?? a.statusCode}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="py-4 px-6 text-right print:hidden">
-                        <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                          <span className="inline-flex items-center gap-0.5 text-xs font-bold text-primary group-hover:translate-x-0.5 transition-transform font-sans">
-                            Detay
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-900">{a.patientName}</p>
+                          <p className="truncate font-mono text-[11px] text-slate-500">
+                            {applicationDisplayNumber(a)}
+                          </p>
                         </div>
-                      </TableCell>
+                      </div>
+                      <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-slate-300" />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 pl-[2.625rem]">
+                      <Badge variant={statusVariant(a.statusCode)} className="text-[10px]">
+                        {STATUS_LABELS[a.statusCode] ?? a.statusCode}
+                      </Badge>
+                      <span className="text-[11px] text-slate-400">
+                        {a.createdAt ? new Date(a.createdAt).toLocaleDateString("tr-TR") : "—"}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {/* Desktop table */}
+              <div className="admin-table-scroll hidden md:block">
+                <Table>
+                  <TableHeader className="bg-slate-50/30">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="h-10 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-400 lg:px-6">Hasta Adı</TableHead>
+                      <TableHead className="h-10 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-400 lg:px-6">Başvuru Numarası</TableHead>
+                      <TableHead className="h-10 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-400 lg:px-6">Referans No / ID</TableHead>
+                      <TableHead className="h-10 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-400 lg:px-6">Oluşturulma</TableHead>
+                      <TableHead className="h-10 px-4 text-[11px] font-bold uppercase tracking-wider text-slate-400 lg:px-6">Durum</TableHead>
+                      <TableHead className="h-10 px-4 text-right text-[11px] font-bold uppercase tracking-wider text-slate-400 print:hidden lg:px-6"></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredApps.map((a) => (
+                      <TableRow
+                        key={a.applicationId}
+                        onClick={() => router.push(ROUTES.admin.application(a.applicationId))}
+                        className="group cursor-pointer border-b transition-all duration-150 last:border-0 hover:bg-slate-50/60"
+                      >
+                        <TableCell className="px-4 py-4 lg:px-6">
+                          <div className="flex items-center gap-3">
+                            <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold shadow-sm", getAvatarColor(a.patientName))}>
+                              {getInitials(a.patientName)}
+                            </div>
+                            <Link
+                              href={ROUTES.admin.application(a.applicationId)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="font-sans font-semibold text-slate-900 underline-offset-4 transition-colors hover:underline group-hover:text-primary"
+                            >
+                              {a.patientName}
+                            </Link>
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-4 py-4 lg:px-6">
+                          <span className="inline-flex items-center gap-1 rounded border border-slate-200/60 bg-slate-100/80 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700">
+                            <Hash className="h-3 w-3 text-slate-400" />
+                            {applicationDisplayNumber(a)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-4 py-4 lg:px-6">
+                          {a.ecommerceNumber ? (
+                            <span className="inline-flex items-center gap-1 rounded border border-primary/10 bg-primary/5 px-2 py-0.5 font-mono text-xs font-semibold text-primary">
+                              <ShoppingBag className="h-3 w-3 text-primary/70" />
+                              {a.ecommerceNumber}
+                            </span>
+                          ) : (
+                            <span className="rounded border border-slate-200/40 bg-slate-50 px-2 py-0.5 font-mono text-xs text-slate-400">
+                              {a.applicationId.slice(0, 8)}…
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell className="px-4 py-4 font-sans text-xs font-medium text-slate-500 lg:px-6">
+                          <span className="inline-flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                            {a.createdAt ? new Date(a.createdAt).toLocaleString("tr-TR") : "—"}
+                          </span>
+                        </TableCell>
+                        <TableCell className="px-4 py-4 lg:px-6">
+                          <Badge variant={statusVariant(a.statusCode)}>
+                            {STATUS_LABELS[a.statusCode] ?? a.statusCode}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="px-4 py-4 text-right print:hidden lg:px-6">
+                          <div className="flex justify-end opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                            <span className="inline-flex items-center gap-0.5 font-sans text-xs font-bold text-primary transition-transform group-hover:translate-x-0.5">
+                              Detay
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            </span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

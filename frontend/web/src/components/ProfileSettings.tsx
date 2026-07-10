@@ -66,14 +66,14 @@ export function ProfileSettings() {
       .then((data) => {
         setForm({
           id: data.id,
-          firstName: data.firstName,
-          lastName: data.lastName,
-          email: data.email,
-          phoneNumber: data.phoneNumber,
-          nationalIdentifier: data.nationalIdentifier,
+          firstName: data.firstName || "",
+          lastName: data.lastName || "",
+          email: data.email || "",
+          phoneNumber: data.phoneNumber || "",
+          nationalIdentifier: data.nationalIdentifier || "",
           dateOfBirth: data.dateOfBirth || "",
           gender: data.gender || 0,
-          role: data.role,
+          role: data.role || "",
         });
       })
       .catch((err) => {

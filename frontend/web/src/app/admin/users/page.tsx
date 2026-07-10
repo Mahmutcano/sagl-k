@@ -183,8 +183,8 @@ export default function AdminUsersPage() {
       ) : users.length === 0 ? (
         <Card className="p-8 text-center text-muted-foreground">Sistemde henüz kayıtlı kullanıcı yok.</Card>
       ) : (
-        <div className="overflow-x-auto rounded-xl border bg-card shadow-sm">
-          <table className="w-full text-left text-sm border-collapse">
+        <div className="admin-table-scroll overflow-x-auto rounded-xl border bg-card shadow-sm">
+          <table className="w-full min-w-[640px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b bg-muted/40 font-medium text-muted-foreground">
                 <th className="p-4">Ad Soyad</th>

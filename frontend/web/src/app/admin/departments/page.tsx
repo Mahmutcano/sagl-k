@@ -174,9 +174,9 @@ export default function AdminDepartmentsPage() {
         </div>
       ) : null}
 
-      <div className="mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4 print:hidden">
+      <div className="mb-4 flex min-w-0 flex-col justify-between gap-3 print:hidden md:mb-6 md:flex-row md:items-end">
         {/* Premium Filter Area */}
-        <form onSubmit={handleSearchSubmit} className="flex-grow grid gap-4 sm:grid-cols-3 items-end bg-white border border-slate-200/80 rounded-2xl p-5 shadow-premium">
+        <form onSubmit={handleSearchSubmit} className="admin-filter-bar min-w-0 flex-grow rounded-xl border border-slate-200/80 bg-white p-3 shadow-premium sm:rounded-2xl sm:p-5">
           <div className="sm:col-span-2 flex flex-col gap-1.5">
             <label htmlFor="search" className="text-xs font-bold text-slate-700 tracking-wide">Arama</label>
             <div className="relative">
@@ -218,15 +218,15 @@ export default function AdminDepartmentsPage() {
         </p>
       ) : (
         <div className="flex flex-col gap-4">
-          <Card className="shadow-premium border-slate-200/80 bg-white/95 rounded-2xl overflow-hidden">
-            <CardHeader className="bg-slate-50/50 border-b py-5 px-6">
-              <CardTitle className="text-base text-slate-800 font-bold flex items-center gap-2">
+          <Card className="shadow-premium overflow-hidden rounded-xl border-slate-200/80 bg-white/95 sm:rounded-2xl">
+            <CardHeader className="border-b bg-slate-50/50 px-3 py-3 sm:px-6 sm:py-5">
+              <CardTitle className="flex items-center gap-2 text-sm font-bold text-slate-800 sm:text-base">
                 <Layers className="h-5 w-5 text-primary" />
                 Bölümler & Klinik Branşlar
               </CardTitle>
               <CardDescription className="text-xs">Sistemdeki aktif klinik çalışma alanları</CardDescription>
             </CardHeader>
-            <CardContent className="p-0">
+            <CardContent className="admin-table-scroll p-0">
               <Table>
                 <TableHeader className="bg-slate-50/30">
                   <TableRow>

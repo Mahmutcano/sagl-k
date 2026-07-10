@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useClientUser } from "@/hooks/useClientUser";
 import { logoutTo, roleLabel } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+import { AppLogo } from "@/components/AppLogo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -21,8 +22,8 @@ import {
   LogOut,
   Menu,
   Layers,
-  HeartPulse,
   Tag,
+  X,
 } from "lucide-react";
 
 type AppShellProps = {
@@ -51,22 +52,40 @@ export function AdminAppShell({ children, title, description, actions }: AppShel
     { href: ROUTES.admin.logs, label: "Sistem Logları", icon: Activity },
   ];
 
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [mobileOpen]);
+
   function handleLogout() {
     router.push(logoutTo("admin"));
   }
 
   const sidebarContent = (
-    <div className="flex h-full flex-col bg-white border-r border-slate-200 text-slate-700">
-      {/* Brand Header */}
-      <div className="flex h-16 items-center gap-2.5 px-6 border-b border-slate-200 bg-slate-50/50">
-        <HeartPulse className="h-6 w-6 text-primary" />
-        <div>
-          <span className="font-bold text-sm block tracking-wide text-slate-900">Tıbbi Danışmanlık</span>
-        </div>
+    <div className="flex h-full min-h-0 flex-col bg-white border-r border-slate-200 text-slate-700">
+      <div className="flex h-14 shrink-0 items-center justify-between gap-2 px-4 border-b border-slate-200 bg-slate-50/50 sm:h-16 sm:px-5">
+        <AppLogo href={ROUTES.admin.home} showText className="min-w-0" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0 md:hidden"
+          aria-label="Menüyü kapat"
+          onClick={() => setMobileOpen(false)}
+        >
+          <X className="h-4 w-4" />
+        </Button>
       </div>
 
-      {/* Nav Navigation List */}
-      <nav className="flex-1 space-y-1 px-4 py-4 overflow-y-auto">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto overscroll-contain px-3 py-3 sm:px-4 sm:py-4">
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = item.exact
@@ -87,27 +106,26 @@ export function AdminAppShell({ children, title, description, actions }: AppShel
             >
               <Icon
                 className={cn(
-                  "h-4 w-4 transition-colors",
+                  "h-4 w-4 shrink-0 transition-colors",
                   active ? "text-primary-foreground" : "text-slate-400 group-hover:text-slate-600"
                 )}
               />
-              {item.label}
+              <span className="truncate">{item.label}</span>
             </Link>
           );
         })}
       </nav>
 
-      {/* Profile/Footer Panel */}
-      <div className="border-t border-slate-200 p-4 bg-slate-50/50">
-        <div className="flex items-center gap-3 px-2 mb-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 border font-bold text-xs">
+      <div className="shrink-0 border-t border-slate-200 p-3 bg-slate-50/50 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
+        <div className="mb-3 flex items-center gap-3 px-1">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-slate-100 text-xs font-bold text-slate-700">
             {user?.role ? roleLabel(user.role).slice(0, 2).toUpperCase() : "AD"}
           </div>
           <div className="min-w-0">
-            <span className="block text-xs font-bold truncate text-slate-800 uppercase">
+            <span className="block truncate text-xs font-bold uppercase text-slate-800">
               {user?.role ? roleLabel(user.role) : "Yönetici"}
             </span>
-            <span className="block text-[10px] text-slate-500 truncate">
+            <span className="block truncate text-[10px] text-slate-500">
               {user?.id ? `ID: ${user.id.slice(0, 8)}` : "Sistem Yetkilisi"}
             </span>
           </div>
@@ -116,7 +134,7 @@ export function AdminAppShell({ children, title, description, actions }: AppShel
           onClick={handleLogout}
           variant="destructive"
           size="sm"
-          className="w-full justify-center gap-1.5 h-8 text-xs font-semibold"
+          className="h-9 w-full justify-center gap-1.5 text-xs font-semibold"
         >
           <LogOut className="h-3.5 w-3.5" />
           Çıkış Yap
@@ -126,84 +144,89 @@ export function AdminAppShell({ children, title, description, actions }: AppShel
   );
 
   return (
-    <div className="min-h-screen flex bg-slate-50/50">
-      {/* Desktop Sidebar (Left-hand persistent) */}
-      <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 z-40">
+    <div className="admin-shell flex min-h-svh min-w-0 overflow-x-hidden bg-slate-50/50">
+      <aside className="z-40 hidden md:fixed md:inset-y-0 md:flex md:w-64 md:flex-col">
         {sidebarContent}
       </aside>
 
-      {/* Mobile Drawer Backdrop overlay */}
-      {mobileOpen && (
+      {mobileOpen ? (
         <div
-          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm md:hidden transition-opacity"
+          className="fixed inset-0 z-50 bg-slate-900/40 md:hidden"
           onClick={() => setMobileOpen(false)}
+          aria-hidden
         />
-      )}
+      ) : null}
 
-      {/* Mobile Sidebar (Left-hand sliding Drawer) */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-55 w-64 flex flex-col md:hidden transition-transform duration-300 ease-in-out transform",
-          mobileOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed inset-y-0 left-0 z-[60] flex w-[min(18rem,88vw)] flex-col shadow-xl transition-transform duration-300 ease-in-out md:hidden",
+          "pt-[env(safe-area-inset-top,0px)]",
+          mobileOpen ? "translate-x-0" : "-translate-x-full pointer-events-none"
         )}
+        aria-hidden={!mobileOpen}
       >
         {sidebarContent}
       </aside>
 
-      {/* Content wrapper */}
-      <div className="flex-1 flex flex-col min-w-0 md:pl-64">
-        {/* Top Header Bar */}
-        <header className="sticky top-0 z-30 bg-white border-b border-slate-200 h-14 flex items-center justify-between px-6 shadow-sm">
-          <div className="flex items-center gap-3">
+      <div className="flex min-w-0 flex-1 flex-col md:pl-64">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-slate-200 bg-white px-3 shadow-sm sm:px-4 md:px-6 pt-[env(safe-area-inset-top,0px)]">
+          <div className="flex min-w-0 items-center gap-2">
             <Button
+              type="button"
               variant="ghost"
-              size="sm"
-              className="p-1 md:hidden text-slate-600 hover:text-slate-900"
+              size="icon"
+              className="h-9 w-9 shrink-0 text-slate-600 hover:text-slate-900 md:hidden"
+              aria-label="Menüyü aç"
               onClick={() => setMobileOpen(true)}
             >
-              <Menu className="h-6 w-6" />
+              <Menu className="h-5 w-5" />
             </Button>
-            
             {title ? (
-              <h2 className="text-sm font-bold tracking-tight text-slate-800 hidden sm:block">
+              <h2 className="truncate text-sm font-bold tracking-tight text-slate-800">
                 {title}
               </h2>
             ) : null}
           </div>
 
-          <div className="flex items-center gap-3">
-            {user?.role && (
-              <Badge variant="outline" className="text-[10px] py-0.5 px-2 bg-slate-50 border-slate-300 text-slate-600">
+          <div className="flex shrink-0 items-center gap-2">
+            {user?.role ? (
+              <Badge
+                variant="outline"
+                className="hidden border-slate-300 bg-slate-50 px-2 py-0.5 text-[10px] text-slate-600 sm:inline-flex"
+              >
                 {roleLabel(user.role)}
               </Badge>
-            )}
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 border font-bold text-xs select-none">
+            ) : null}
+            <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-slate-100 text-xs font-bold text-slate-700 select-none">
               A
             </div>
           </div>
         </header>
 
-        {/* Content Body Area */}
-        <main className="flex-1 p-6 md:p-8 max-w-7xl w-full mx-auto flex flex-col gap-6">
-          {(title || actions) && (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b pb-4 border-slate-200">
-              <div className="space-y-1">
+        <main className="mx-auto flex w-full max-w-7xl min-w-0 flex-1 flex-col gap-4 px-3 py-4 sm:gap-5 sm:px-4 sm:py-5 md:gap-6 md:px-6 md:py-8 pb-[max(1rem,env(safe-area-inset-bottom,0px))]">
+          {(title || description || actions) && (
+            <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 sm:flex-row sm:items-start sm:justify-between sm:pb-4">
+              <div className="min-w-0 space-y-1">
                 {title ? (
-                  <h1 className="text-xl md:text-2xl font-bold tracking-tight text-slate-800">
+                  <h1 className="hidden text-xl font-bold tracking-tight text-slate-800 sm:block md:text-2xl">
                     {title}
                   </h1>
                 ) : null}
                 {description ? (
-                  <p className="text-slate-500 text-xs md:text-sm max-w-2xl">{description}</p>
+                  <p className="max-w-2xl text-xs leading-relaxed text-slate-500 sm:text-sm">
+                    {description}
+                  </p>
                 ) : null}
               </div>
-              {actions ? <div className="flex flex-wrap gap-2 shrink-0">{actions}</div> : null}
+              {actions ? (
+                <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
+                  {actions}
+                </div>
+              ) : null}
             </div>
           )}
-          
-          <div className="flex-1 flex flex-col gap-6">
-            {children}
-          </div>
+
+          <div className="flex min-w-0 flex-1 flex-col gap-4 sm:gap-6">{children}</div>
         </main>
       </div>
     </div>

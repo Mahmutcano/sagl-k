@@ -159,12 +159,12 @@ export default function AdminRefundsPage() {
       {error ? <FormAlert title="Hata" message={error} /> : null}
       {msg ? <FormAlert title="Başarılı" message={msg} variant="default" /> : null}
 
-      <div className="grid gap-6 lg:grid-cols-12 items-start">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-12 lg:items-start lg:gap-6">
         {/* Left Card: Refund Request Form */}
-        <Card className="lg:col-span-5 shadow-premium border-slate-200/80 bg-white/95 rounded-2xl overflow-hidden">
+        <Card className="min-w-0 overflow-hidden rounded-xl border-slate-200/80 bg-white/95 shadow-premium sm:rounded-2xl lg:col-span-5">
           <form onSubmit={submit} noValidate>
-            <CardHeader className="bg-slate-50/50 border-b py-5 px-6">
-              <CardTitle className="text-base text-slate-800 font-bold flex items-center gap-2">
+            <CardHeader className="border-b bg-slate-50/50 px-3 py-3 sm:px-6 sm:py-5">
+              <CardTitle className="flex items-center gap-2 text-sm font-bold text-slate-800 sm:text-base">
                 <RefreshCw className="h-5 w-5 text-primary" />
                 İade Talebi Oluştur
               </CardTitle>
@@ -214,8 +214,8 @@ export default function AdminRefundsPage() {
         </Card>
 
         {/* Right Card: Paged Payments Table */}
-        <Card className="lg:col-span-7 shadow-premium border-slate-200/80 bg-white/95 rounded-2xl overflow-hidden">
-          <CardHeader className="bg-slate-50/50 border-b py-5 px-6">
+        <Card className="min-w-0 overflow-hidden rounded-xl border-slate-200/80 bg-white/95 shadow-premium sm:rounded-2xl lg:col-span-7">
+          <CardHeader className="border-b bg-slate-50/50 px-3 py-3 sm:px-6 sm:py-5">
             <CardTitle className="text-base text-slate-800 font-bold">Ödemeler Listesi</CardTitle>
             <CardDescription className="text-xs">İade işlemi yapmak istediğiniz ödemeyi seçin</CardDescription>
           </CardHeader>
@@ -269,7 +269,7 @@ export default function AdminRefundsPage() {
             ) : payments.length === 0 ? (
               <div className="text-center py-10 text-xs text-slate-500 font-medium italic border border-dashed rounded-xl p-4">Ödeme kaydı bulunamadı.</div>
             ) : (
-              <div className="overflow-x-auto border border-slate-200/60 rounded-xl">
+              <div className="admin-table-scroll overflow-x-auto rounded-xl border border-slate-200/60">
                 <Table>
                   <TableHeader className="bg-slate-50/50">
                     <TableRow>

@@ -202,17 +202,17 @@ export default function AdminPaymentsPage() {
 
       {error ? <FormAlert title="Hata" message={error} /> : null}
 
-      <div className="mb-6 flex flex-col lg:flex-row lg:items-center justify-between gap-4 print:hidden">
+      <div className="mb-4 flex min-w-0 flex-col gap-3 print:hidden lg:mb-6 lg:flex-row lg:items-start lg:justify-between">
         {/* Premium Filter Area */}
-        <form onSubmit={handleSearchSubmit} className="flex-1 grid gap-4 sm:grid-cols-4 items-end bg-white border border-slate-200/80 rounded-2xl p-5 shadow-premium">
-          <div className="sm:col-span-2 flex flex-col gap-1.5">
-            <label htmlFor="search" className="text-xs font-bold text-slate-700 tracking-wide">Arama</label>
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+        <form onSubmit={handleSearchSubmit} className="admin-filter-bar min-w-0 flex-1 rounded-xl border border-slate-200/80 bg-white p-3 shadow-premium sm:rounded-2xl sm:p-5">
+          <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-2 lg:col-span-2">
+            <label htmlFor="search" className="text-xs font-bold tracking-wide text-slate-700">Arama</label>
+            <div className="relative min-w-0">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <Input
                 id="search"
-                className="pl-10 h-10 border-slate-200 focus-visible:ring-primary/20 focus-visible:border-primary bg-white rounded-xl shadow-inner-sm"
-                placeholder="Hasta adı, başvuru veya e-ticaret referans no yazın..."
+                className="h-10 rounded-xl border-slate-200 bg-white pl-10 shadow-inner-sm focus-visible:border-primary focus-visible:ring-primary/20"
+                placeholder="Hasta adı, başvuru no..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
               />
@@ -230,18 +230,18 @@ export default function AdminPaymentsPage() {
             value={endDate}
             onChange={(val) => { setPage(0); setEndDate(val); }}
           />
-          <div className="sm:col-span-4 flex justify-end gap-2.5 mt-2 border-t border-slate-100 pt-4">
-            <Button type="button" variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl font-bold px-4">
+          <div className="col-span-full flex flex-col-reverse gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:justify-end sm:gap-2.5">
+            <Button type="button" variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 rounded-xl px-4 font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-800">
               Filtreleri Temizle
             </Button>
-            <Button type="submit" size="sm" className="h-9 gap-1.5 font-bold shadow-md shadow-primary/10 rounded-xl px-5">
+            <Button type="submit" size="sm" className="h-9 gap-1.5 rounded-xl px-5 font-bold shadow-md shadow-primary/10">
               <Search className="h-4 w-4" />
               Filtrele
             </Button>
           </div>
         </form>
 
-        <Button onClick={handleExport} disabled={exporting} variant="outline" className="gap-2 h-10 self-end font-bold rounded-xl border-slate-200 hover:bg-slate-50 shadow-sm print:hidden">
+        <Button onClick={handleExport} disabled={exporting} variant="outline" className="h-10 w-full gap-2 self-stretch rounded-xl border-slate-200 font-bold shadow-sm hover:bg-slate-50 print:hidden lg:w-auto lg:self-end">
           <Download className="h-4 w-4" />
           {exporting ? "Dışa Aktarılıyor..." : "CSV İndir"}
         </Button>
@@ -264,8 +264,8 @@ export default function AdminPaymentsPage() {
         </Card>
       ) : (
         <div className="flex flex-col gap-4">
-          <Card className="print:hidden shadow-premium border-slate-200/80 bg-white/95 rounded-2xl overflow-hidden">
-            <CardContent className="p-0">
+          <Card className="print:hidden shadow-premium overflow-hidden rounded-xl border-slate-200/80 bg-white/95 sm:rounded-2xl">
+            <CardContent className="admin-table-scroll p-0">
               <Table>
                 <TableHeader className="bg-slate-50/50">
                   <TableRow>
