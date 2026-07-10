@@ -25,17 +25,15 @@ type FieldProps = {
 
 export function FormField({ id, label, hint, error, className, children }: FieldProps) {
   return (
-    <div className={cn("flex flex-col gap-2", className)}>
-      <Label htmlFor={id} className="text-sm font-medium text-slate-700 leading-none">
-        {label}
-      </Label>
+    <div className={cn("grid w-full items-center gap-1.5", className)}>
+      <Label htmlFor={id}>{label}</Label>
       {children}
       {error ? (
-        <p id={`${id}-error`} className="text-sm text-destructive" role="alert">
+        <p id={`${id}-error`} className="text-[0.8rem] font-medium text-destructive" role="alert">
           {error}
         </p>
       ) : hint ? (
-        <p id={`${id}-hint`} className="text-sm text-muted-foreground">
+        <p id={`${id}-hint`} className="text-[0.8rem] text-muted-foreground">
           {hint}
         </p>
       ) : null}
@@ -168,11 +166,11 @@ export function BirthDateSelect({
   }
 
   const selectClass =
-    "h-11 w-full min-w-0 appearance-none rounded-xl border border-slate-200 bg-white px-2.5 text-sm font-medium text-foreground shadow-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20";
+    "flex h-9 w-full min-w-0 appearance-none rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
     <FormField id={id} label={label} hint={hint} error={error} className={fieldClassName}>
-      <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 sm:gap-2.5">
         <div className="min-w-0">
           <label htmlFor={`${id}-day`} className="mb-1 block text-[11px] font-medium text-muted-foreground">
             Gün
@@ -181,6 +179,7 @@ export function BirthDateSelect({
             id={`${id}-day`}
             className={selectClass}
             value={draft.day}
+            size={1}
             aria-invalid={error ? true : undefined}
             onChange={(e) => updateDraft({ ...draft, day: e.target.value })}
           >
@@ -217,7 +216,7 @@ export function BirthDateSelect({
           </label>
           <select
             id={`${id}-year`}
-            className={selectClass}
+            className={cn(selectClass, "max-h-48")}
             value={draft.y}
             aria-invalid={error ? true : undefined}
             onChange={(e) => updateDraft({ ...draft, y: e.target.value })}

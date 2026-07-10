@@ -5,6 +5,7 @@ import { ApiError, api } from "@/lib/api";
 import { API } from "@/lib/endpoints";
 import { type PaymentRequest, type PaymentReceipt, normalizePaymentResult, isPaymentSuccessful } from "@/lib/application";
 import { FormAlert, FormField } from "@/components/FormField";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -27,6 +28,7 @@ type Props = {
 
 export function ApplicationPaymentForm({ applicationId, token, onSuccess, onError }: Props) {
   const [paying, setPaying] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState("");
   const [card, setCard] = useState({
     cardHolder: "",
@@ -201,9 +203,30 @@ export function ApplicationPaymentForm({ applicationId, token, onSuccess, onErro
           />
         </FormField>
       </div>
-      <Button type="button" disabled={paying} onClick={pay} className="w-full min-h-11 touch-manipulation sm:w-auto">
+      <Button
+        type="button"
+        disabled={paying}
+        onClick={() => {
+          if (!validatePaymentForm()) return;
+          setConfirmOpen(true);
+        }}
+        className="w-full min-h-11 touch-manipulation sm:w-auto"
+      >
         {paying ? "İşleniyor..." : "Param ile ödemeyi tamamla"}
       </Button>
+
+      <ConfirmModal
+        isOpen={confirmOpen}
+        title="Ödemeyi onayla"
+        message={`${PAYMENT_AMOUNT.toLocaleString("tr-TR")} TRY tutarında ödemeyi tamamlamak istediğinize emin misiniz?`}
+        confirmText="Evet, öde"
+        cancelText="Vazgeç"
+        onConfirm={() => {
+          setConfirmOpen(false);
+          void pay();
+        }}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

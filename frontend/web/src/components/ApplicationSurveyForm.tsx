@@ -15,12 +15,12 @@ type Props = {
 };
 
 const SURVEY_PLACEHOLDERS: Record<string, string> = {
-  chiefComplaint: "Örn: Yaklaşık 3 aydır devam eden göğüste sıkışma hissi, nefes darlığı ve merdiven çıkarken çabuk yorulma şikayeti...",
-  medicalHistory: "Örn: 5 yıl önce konulmuş hipertansiyon tanısı, düzenli tansiyon takibi yapılıyor. 2018 yılında apandisit ameliyatı...",
-  currentMedications: "Örn: Coraspin 100mg günde 1 kez, Beloc ZOK 50mg günde 1 kez...",
-  previousDiagnosis: "Örn: Kardiyoloji muayenesi sonrası koroner arter hastalığı şüphesi, EKG ve Efor testi sonuçları ek belgelerdedir...",
-  questionsForDoctor: "Örn: 1. Mevcut şikayetlerime göre bypass ameliyatı olmam gerekli mi?\n2. İlaç tedavisine devam edebilir miyim?",
-  additionalNotes: "Varsa belirtmek istediğiniz diğer hususları, ailedeki genetik hastalık geçmişini vb. buraya yazabilirsiniz...",
+  chiefComplaint: "Kısaca şikayetinizi yazın...",
+  medicalHistory: "Geçmiş hastalık / ameliyat...",
+  currentMedications: "Düzenli ilaçlar (yoksa boş)...",
+  previousDiagnosis: "Önceki tanı veya tetkikler...",
+  questionsForDoctor: "Doktora sormak istedikleriniz...",
+  additionalNotes: "Varsa ek not...",
 };
 
 export function ApplicationSurveyForm({ value, onChange, errors = {} }: Props) {
@@ -29,10 +29,10 @@ export function ApplicationSurveyForm({ value, onChange, errors = {} }: Props) {
   }
 
   return (
-    <div className="grid gap-4 sm:gap-5">
+    <div className="grid gap-3">
       {SURVEY_FIELDS.map((field) => {
         const currentLen = value[field.key]?.length || 0;
-        const rows = field.rows ?? 3;
+        const rows = field.rows ?? 2;
         return (
           <FormField
             key={field.key}
@@ -48,14 +48,12 @@ export function ApplicationSurveyForm({ value, onChange, errors = {} }: Props) {
               value={value[field.key]}
               onChange={(e) => update(field.key, e.target.value)}
               maxLength={2000}
-              className="resize-y min-h-[5.5rem] sm:min-h-[6rem] text-base sm:text-sm"
+              className="min-h-[4.5rem] resize-y text-base sm:text-sm"
             />
-            <div className="flex justify-between items-center text-[11px] text-muted-foreground mt-1 px-1">
-              <span>
-                {field.required ? "(En az 10 karakter girilmelidir)" : "(İsteğe bağlı)"}
-              </span>
-              <span className={currentLen >= 2000 ? "text-destructive font-semibold" : ""}>
-                {currentLen} / 2000
+            <div className="mt-1 flex items-center justify-between px-0.5 text-[11px] text-muted-foreground">
+              <span>{field.required ? "En az 10 karakter" : "İsteğe bağlı"}</span>
+              <span className={currentLen >= 2000 ? "font-semibold text-destructive" : ""}>
+                {currentLen}/2000
               </span>
             </div>
           </FormField>

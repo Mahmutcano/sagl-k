@@ -53,6 +53,13 @@ export function DoctorAppShell({ children, title, description, actions }: AppShe
               !p.endsWith("/profile")),
         },
         {
+          href: ROUTES.doctor.stats,
+          label: "Özet panel",
+          shortLabel: "Özet",
+          icon: ClipboardList,
+          isActive: (p: string) => p.startsWith("/doctor/stats"),
+        },
+        {
           href: ROUTES.doctor.profile,
           label: "Profil Ayarlarım",
           shortLabel: "Profil",

@@ -3,6 +3,12 @@
  * Every rule returns a Turkish explanation for inline field feedback.
  */
 
+import {
+  normalizeNationalNumber,
+  validateNationalPhone,
+} from "@/lib/phone";
+import { isTurkishNationality, validatePassportNumber } from "@/lib/nationality";
+
 export type FieldError = {
   field: string;
   code: string;
@@ -76,34 +82,51 @@ export function validateEmail(value: string): string | null {
   return null;
 }
 
+/** Canonical TR national number for DB (no +90, no leading 0). */
 export function normalizePhoneTR(value: string): string {
-  let v = value.trim().replace(/\s/g, "");
-  if (v.startsWith("+90")) v = v.slice(3);
-  else if (v.startsWith("90") && v.length === 12) v = v.slice(2);
-  if (v.startsWith("0")) v = v.slice(1);
-  return v;
+  return normalizeNationalNumber(value, "+90");
 }
 
 export function validatePhoneTR(value: string): string | null {
-  const v = normalizePhoneTR(value);
-  if (!v) return "Telefon numarası zorunludur.";
-  if (!/^5\d{9}$/.test(v))
-    return "Telefon numarası 5XX XXX XX XX formatında 10 haneli olmalıdır (başında 0 olmadan).";
-  return null;
+  return validateNationalPhone("+90", value);
 }
 
+export { validatePassportNumber, isTurkishNationality };
+
 export function validatePersonName(value: string, label: string): string | null {
-  const v = value.trim();
+  const v = formatPersonName(value);
   if (!v) return `${label} zorunludur.`;
   if (charCount(v) < 2) return `${label} en az 2 karakter olmalıdır.`;
   if (charCount(v) > 80) return `${label} en fazla 80 karakter olabilir.`;
-  // Letters (incl. Turkish), spaces, hyphen, apostrophe.
   if (!/^[A-Za-zÀ-ÖØ-öø-ÿĞğÜüŞşİıÖöÇç\s'-]+$/.test(v)) {
     return `${label} yalnızca harf, boşluk, tire veya kesme işareti içerebilir.`;
   }
   return null;
 }
 
+/** Turkish title-case: AHMET → Ahmet, ayşe → Ayşe */
+export function formatPersonName(value: string): string {
+  const parts = value.trim().split(/\s+/).filter(Boolean);
+  return parts
+    .map((part) => {
+      const chars = Array.from(part);
+      if (!chars.length) return "";
+      return turkishTitle(chars[0]) + chars.slice(1).map(turkishLower).join("");
+    })
+    .join(" ");
+}
+
+function turkishLower(ch: string): string {
+  if (ch === "I") return "ı";
+  if (ch === "İ") return "i";
+  return ch.toLocaleLowerCase("tr-TR");
+}
+
+function turkishTitle(ch: string): string {
+  if (ch === "i") return "İ";
+  if (ch === "ı") return "I";
+  return ch.toLocaleUpperCase("tr-TR");
+}
 
 export function validateBirthDate(value: string, opts?: { minAge?: number }): string | null {
   const v = value.trim();
@@ -124,7 +147,6 @@ export function validateBirthDate(value: string, opts?: { minAge?: number }): st
   return null;
 }
 
-/** Kayıt için doğum tarihi (18+). */
 export function validateDateOfBirth(value: string): string | null {
   return validateBirthDate(value, { minAge: 18 });
 }
@@ -174,8 +196,16 @@ export type LoginInput = {
 
 export function validateLogin(input: LoginInput): FieldErrors {
   const errors: FieldErrors = {};
-  const nid = validateNationalId(input.nationalIdentifier);
-  if (nid) errors.nationalIdentifier = nid;
+  const id = input.nationalIdentifier.trim();
+  if (!id) {
+    errors.nationalIdentifier = "TC Kimlik No veya pasaport numarası zorunludur.";
+  } else if (/^\d{11}$/.test(id)) {
+    const nid = validateNationalId(id);
+    if (nid) errors.nationalIdentifier = nid;
+  } else {
+    const pp = validatePassportNumber(id);
+    if (pp) errors.nationalIdentifier = pp;
+  }
   const pw = validateLoginPassword(input.password);
   if (pw) errors.password = pw;
   return errors;
@@ -184,7 +214,10 @@ export function validateLogin(input: LoginInput): FieldErrors {
 export type RegisterInput = {
   firstName: string;
   lastName: string;
+  nationality: string;
   nationalIdentifier: string;
+  passportNumber: string;
+  phoneCountryCode: string;
   phoneNumber: string;
   email: string;
   password: string;
@@ -194,14 +227,26 @@ export type RegisterInput = {
 
 export function validateRegister(input: RegisterInput): FieldErrors {
   const errors: FieldErrors = {};
-  const fn = validatePersonName(input.firstName, "Ad");
+  const firstName = formatPersonName(input.firstName);
+  const lastName = formatPersonName(input.lastName);
+  const fn = validatePersonName(firstName, "Ad");
   if (fn) errors.firstName = fn;
-  const ln = validatePersonName(input.lastName, "Soyad");
+  const ln = validatePersonName(lastName, "Soyad");
   if (ln) errors.lastName = ln;
-  const nid = validateNationalId(input.nationalIdentifier);
-  if (nid) errors.nationalIdentifier = nid;
-  const phone = validatePhoneTR(input.phoneNumber);
+
+  if (!input.nationality?.trim()) {
+    errors.nationality = "Uyruk seçiniz.";
+  } else if (isTurkishNationality(input.nationality)) {
+    const nid = validateNationalId(input.nationalIdentifier);
+    if (nid) errors.nationalIdentifier = nid;
+  } else {
+    const pp = validatePassportNumber(input.passportNumber);
+    if (pp) errors.passportNumber = pp;
+  }
+
+  const phone = validateNationalPhone(input.phoneCountryCode || "+90", input.phoneNumber);
   if (phone) errors.phoneNumber = phone;
+
   const email = validateEmail(input.email);
   if (email) errors.email = email;
   const pw = validatePassword(input.password);
@@ -230,7 +275,6 @@ export type RepresentedPersonInput = {
   gender: number;
 };
 
-/** Yakın (temsil edilen hasta) bilgileri — başvuran ile aynı olamaz. */
 export function validateRepresentedPerson(
   input: RepresentedPersonInput,
   applicantNationalId?: string | null

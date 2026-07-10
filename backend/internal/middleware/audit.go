@@ -11,11 +11,21 @@ import (
 	"medical-consultation-platform/backend/internal/repository"
 )
 
+type statusCapture struct {
+	http.ResponseWriter
+	status int
+}
+
+func (s *statusCapture) WriteHeader(code int) {
+	s.status = code
+	s.ResponseWriter.WriteHeader(code)
+}
+
 func AuditLog(db *repository.DB) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Skip GET requests to avoid log bloat
-			if r.Method == http.MethodGet {
+			// Skip GET/OPTIONS noise
+			if r.Method == http.MethodGet || r.Method == http.MethodOptions || r.Method == http.MethodHead {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -34,25 +44,51 @@ func AuditLog(db *repository.DB) func(http.Handler) http.Handler {
 				}
 			}
 
-			next.ServeHTTP(w, r)
+			sw := &statusCapture{ResponseWriter: w, status: http.StatusOK}
+			next.ServeHTTP(sw, r)
 
 			var userID *uuid.UUID
+			var role, userName string
 			claims := ClaimsFromContext(r.Context())
 			if claims != nil {
 				uid := claims.UserID
 				userID = &uid
+				role = claims.Role
+				// Skip pure admin operator noise — patient/doctor activity is the focus.
+				if role == "admin" || role == "developer" {
+					return
+				}
+				_ = db.Pool.QueryRow(r.Context(), `
+					SELECT COALESCE(first_name,'') || ' ' || COALESCE(last_name,''), role::text
+					FROM users WHERE id = $1
+				`, uid).Scan(&userName, &role)
 			}
 
-			var payload map[string]interface{}
+			payload := map[string]interface{}{
+				"method":     r.Method,
+				"endpoint":   r.URL.Path,
+				"statusCode": sw.status,
+				"query":      r.URL.RawQuery,
+			}
+			if userName != "" {
+				payload["userName"] = strings.TrimSpace(userName)
+			}
+			if role != "" {
+				payload["userRole"] = role
+			}
+			if sw.status >= 400 {
+				payload["error"] = true
+			}
+
 			if len(bodyBytes) > 0 {
-				_ = json.Unmarshal(bodyBytes, &payload)
-				if payload != nil {
-					// Sanitize credentials
-					for _, k := range []string{"password", "passwordConfirm", "token", "code", "cvc", "card_number"} {
-						if _, ok := payload[k]; ok {
-							payload[k] = "[REDACTED]"
+				var body map[string]interface{}
+				if json.Unmarshal(bodyBytes, &body) == nil && body != nil {
+					for _, k := range []string{"password", "passwordConfirm", "token", "code", "cvc", "card_number", "oldPassword", "newPassword"} {
+						if _, ok := body[k]; ok {
+							body[k] = "[REDACTED]"
 						}
 					}
+					payload["body"] = body
 				}
 			}
 
@@ -62,7 +98,7 @@ func AuditLog(db *repository.DB) func(http.Handler) http.Handler {
 			_, _ = db.Pool.Exec(r.Context(), `
 				INSERT INTO audit_logs (user_id, action, entity_type, payload, ip_address)
 				VALUES ($1, $2, 'http_request', $3, $4::inet)
-			`, userID, action, payloadJSON, ip)
+			`, userID, action, payloadJSON, strings.TrimSpace(ip))
 		})
 	}
 }

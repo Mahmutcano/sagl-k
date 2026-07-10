@@ -16,16 +16,16 @@ export const STATUS_LABELS: Record<number, string> = {
 /** Hekim / sekreterya arayüzü — ödeme bilgisi gösterilmez */
 export const STAFF_STATUS_LABELS: Record<number, string> = {
   0: "Başvuru tamamlanmadı",
-  1: "Başvuru yapıldı",
-  2: "Sonuç bekleniyor",
+  1: "Rapor bekleniyor",
+  2: "Rapor bekleniyor",
   3: "Reddedildi",
-  4: "Sonuç bekleniyor",
+  4: "Rapor bekleniyor",
   5: "Ek bilgi gerekli",
   6: "Sonuçlandı",
   7: "İptal edildi",
   8: "İade sürecinde",
   9: "İade edildi",
-  10: "Sonuç bekleniyor",
+  10: "Rapor bekleniyor",
   11: "Sekreterya incelemesi",
 };
 
@@ -312,6 +312,26 @@ export type StatusHistoryItem = {
   newStatusCode: number;
   note?: string | null;
   createdAt: string;
+  actor?: string;
+};
+
+export type ApplicationTimelineEvent = {
+  type: string;
+  title: string;
+  detail?: string;
+  actor?: string;
+  createdAt: string;
+  oldStatusCode?: number | null;
+  newStatusCode?: number;
+  note?: string | null;
+  amount?: number;
+  status?: string;
+  applicationNumber?: string;
+};
+
+export type ApplicationHistoryResponse = {
+  events: ApplicationTimelineEvent[];
+  statusHistory: StatusHistoryItem[];
 };
 
 export const DEFAULT_REPORT_DRAFT = JSON.stringify(

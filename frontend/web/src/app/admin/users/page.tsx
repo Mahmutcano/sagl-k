@@ -8,6 +8,14 @@ import { requireSession, roleLabel } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import {
   FormAlert,
@@ -228,18 +236,16 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* User Edit Dialog */}
-      {editingUser ? (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <Card className="w-full max-w-2xl large-form shadow-2xl border-slate-200 my-8">
-            <form onSubmit={handleSaveEdit} noValidate>
-              <CardHeader>
-                <CardTitle>Kullanıcı Bilgilerini Düzenle</CardTitle>
-                <CardDescription>
-                  Yönetici yetkisiyle bu kullanıcının kişisel, iletişim ve yetki bilgilerini güncelliyorsunuz.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="grid gap-4 sm:grid-cols-2 max-h-[60vh] overflow-y-auto pr-2">
+      <Dialog open={Boolean(editingUser)} onOpenChange={(open) => !open && setEditingUser(null)}>
+        <DialogContent className="max-h-[90vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-2xl">
+          <form onSubmit={handleSaveEdit} noValidate className="grid gap-4">
+            <DialogHeader>
+              <DialogTitle>Kullanıcı Bilgilerini Düzenle</DialogTitle>
+              <DialogDescription>
+                Yönetici yetkisiyle bu kullanıcının kişisel, iletişim ve yetki bilgilerini güncelliyorsunuz.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid max-h-[55vh] gap-4 overflow-y-auto pr-1 sm:grid-cols-2">
                 {editError ? <div className="sm:col-span-2"><FormAlert title="Hata" message={editError} /></div> : null}
 
                 <TextInput
@@ -333,19 +339,18 @@ export default function AdminUsersPage() {
                     error={editFields.password}
                   />
                 </div>
-              </CardContent>
-              <CardFooter className="border-t flex gap-2 justify-end">
-                <Button type="submit" disabled={saving}>
-                  {saving ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
-                </Button>
-                <Button type="button" variant="ghost" onClick={() => setEditingUser(null)}>
-                  İptal
-                </Button>
-              </CardFooter>
-            </form>
-          </Card>
-        </div>
-      ) : null}
+            </div>
+            <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
+              <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => setEditingUser(null)}>
+                İptal
+              </Button>
+              <Button type="submit" className="w-full sm:w-auto" disabled={saving}>
+                {saving ? "Kaydediliyor..." : "Değişiklikleri Kaydet"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </AdminAppShell>
   );
 }

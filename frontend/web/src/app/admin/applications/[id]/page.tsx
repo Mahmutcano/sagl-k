@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ApiError, api, getToken, getUser, isAdminRole, clearAuth, fetchTextWithAuth } from "@/lib/api";
 import { API } from "@/lib/endpoints";
-import { STATUS_LABELS, statusVariant, type StatusHistoryItem, type ApplicationDetail } from "@/lib/application";
+import { STATUS_LABELS, statusVariant, type ApplicationHistoryResponse, type ApplicationTimelineEvent, type ApplicationDetail } from "@/lib/application";
 import { parseSurveyData, type ApplicationSurveyAnswers } from "@/lib/applicationSurvey";
 import { AdminAppShell } from "@/components/AdminAppShell";
 import { FormAlert, FormField, FormSelect, BirthDateSelect, TextInput } from "@/components/FormField";
@@ -14,13 +14,35 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useApplicationCatalog } from "@/hooks/useApplicationCatalog";
 import { FileText } from "lucide-react";
 
+function formatWhen(iso?: string) {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("tr-TR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function timelineBadge(type: string) {
+  if (type === "payment_paid" || type === "final_report") return "default" as const;
+  if (type === "doctor_opened" || type === "report_viewed") return "secondary" as const;
+  if (type.startsWith("draft")) return "outline" as const;
+  return "secondary" as const;
+}
+
 export default function AdminApplicationDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
-  const [history, setHistory] = useState<StatusHistoryItem[]>([]);
+  const [timeline, setTimeline] = useState<ApplicationTimelineEvent[]>([]);
   
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -58,8 +80,16 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
 
   const loadData = useCallback(async (token: string) => {
     try {
-      const histData = await api<StatusHistoryItem[]>(API.admin.applicationHistory(params.id), {}, token);
-      setHistory(histData);
+      const histData = await api<ApplicationHistoryResponse | ApplicationTimelineEvent[]>(
+        API.admin.applicationHistory(params.id),
+        {},
+        token
+      );
+      if (Array.isArray(histData)) {
+        setTimeline(histData as ApplicationTimelineEvent[]);
+      } else {
+        setTimeline(histData.events ?? histData.statusHistory ?? []);
+      }
 
       const appData = await api<ApplicationDetail>(API.applications.detail(params.id), {}, token);
       setStatus(appData.statusCode);
@@ -226,7 +256,7 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
           
           {/* Left Column: Form Editor (takes 2 cols) */}
           <div className="lg:col-span-2 flex flex-col gap-6">
-            <Card className="large-form shadow-md border-slate-200">
+            <Card className=" ">
               <form onSubmit={handleAdminSave} noValidate>
                 <CardHeader>
                   <CardTitle>Başvuru Bilgilerini Düzenle</CardTitle>
@@ -236,8 +266,8 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
                 </CardHeader>
                 <CardContent className="flex flex-col gap-5">
                   <div>
-                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Operasyonel Durum & Hekim Atama</h4>
-                    <div className="grid gap-6 sm:grid-cols-3 bg-slate-50/60 border border-slate-200/50 rounded-2xl p-5 shadow-sm">
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3">Operasyonel Durum & Hekim Atama</h4>
+                    <div className="grid gap-6 sm:grid-cols-3 bg-muted/60 border /50 rounded-2xl p-5 shadow-sm">
                       <FormSelect
                         id="status-select"
                         label="Başvuru Durumu"
@@ -394,7 +424,7 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
 
             {/* Doctor Reports Card */}
             {(draftReport || finalReport) && (
-              <Card className="shadow-md border-slate-200">
+              <Card className=" ">
                 <CardHeader>
                   <CardTitle className="text-base text-primary">Uzman Hekim Raporları</CardTitle>
                   <CardDescription>
@@ -410,7 +440,7 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
                           {new Date(finalReport.createdAt).toLocaleString("tr-TR")}
                         </span>
                       </div>
-                      <div className="text-sm bg-white border rounded-md p-3 whitespace-pre-wrap font-sans text-slate-800">
+                      <div className="text-sm bg-white border rounded-md p-3 whitespace-pre-wrap font-sans text-foreground">
                         {typeof finalReport.reportJson === "string" 
                           ? finalReport.reportJson 
                           : (finalReport.reportJson as Record<string, unknown>)?.conclusion 
@@ -425,7 +455,7 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
                       <div className="flex justify-between items-center mb-2">
                         <Badge variant="secondary" className="bg-amber-500 text-white">Taslak Rapor (Kaydedilmiş)</Badge>
                       </div>
-                      <div className="text-sm bg-white border rounded-md p-3 whitespace-pre-wrap font-sans text-slate-800">
+                      <div className="text-sm bg-white border rounded-md p-3 whitespace-pre-wrap font-sans text-foreground">
                         {(() => {
                           try {
                             const parsed = JSON.parse(draftReport);
@@ -445,10 +475,10 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
           {/* Right Column: Status Change History (takes 1 col) */}
           <div className="flex flex-col gap-6">
             {/* Attachments Card */}
-            <Card className="shadow-md border-slate-200">
-              <CardHeader className="bg-slate-50/50">
-                <CardTitle className="text-base text-slate-800 flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-slate-500" />
+            <Card className=" ">
+              <CardHeader className="bg-muted/40">
+                <CardTitle className="text-base text-foreground flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
                   Ekli Dosyalar (PDF & Görsel)
                 </CardTitle>
                 <CardDescription className="text-xs">
@@ -461,9 +491,9 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
                 ) : (
                   <div className="grid gap-2">
                     {attachments.map((file) => (
-                      <div key={file.id} className="flex items-center justify-between gap-3 rounded-lg border p-2 text-xs bg-slate-50/50">
+                      <div key={file.id} className="flex items-center justify-between gap-3 rounded-lg border p-2 text-xs bg-muted/40">
                         <div className="min-w-0 flex-1">
-                          <p className="font-semibold truncate text-slate-800">{file.fileName}</p>
+                          <p className="font-semibold truncate text-foreground">{file.fileName}</p>
                           <p className="text-[10px] text-muted-foreground font-mono mt-0.5">
                             {(file.fileSize / 1024).toFixed(1)} KB · {file.mimeType}
                           </p>
@@ -484,40 +514,42 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
               </CardContent>
             </Card>
 
-            <Card className="shadow-md border-slate-200">
+            <Card className=" ">
               <CardHeader>
-                <CardTitle className="text-base">Durum Geçmişi</CardTitle>
-                <CardDescription>Başvurunun geçirdiği tüm durum değişikliklerinin geçmişi.</CardDescription>
+                <CardTitle className="text-base">Başvuru Geçmişi</CardTitle>
+                <CardDescription>
+                  Oluşturma, ödeme, doktor incelemesi, rapor ve durum adımlarının tarih/saat kaydı.
+                </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                {history.length === 0 ? (
-                  <p className="p-4 text-sm text-muted-foreground italic text-center">Durum geçmişi yok.</p>
+                {timeline.length === 0 ? (
+                  <p className="p-4 text-center text-sm italic text-muted-foreground">Geçmiş kaydı yok.</p>
                 ) : (
-                  <Table className="text-xs">
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Hedef Durum</TableHead>
-                        <TableHead>Tarih</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {history.map((h, i) => (
-                        <TableRow key={i} className="hover:bg-muted/10">
-                          <TableCell>
-                            <Badge variant={statusVariant(h.newStatusCode)} className="text-[10px] px-1.5 py-0.5">
-                              {STATUS_LABELS[h.newStatusCode] ?? h.newStatusCode}
+                  <div className="divide-y">
+                    {timeline.map((h, i) => (
+                      <div key={`${h.type}-${h.createdAt}-${i}`} className="flex gap-3 px-4 py-3">
+                        <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                        <div className="min-w-0 flex-1 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant={h.type === "status" && h.newStatusCode != null ? statusVariant(h.newStatusCode) : timelineBadge(h.type)} className="text-[10px]">
+                              {h.title || (h.newStatusCode != null ? STATUS_LABELS[h.newStatusCode] : h.type)}
                             </Badge>
-                            {h.note ? (
-                              <p className="text-[10px] text-muted-foreground mt-0.5 italic">{h.note}</p>
+                            {h.type === "status" && h.newStatusCode != null ? (
+                              <span className="text-[10px] text-muted-foreground">
+                                {STATUS_LABELS[h.newStatusCode] ?? h.newStatusCode}
+                              </span>
                             ) : null}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground font-mono text-[10px]">
-                            {h.createdAt ? new Date(h.createdAt).toLocaleString("tr-TR") : "—"}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                          </div>
+                          {h.detail ? <p className="text-xs text-muted-foreground">{h.detail}</p> : null}
+                          {h.note ? <p className="text-[10px] italic text-muted-foreground">{h.note}</p> : null}
+                          <p className="font-mono text-[10px] text-muted-foreground">
+                            {formatWhen(h.createdAt)}
+                            {h.actor ? ` · ${h.actor}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </CardContent>
             </Card>

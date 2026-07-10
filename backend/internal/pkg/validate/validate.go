@@ -186,17 +186,71 @@ func Email(errs *Errors, field, value string) {
 }
 
 func PhoneTR(errs *Errors, field, value string) {
-	value = strings.TrimSpace(strings.TrimPrefix(value, "+90"))
-	value = strings.TrimPrefix(value, "90")
-	value = strings.TrimPrefix(value, "0")
-	value = strings.ReplaceAll(value, " ", "")
+	PhoneNational(errs, field, "+90", value)
+}
+
+// PhoneNational validates a national number for the given country dial code.
+// Canonical DB shape: phone_country_code="+90", phone_number="5321234567".
+func PhoneNational(errs *Errors, field, countryCode, value string) {
+	cc := NormalizeCountryCode(countryCode)
+	value = NormalizeNationalPhone(cc, value)
 	if value == "" {
 		errs.Add(field, "required", "Telefon numarası zorunludur.")
 		return
 	}
-	if !phoneTR.MatchString(value) {
-		errs.Add(field, "format", "Telefon numarası 5XX XXX XX XX formatında 10 haneli olmalıdır (başında 0 olmadan).")
+	if cc == "+90" {
+		if !phoneTR.MatchString(value) {
+			errs.Add(field, "format", "Telefon numarası 5XX XXX XX XX formatında 10 haneli olmalıdır (başında 0 olmadan).")
+		}
+		return
 	}
+	if len(value) < 6 || len(value) > 15 {
+		errs.Add(field, "format", "Telefon numarası 6–15 haneli olmalıdır.")
+	}
+}
+
+func PassportNumber(errs *Errors, field, value string) {
+	value = strings.ToUpper(strings.TrimSpace(value))
+	if value == "" {
+		errs.Add(field, "required", "Pasaport numarası zorunludur.")
+		return
+	}
+	if len(value) < 5 || len(value) > 20 {
+		errs.Add(field, "format", "Pasaport numarası 5–20 karakter olmalıdır.")
+		return
+	}
+	for _, r := range value {
+		if (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') {
+			continue
+		}
+		errs.Add(field, "format", "Pasaport numarası yalnızca harf ve rakam içermelidir.")
+		return
+	}
+}
+
+func NationalityCode(errs *Errors, field, value string) {
+	value = strings.ToUpper(strings.TrimSpace(value))
+	if value == "" {
+		errs.Add(field, "required", "Uyruk seçiniz.")
+		return
+	}
+	if len(value) < 2 || len(value) > 5 {
+		errs.Add(field, "format", "Uyruk kodu geçersiz.")
+	}
+}
+
+// LoginIdentifier accepts either an 11-digit TCKN or a passport number.
+func LoginIdentifier(errs *Errors, field, value string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		errs.Add(field, "required", "TC Kimlik No veya pasaport numarası zorunludur.")
+		return
+	}
+	if digitsOnly.MatchString(value) && len(value) == 11 {
+		NationalID(errs, field, value)
+		return
+	}
+	PassportNumber(errs, field, value)
 }
 
 func PhoneOptionalE164(errs *Errors, field, value string) {
@@ -230,6 +284,50 @@ func PersonName(errs *Errors, field, value, label string) {
 		}
 		errs.Add(field, "format", fmt.Sprintf("%s yalnızca harf, boşluk, tire veya kesme işareti içerebilir.", label))
 		return
+	}
+}
+
+// FormatPersonName applies Turkish title-case: "AHMET CAN" → "Ahmet Can", "ayşe" → "Ayşe".
+func FormatPersonName(value string) string {
+	parts := strings.Fields(strings.TrimSpace(value))
+	if len(parts) == 0 {
+		return ""
+	}
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		runes := []rune(part)
+		if len(runes) == 0 {
+			continue
+		}
+		buf := make([]rune, len(runes))
+		buf[0] = turkishTitle(runes[0])
+		for i := 1; i < len(runes); i++ {
+			buf[i] = turkishLower(runes[i])
+		}
+		out = append(out, string(buf))
+	}
+	return strings.Join(out, " ")
+}
+
+func turkishLower(r rune) rune {
+	switch r {
+	case 'I':
+		return 'ı'
+	case 'İ':
+		return 'i'
+	default:
+		return unicode.ToLower(r)
+	}
+}
+
+func turkishTitle(r rune) rune {
+	switch r {
+	case 'i':
+		return 'İ'
+	case 'ı':
+		return 'I'
+	default:
+		return unicode.ToUpper(r)
 	}
 }
 
@@ -446,11 +544,49 @@ func RejectionReason(errs *Errors, field, value string, isApproved bool) {
 	}
 }
 
-// NormalizePhoneTR strips country/leading zero prefixes for storage.
+// NormalizePhoneTR strips country/leading zero prefixes for storage (TR national digits).
 func NormalizePhoneTR(value string) string {
+	return NormalizeNationalPhone("+90", value)
+}
+
+// NormalizeCountryCode returns canonical dial code with leading "+", default "+90".
+func NormalizeCountryCode(code string) string {
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return "+90"
+	}
+	code = strings.ReplaceAll(code, " ", "")
+	if !strings.HasPrefix(code, "+") {
+		code = "+" + code
+	}
+	return code
+}
+
+// NormalizeNationalPhone returns national digits only (no leading 0, no country code).
+// Example: "+90", "0532 123 45 67" → "5321234567"
+func NormalizeNationalPhone(countryCode, value string) string {
+	cc := NormalizeCountryCode(countryCode)
 	value = strings.TrimSpace(value)
-	value = strings.TrimPrefix(value, "+90")
-	value = strings.TrimPrefix(value, "90")
-	value = strings.TrimPrefix(value, "0")
-	return strings.ReplaceAll(value, " ", "")
+	var b strings.Builder
+	for _, r := range value {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	digits := b.String()
+	dialDigits := strings.TrimPrefix(cc, "+")
+	if dialDigits != "" && strings.HasPrefix(digits, dialDigits) && len(digits) > len(dialDigits)+4 {
+		digits = digits[len(dialDigits):]
+	}
+	for strings.HasPrefix(digits, "0") {
+		digits = digits[1:]
+	}
+	return digits
+}
+
+// ToE164 builds E.164 for SMS gateways from canonical DB fields.
+func ToE164(countryCode, nationalNumber string) string {
+	cc := NormalizeCountryCode(countryCode)
+	national := NormalizeNationalPhone(cc, nationalNumber)
+	return cc + national
 }

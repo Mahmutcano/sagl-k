@@ -77,7 +77,7 @@ func isAllDigits(s string) bool {
 }
 
 func normalizeGSM(phone string) string {
-	digits := make([]byte, 0, 12)
+	digits := make([]byte, 0, 15)
 	for i := 0; i < len(phone); i++ {
 		if phone[i] >= '0' && phone[i] <= '9' {
 			digits = append(digits, phone[i])
@@ -90,6 +90,9 @@ func normalizeGSM(phone string) string {
 	case len(s) == 11 && s[0] == '0' && s[1] == '5':
 		return "9" + s
 	case len(s) == 12 && strings.HasPrefix(s, "90"):
+		return s
+	case len(s) >= 10 && len(s) <= 15:
+		// E.164 digits without '+' (international or already-normalized TR).
 		return s
 	default:
 		return ""

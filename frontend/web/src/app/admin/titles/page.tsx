@@ -149,10 +149,10 @@ export default function AdminTitlesPage() {
         </div>
       ) : null}
 
-      <Card className="shadow-premium overflow-hidden rounded-xl border-slate-200/80 bg-white/95 sm:rounded-2xl">
-        <CardHeader className="flex flex-col gap-3 border-b bg-slate-50/50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
+      <Card className=" overflow-hidden rounded-xl /80 bg-white/95 sm:rounded-2xl">
+        <CardHeader className="flex flex-col gap-3 border-b bg-muted/40 px-3 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-5">
           <div className="min-w-0">
-            <CardTitle className="text-sm font-bold text-slate-800 sm:text-base">Unvan Listesi</CardTitle>
+            <CardTitle className="text-sm font-bold text-foreground sm:text-base">Unvan Listesi</CardTitle>
             <CardDescription className="text-xs">Sistemdeki doktorların seçim yapabileceği tüm unvanlar</CardDescription>
           </div>
           <Button onClick={handleOpenAdd} size="sm" className="w-full gap-1.5 shadow-sm sm:w-auto">
@@ -167,35 +167,35 @@ export default function AdminTitlesPage() {
               <Skeleton className="h-10 w-full rounded-lg" />
             </div>
           ) : titles.length === 0 ? (
-            <div className="p-16 text-center text-slate-500">Kayıtlı unvan bulunamadı.</div>
+            <div className="p-16 text-center text-muted-foreground">Kayıtlı unvan bulunamadı.</div>
           ) : (
             <Table>
-              <TableHeader className="bg-slate-50/30">
+              <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Unvan Adı</TableHead>
-                  <TableHead className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Durum</TableHead>
-                  <TableHead className="px-6 py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Oluşturulma</TableHead>
+                  <TableHead className="px-6 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Unvan Adı</TableHead>
+                  <TableHead className="px-6 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Durum</TableHead>
+                  <TableHead className="px-6 py-3 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Oluşturulma</TableHead>
                   <TableHead className="px-6 py-3 text-right print:hidden"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {titles.map((t) => (
-                  <TableRow key={t.id} className="hover:bg-slate-50/50 transition-colors">
-                    <TableCell className="px-6 py-4 font-semibold text-slate-800">{t.name}</TableCell>
+                  <TableRow key={t.id} className="hover:bg-muted/40 transition-colors">
+                    <TableCell className="px-6 py-4 font-semibold text-foreground">{t.name}</TableCell>
                     <TableCell className="px-6 py-4">
                       <Badge variant={t.isActive ? "default" : "secondary"}>
                         {t.isActive ? "Aktif" : "Pasif"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="px-6 py-4 text-xs text-slate-500 font-mono">
+                    <TableCell className="px-6 py-4 text-xs text-muted-foreground font-mono">
                       {new Date(t.createdAt).toLocaleString("tr-TR")}
                     </TableCell>
                     <TableCell className="px-6 py-4 text-right print:hidden">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(t)} className="h-8 w-8 p-0 text-slate-500 hover:text-primary">
+                        <Button variant="ghost" size="sm" onClick={() => handleOpenEdit(t)} className="h-8 w-8 p-0 text-muted-foreground hover:text-primary">
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleDelete(t.id)} className="h-8 w-8 p-0 text-slate-500 hover:text-destructive">
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(t.id)} className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive">
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
@@ -211,10 +211,10 @@ export default function AdminTitlesPage() {
       {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-md shadow-2xl border-slate-200 bg-white">
+          <Card className="w-full max-w-md shadow-2xl bg-white">
             <form onSubmit={handleSave}>
               <CardHeader className="relative border-b pb-4">
-                <CardTitle className="text-base text-slate-800 font-bold">
+                <CardTitle className="text-base text-foreground font-bold">
                   {editingId ? "Unvanı Düzenle" : "Yeni Unvan Tanımla"}
                 </CardTitle>
                 <Button
@@ -246,16 +246,16 @@ export default function AdminTitlesPage() {
                       id="isActive"
                       checked={formActive}
                       onChange={(e) => setFormActive(e.target.checked)}
-                      className="rounded border-slate-300 text-primary focus:ring-primary cursor-pointer h-4 w-4"
+                      className="rounded text-primary focus:ring-primary cursor-pointer h-4 w-4"
                     />
-                    <label htmlFor="isActive" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                    <label htmlFor="isActive" className="text-xs font-semibold text-foreground cursor-pointer">
                       Bu unvan aktif/seçilebilir durumda
                     </label>
                   </div>
                 )}
               </CardContent>
 
-              <CardFooter className="border-t pt-4 flex gap-2 justify-end bg-slate-50/50">
+              <CardFooter className="border-t pt-4 flex gap-2 justify-end bg-muted/40">
                 <Button type="button" variant="outline" size="sm" onClick={() => setIsModalOpen(false)} disabled={saving}>
                   İptal
                 </Button>

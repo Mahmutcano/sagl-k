@@ -89,6 +89,17 @@ func (s *Service) SendReportReadyEmail(ctx context.Context, userID uuid.UUID, em
 	_ = s.SendEmail(ctx, email, "Raporunuz hazır", "report_ready", body, &userID)
 }
 
+func (s *Service) SendReportUpdatedEmail(ctx context.Context, userID uuid.UUID, email, appNumber string) {
+	if strings.TrimSpace(email) == "" {
+		return
+	}
+	body := fmt.Sprintf(
+		"Başvurunuza ait rapor güncellendi.\n\nBaşvuru no: %s\n\nGüncel raporu hasta panelinden görüntüleyebilirsiniz.\n\nSaygılarımızla",
+		appNumber,
+	)
+	_ = s.SendEmail(ctx, email, "Raporunuz güncellendi", "report_updated", body, &userID)
+}
+
 func (s *Service) SendEmail(ctx context.Context, to, subject, templateKey, body string, userID *uuid.UUID) error {
 	status := "sent"
 	if err := s.em.Send(ctx, to, subject, body); err != nil {

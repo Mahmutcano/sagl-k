@@ -16,6 +16,7 @@ type OtpExpiryBannerProps = {
 };
 
 function resolveDeadline(expiresInSeconds?: number, expiresAt?: string): number {
+  // Prefer absolute backend expiry so back/forward remounts do not restart the timer.
   if (expiresAt) {
     const t = Date.parse(expiresAt);
     if (!Number.isNaN(t)) return t;
@@ -46,7 +47,8 @@ export function OtpExpiryBanner({
     const next = resolveDeadline(expiresInSeconds, expiresAt);
     setDeadline(next);
     setRemaining(Math.max(0, Math.ceil((next - Date.now()) / 1000)));
-  }, [resetKey, expiresInSeconds, expiresAt]);
+    // resetKey bumps only when a new SMS is issued; expiresAt is the source of truth.
+  }, [resetKey, expiresAt]); // eslint-disable-line react-hooks/exhaustive-deps -- expiresInSeconds is fallback only when expiresAt missing
 
   useEffect(() => {
     const id = window.setInterval(() => {

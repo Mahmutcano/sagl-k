@@ -103,7 +103,7 @@ export default function AdminNotificationsPage() {
           </CardContent>
         </Card>
       ) : (
-        <Card className="shadow-md border-slate-200">
+        <Card className=" ">
           <CardContent className="pt-6">
             <Table>
               <TableHeader>
@@ -160,8 +160,8 @@ export default function AdminNotificationsPage() {
           <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
             
             {/* Modal Header */}
-            <div className="flex justify-between items-center p-4 border-b bg-slate-50">
-              <span className="text-sm font-semibold text-slate-700">Bildirim Detayları ve Önizleme</span>
+            <div className="flex justify-between items-center p-4 border-b bg-muted">
+              <span className="text-sm font-semibold text-foreground">Bildirim Detayları ve Önizleme</span>
               <Button onClick={() => setSelectedNotif(null)} variant="ghost" size="sm" className="p-1">
                 <X className="h-5 w-5" />
               </Button>
@@ -171,18 +171,18 @@ export default function AdminNotificationsPage() {
             <div className="p-6 overflow-y-auto flex flex-col gap-4">
               
               {/* Meta Grid */}
-              <div className="grid grid-cols-2 gap-4 text-xs border rounded-lg p-3 bg-slate-50/50">
+              <div className="grid grid-cols-2 gap-4 text-xs border rounded-lg p-3 bg-muted/40">
                 <div>
                   <span className="text-muted-foreground block">Gönderim Kanalı</span>
-                  <span className="font-semibold capitalize text-slate-800">{selectedNotif.channel}</span>
+                  <span className="font-semibold capitalize text-foreground">{selectedNotif.channel}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block">Alıcı</span>
-                  <span className="font-semibold text-slate-800 font-mono">{selectedNotif.recipient}</span>
+                  <span className="font-semibold text-foreground font-mono">{selectedNotif.recipient}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block">Şablon (Template)</span>
-                  <span className="font-semibold text-slate-800 font-mono">{selectedNotif.templateKey || "—"}</span>
+                  <span className="font-semibold text-foreground font-mono">{selectedNotif.templateKey || "—"}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block">Durum</span>
@@ -192,11 +192,11 @@ export default function AdminNotificationsPage() {
                 </div>
                 <div>
                   <span className="text-muted-foreground block">Oluşturulma</span>
-                  <span className="text-slate-700">{new Date(selectedNotif.createdAt).toLocaleString("tr-TR")}</span>
+                  <span className="text-foreground">{new Date(selectedNotif.createdAt).toLocaleString("tr-TR")}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block">Gönderilme</span>
-                  <span className="text-slate-700">{selectedNotif.sentAt ? new Date(selectedNotif.sentAt).toLocaleString("tr-TR") : "—"}</span>
+                  <span className="text-foreground">{selectedNotif.sentAt ? new Date(selectedNotif.sentAt).toLocaleString("tr-TR") : "—"}</span>
                 </div>
               </div>
 
@@ -204,7 +204,7 @@ export default function AdminNotificationsPage() {
               {!!selectedNotif.subject && (
                 <div>
                   <span className="text-xs text-muted-foreground block mb-0.5">Konu / Başlık</span>
-                  <div className="border rounded-md px-3 py-2 bg-slate-50 font-medium text-sm text-slate-800">
+                  <div className="border rounded-md px-3 py-2 bg-muted font-medium text-sm text-foreground">
                     {selectedNotif.subject}
                   </div>
                 </div>
@@ -214,7 +214,7 @@ export default function AdminNotificationsPage() {
               <div>
                 <span className="text-xs text-muted-foreground block mb-1">Mesaj İçeriği</span>
                 <div 
-                  className="border rounded-lg p-4 bg-slate-50 text-sm overflow-x-auto min-h-[120px] max-h-[300px] font-sans text-slate-700 whitespace-pre-wrap"
+                  className="border rounded-lg p-4 bg-muted text-sm overflow-x-auto min-h-[120px] max-h-[300px] font-sans text-foreground whitespace-pre-wrap"
                   style={{ wordBreak: "break-all" }}
                 >
                   {selectedNotif.body || "İçerik bulunamadı."}
@@ -225,7 +225,7 @@ export default function AdminNotificationsPage() {
               {!!selectedNotif.providerResponse && (
                 <div>
                   <span className="text-xs text-muted-foreground block mb-1">Sağlayıcı Yanıtı (Raw API Log)</span>
-                  <pre className="text-[11px] font-mono border rounded-lg p-3 bg-slate-900 text-slate-200 overflow-x-auto max-h-[150px]">
+                  <pre className="text-[11px] font-mono border rounded-lg p-3 bg-foreground text-muted-foreground overflow-x-auto max-h-[150px]">
                     {JSON.stringify(selectedNotif.providerResponse, null, 2)}
                   </pre>
                 </div>
@@ -234,7 +234,7 @@ export default function AdminNotificationsPage() {
             </div>
             
             {/* Footer */}
-            <div className="p-4 border-t bg-slate-50 flex justify-end">
+            <div className="p-4 border-t bg-muted flex justify-end">
               <Button onClick={() => setSelectedNotif(null)} size="sm">
                 Kapat
               </Button>

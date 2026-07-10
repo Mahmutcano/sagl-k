@@ -11,10 +11,21 @@ import {
   TextInput,
 } from "@/components/FormField";
 import { PasswordInput } from "@/components/PasswordInput";
+import { PhoneNumberField } from "@/components/PhoneNumberField";
 import { MessageModal } from "@/components/MessageModal";
 import { OtpExpiryBanner, DEFAULT_OTP_SECONDS } from "@/components/OtpExpiryBanner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { DEFAULT_PHONE_COUNTRY, normalizeNationalNumber } from "@/lib/phone";
 import { type FieldErrors } from "@/lib/validation";
 
 type ProfileData = {
@@ -22,7 +33,9 @@ type ProfileData = {
   firstName: string;
   lastName: string;
   email: string;
+  phoneCountryCode: string;
   phoneNumber: string;
+  patientNumber?: string;
   nationalIdentifier: string;
   dateOfBirth: string;
   gender: number;
@@ -40,6 +53,7 @@ export function ProfileSettings() {
     firstName: "",
     lastName: "",
     email: "",
+    phoneCountryCode: DEFAULT_PHONE_COUNTRY.dial,
     phoneNumber: "",
     nationalIdentifier: "",
     dateOfBirth: "",
@@ -76,7 +90,12 @@ export function ProfileSettings() {
           firstName: data.firstName || "",
           lastName: data.lastName || "",
           email: data.email || "",
-          phoneNumber: data.phoneNumber || "",
+          phoneCountryCode: data.phoneCountryCode || DEFAULT_PHONE_COUNTRY.dial,
+          phoneNumber: normalizeNationalNumber(
+            data.phoneNumber || "",
+            data.phoneCountryCode || DEFAULT_PHONE_COUNTRY.dial
+          ),
+          patientNumber: data.patientNumber || "",
           nationalIdentifier: data.nationalIdentifier || "",
           dateOfBirth: data.dateOfBirth || "",
           gender: data.gender || 0,
@@ -118,7 +137,8 @@ export function ProfileSettings() {
             lastName: form.lastName,
             email: form.email,
             nationalIdentifier: form.nationalIdentifier,
-            phoneNumber: form.phoneNumber,
+            phoneCountryCode: form.phoneCountryCode,
+            phoneNumber: normalizeNationalNumber(form.phoneNumber, form.phoneCountryCode),
             dateOfBirth: form.dateOfBirth ? form.dateOfBirth : null,
             gender: form.gender ? form.gender : null,
           }),
@@ -243,7 +263,7 @@ export function ProfileSettings() {
 
       <div className="flex flex-col gap-6">
         {/* Personal Details Card */}
-        <Card className="large-form shadow-md border-slate-200">
+        <Card className=" ">
           <form onSubmit={handleProfileSubmit} noValidate>
             <CardHeader>
               <CardTitle>Kişisel Bilgiler</CardTitle>
@@ -251,7 +271,13 @@ export function ProfileSettings() {
                 Ad, soyad, e-posta, T.C. Kimlik numarası ve iletişim bilgilerinizi buradan güncelleyebilirsiniz.
               </CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
+            <CardContent className="grid gap-4">
+              {form.patientNumber ? (
+                <div className="rounded-lg border bg-muted/40 px-3 py-2 text-sm">
+                  <span className="text-muted-foreground">Hasta No: </span>
+                  <span className="font-mono font-semibold tracking-wide">{form.patientNumber}</span>
+                </div>
+              ) : null}
               <TextInput
                 id="firstName"
                 label="Ad"
@@ -281,13 +307,13 @@ export function ProfileSettings() {
                 onChange={(e) => updateField("nationalIdentifier", e.target.value)}
                 error={fields.nationalIdentifier}
               />
-              <TextInput
-                id="phoneNumber"
-                label="Telefon Numarası"
-                hint="Değiştirildiğinde SMS doğrulaması gerekecektir."
-                value={form.phoneNumber}
-                onChange={(e) => updateField("phoneNumber", e.target.value)}
+              <PhoneNumberField
+                countryDial={form.phoneCountryCode}
+                nationalNumber={form.phoneNumber}
+                onCountryChange={(dial) => updateField("phoneCountryCode", dial)}
+                onNationalChange={(n) => updateField("phoneNumber", n)}
                 error={fields.phoneNumber}
+                hint="Değiştirildiğinde SMS doğrulaması gerekecektir."
               />
               <FormSelect
                 id="gender"
@@ -308,8 +334,8 @@ export function ProfileSettings() {
                 fieldClassName="sm:col-span-2"
               />
             </CardContent>
-            <CardFooter className="border-t flex justify-end">
-              <Button type="submit" disabled={saving}>
+            <CardFooter className="mt-2 flex justify-end border-t pt-4 sm:mt-4">
+              <Button type="submit" disabled={saving} className="w-full sm:w-auto">
                 {saving ? "Kaydediliyor..." : "Bilgileri Kaydet"}
               </Button>
             </CardFooter>
@@ -317,7 +343,7 @@ export function ProfileSettings() {
         </Card>
 
         {/* Password Card */}
-        <Card className="large-form shadow-md border-slate-200">
+        <Card className=" ">
           <form onSubmit={handlePasswordSubmit} noValidate>
             <CardHeader>
               <CardTitle>Şifre İşlemleri</CardTitle>
@@ -346,8 +372,8 @@ export function ProfileSettings() {
                 onChange={(e) => setNewPassword(e.target.value)}
               />
             </CardContent>
-            <CardFooter className="border-t flex justify-end">
-              <Button type="submit" variant="secondary" disabled={saving}>
+            <CardFooter className="mt-2 flex justify-end border-t pt-4 sm:mt-4">
+              <Button type="submit" variant="secondary" disabled={saving} className="w-full sm:w-auto">
                 {saving ? "Değiştiriliyor..." : "Şifreyi Değiştir"}
               </Button>
             </CardFooter>
@@ -355,54 +381,51 @@ export function ProfileSettings() {
         </Card>
       </div>
 
-      {/* OTP Verification Modal */}
-      {showOtpModal ? (
-        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-md large-form shadow-2xl border-slate-200">
-            <form onSubmit={handleVerifyOtp} noValidate>
-              <CardHeader>
-                <CardTitle>SMS Doğrulama</CardTitle>
-                <CardDescription>
-                  Lütfen yeni telefon numaranıza gönderilen 6 haneli güvenlik doğrulama kodunu girin.
-                  Kod sınırlı süre geçerlidir.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                {otpError ? <p className="text-sm text-destructive font-medium">{otpError}</p> : null}
+      <Dialog open={showOtpModal} onOpenChange={(open) => !open && setShowOtpModal(false)}>
+        <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+          <form onSubmit={handleVerifyOtp} noValidate className="grid gap-4">
+            <DialogHeader>
+              <DialogTitle>SMS Doğrulama</DialogTitle>
+              <DialogDescription>
+                Lütfen yeni telefon numaranıza gönderilen 6 haneli güvenlik doğrulama kodunu girin.
+                Kod sınırlı süre geçerlidir.
+              </DialogDescription>
+            </DialogHeader>
 
-                <OtpExpiryBanner
-                  expiresInSeconds={otpExpiresIn}
-                  expiresAt={otpExpiresAt || undefined}
-                  resetKey={otpResetKey}
-                  onExpired={() => setOtpExpired(true)}
-                />
+            {otpError ? <p className="text-sm font-medium text-destructive">{otpError}</p> : null}
 
-                <FormField id="otpCode" label="Doğrulama Kodu">
-                  <input
-                    id="otpCode"
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    placeholder="123456"
-                    disabled={otpExpired}
-                    className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-center text-xl font-bold tracking-widest placeholder:text-muted-foreground placeholder:tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
-                  />
-                </FormField>
-              </CardContent>
-              <CardFooter className="border-t flex gap-2 justify-end">
-                <Button type="submit" disabled={verifyingOtp || otpExpired}>
-                  {verifyingOtp ? "Doğrulanıyor..." : "Numarayı Doğrula"}
-                </Button>
-                <Button type="button" variant="ghost" onClick={() => setShowOtpModal(false)}>
-                  İptal
-                </Button>
-              </CardFooter>
-            </form>
-          </Card>
-        </div>
-      ) : null}
+            <OtpExpiryBanner
+              expiresInSeconds={otpExpiresIn}
+              expiresAt={otpExpiresAt || undefined}
+              resetKey={otpResetKey}
+              onExpired={() => setOtpExpired(true)}
+            />
+
+            <FormField id="otpCode" label="Doğrulama Kodu">
+              <Input
+                id="otpCode"
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                placeholder="123456"
+                disabled={otpExpired}
+                className="text-center text-xl font-bold tracking-widest"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+              />
+            </FormField>
+
+            <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
+              <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={() => setShowOtpModal(false)}>
+                İptal
+              </Button>
+              <Button type="submit" className="w-full sm:w-auto" disabled={verifyingOtp || otpExpired}>
+                {verifyingOtp ? "Doğrulanıyor..." : "Numarayı Doğrula"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

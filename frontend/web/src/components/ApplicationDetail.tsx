@@ -28,7 +28,6 @@ import { FormAlert } from "@/components/FormField";
 import { ApplicationPreviewPanel } from "@/components/ApplicationPreviewPanel";
 import { PatientReportPanel } from "@/components/PatientReportPanel";
 import { ApplicationFlowSteps } from "@/components/ApplicationFlowSteps";
-import { ApplicationChat } from "@/modules/chat/ApplicationChat";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -176,16 +175,9 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
         </Button>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {isPatientEditableStatus(app.statusCode) ? (
-            <>
-              <Button variant="outline" size="sm" asChild>
-                <Link href={ROUTES.patient.editApplication(id, "details")}>
-                  Bölüm / doktor
-                </Link>
-              </Button>
-              <Button size="sm" asChild>
-                <Link href={ROUTES.patient.editApplication(id)}>Başvuruya devam et</Link>
-              </Button>
-            </>
+            <Button size="sm" asChild>
+              <Link href={ROUTES.patient.editApplication(id)}>Başvuruya devam et</Link>
+            </Button>
           ) : null}
           {isPatientCancellableStatus(app.statusCode) ? (
             <Button variant="destructive" size="sm" type="button" onClick={cancelApplication}>
@@ -370,12 +362,6 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
           </CardContent>
         </Card>
       ) : null}
-
-      <ApplicationChat
-        applicationId={id}
-        token={token}
-        enabled={app.statusCode >= 1 && !isConcludedStatus(app.statusCode)}
-      />
 
       <ConfirmModal
         isOpen={isConfirmOpen}

@@ -9,15 +9,20 @@ import { ApiError, api } from "@/lib/api";
 import { API } from "@/lib/endpoints";
 import {
   hasErrors,
-  normalizePhoneTR,
   validateOTP,
   validatePassword,
-  validatePhoneTR,
   type FieldErrors,
 } from "@/lib/validation";
+import {
+  DEFAULT_PHONE_COUNTRY,
+  formatPhoneDisplay,
+  normalizeNationalNumber,
+  validateNationalPhone,
+} from "@/lib/phone";
 import { AuthShell } from "@/components/AuthShell";
 import { FormAlert, TextInput } from "@/components/FormField";
 import { PasswordInput } from "@/components/PasswordInput";
+import { PhoneNumberField } from "@/components/PhoneNumberField";
 import { OtpExpiryBanner, DEFAULT_OTP_SECONDS } from "@/components/OtpExpiryBanner";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,9 +33,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
 export default function ForgotPasswordPage() {
   const router = useRouter();
   const [step, setStep] = useState<"phone" | "reset">("phone");
+  const [phoneCountryCode, setPhoneCountryCode] = useState(DEFAULT_PHONE_COUNTRY.dial);
   const [phoneNumber, setPhoneNumber] = useState("");
   const [code, setCode] = useState("");
   const [mockSmsCode, setMockSmsCode] = useState("");
@@ -38,31 +45,56 @@ export default function ForgotPasswordPage() {
   const [otpExpiresAt, setOtpExpiresAt] = useState("");
   const [otpResetKey, setOtpResetKey] = useState(0);
   const [otpExpired, setOtpExpired] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
   const [password, setPassword] = useState("");
   const [fields, setFields] = useState<FieldErrors>({});
   const [formError, setFormError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const pendingOtpValid =
+    otpSent &&
+    !!otpExpiresAt &&
+    !Number.isNaN(Date.parse(otpExpiresAt)) &&
+    Date.parse(otpExpiresAt) > Date.now() &&
+    !otpExpired;
+
+  function canonicalPhone() {
+    return normalizeNationalNumber(phoneNumber, phoneCountryCode);
+  }
+
   async function handleInitiate(e: React.FormEvent) {
     e.preventDefault();
     setFormError("");
     const f: FieldErrors = {};
-    const phoneErr = validatePhoneTR(phoneNumber);
+    const phoneErr = validateNationalPhone(phoneCountryCode, phoneNumber);
     if (phoneErr) f.phoneNumber = phoneErr;
     setFields(f);
     if (hasErrors(f)) return;
 
     setLoading(true);
     try {
-      const res = await api<{ sent?: boolean; code?: string; expiresInSeconds?: number; expiresAt?: string }>(API.auth.forgotInitiate, {
+      const res = await api<{
+        sent?: boolean;
+        code?: string;
+        expiresInSeconds?: number;
+        expiresAt?: string;
+      }>(API.auth.forgotInitiate, {
         method: "POST",
-        body: JSON.stringify({ phoneNumber: normalizePhoneTR(phoneNumber) }),
+        body: JSON.stringify({
+          phoneCountryCode,
+          phoneNumber: canonicalPhone(),
+        }),
       });
       setMockSmsCode(res?.code?.trim() ?? "");
-      setOtpExpiresIn(res?.expiresInSeconds && res.expiresInSeconds > 0 ? res.expiresInSeconds : DEFAULT_OTP_SECONDS);
+      setOtpExpiresIn(
+        res?.expiresInSeconds && res.expiresInSeconds > 0
+          ? res.expiresInSeconds
+          : DEFAULT_OTP_SECONDS
+      );
       setOtpExpiresAt(res?.expiresAt ?? "");
       setOtpResetKey((k) => k + 1);
       setOtpExpired(false);
+      setOtpSent(true);
       setCode("");
       setPassword("");
       setStep("reset");
@@ -92,7 +124,8 @@ export default function ForgotPasswordPage() {
       await api(API.auth.forgotComplete, {
         method: "POST",
         body: JSON.stringify({
-          phoneNumber: normalizePhoneTR(phoneNumber),
+          phoneCountryCode,
+          phoneNumber: canonicalPhone(),
           code,
           password,
         }),
@@ -111,12 +144,14 @@ export default function ForgotPasswordPage() {
   if (step === "reset") {
     return (
       <AuthShell>
-        <Card className="large-form w-full shadow-premium-lg">
+        <Card className="w-full">
           <CardHeader>
             <CardTitle>Yeni şifre</CardTitle>
             <CardDescription>
-              <span className="font-medium">{normalizePhoneTR(phoneNumber)}</span> numarasına
-              gönderilen kodu ve yeni şifrenizi girin. Kod sınırlı süre geçerlidir.
+              <span className="font-medium">
+                {formatPhoneDisplay(phoneCountryCode, phoneNumber)}
+              </span>{" "}
+              numarasına gönderilen kodu ve yeni şifrenizi girin.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -153,13 +188,24 @@ export default function ForgotPasswordPage() {
               {mockSmsCode ? (
                 <p className="rounded-md border border-dashed border-amber-500/50 bg-amber-50 px-3 py-2 text-center text-sm text-amber-950">
                   Test SMS kodu:{" "}
-                  <span className="font-mono text-base font-semibold tracking-widest">{mockSmsCode}</span>
+                  <span className="font-mono text-base font-semibold tracking-widest">
+                    {mockSmsCode}
+                  </span>
                 </p>
               ) : null}
             </form>
           </CardContent>
           <CardFooter className="border-t">
-            <Button variant="link" size="sm" onClick={() => setStep("phone")}>
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => {
+                setStep("phone");
+                setCode("");
+                setFormError("");
+                setFields({});
+              }}
+            >
               Telefonu değiştir
             </Button>
           </CardFooter>
@@ -170,7 +216,7 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthShell>
-      <Card className="large-form w-full shadow-premium-lg">
+      <Card className="w-full">
         <CardHeader>
           <CardTitle>Şifremi unuttum</CardTitle>
           <CardDescription>Kayıtlı cep telefonunuza doğrulama kodu gönderilir.</CardDescription>
@@ -178,14 +224,25 @@ export default function ForgotPasswordPage() {
         <CardContent>
           <form onSubmit={handleInitiate} className="flex flex-col gap-4" noValidate>
             {formError ? <FormAlert title="Hata" message={formError} /> : null}
-            <TextInput
-              id="phoneNumber"
-              label="Cep telefonu"
-              placeholder="5XX XXX XX XX"
-              inputMode="tel"
-              autoComplete="tel"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
+            {pendingOtpValid ? (
+              <div className="rounded-xl border border-primary/20 bg-primary/[0.04] px-4 py-3 text-sm">
+                <p className="font-medium">Aktif doğrulama kodunuzun süresi devam ediyor.</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  onClick={() => setStep("reset")}
+                >
+                  Doğrulamaya devam et
+                </Button>
+              </div>
+            ) : null}
+            <PhoneNumberField
+              countryDial={phoneCountryCode}
+              nationalNumber={phoneNumber}
+              onCountryChange={setPhoneCountryCode}
+              onNationalChange={setPhoneNumber}
               error={fields.phoneNumber}
             />
             <Button type="submit" className="w-full" disabled={loading}>
@@ -195,7 +252,7 @@ export default function ForgotPasswordPage() {
         </CardContent>
         <CardFooter className="border-t">
           <Button variant="link" size="sm" asChild>
-            <Link href="/login">Girişe dön</Link>
+            <Link href={ROUTES.patient.login}>Girişe dön</Link>
           </Button>
         </CardFooter>
       </Card>

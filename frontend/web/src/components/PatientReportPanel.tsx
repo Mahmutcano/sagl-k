@@ -144,7 +144,7 @@ export function PatientReportPanel({ applicationId, token, report, reportLoading
   }
 
   return (
-    <Card className="border-primary/20 shadow-md overflow-hidden">
+    <Card className="border-primary/20 overflow-hidden">
       <CardHeader className="border-b bg-muted/30">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

@@ -198,7 +198,7 @@ export function PaymentReceiptCard({ receipt, fallbackApplicationNumber, showPri
                   key={row.label}
                   className={`flex items-start justify-between gap-4 py-2 ${
                     index < rows.length - 1 ? "border-b border-dashed border-border print:border-black" : ""
-                  }`}
+                 }`}
                 >
                   <span className="shrink-0 text-xs text-muted-foreground print:text-black">
                     {row.label}

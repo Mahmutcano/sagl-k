@@ -21,8 +21,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Layers, Plus, X, Search, ChevronLeft, ChevronRight } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Edit, Layers, Plus, Search, X, ChevronLeft, ChevronRight } from "lucide-react";
 
 type Profession = {
   id: string;
@@ -40,6 +39,8 @@ type Hospital = {
   code: string;
 };
 
+const NO_HOSPITAL = "_none";
+
 export default function AdminDepartmentsPage() {
   const router = useRouter();
   const [professions, setProfessions] = useState<Profession[]>([]);
@@ -48,20 +49,21 @@ export default function AdminDepartmentsPage() {
   const [error, setError] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  // Pagination & Filtering
   const [page, setPage] = useState(0);
   const [pageSize] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
   const [searchText, setSearchText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [hospitalFilter, setHospitalFilter] = useState("");
 
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     code: "",
     name: "",
     targetInstitution: 1,
     hospitalId: "",
+    isActive: true,
   });
   const [fields, setFields] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
@@ -83,13 +85,19 @@ export default function AdminDepartmentsPage() {
       api<Hospital[]>(API.admin.hospitals, {}, token),
     ])
       .then(([p, h]) => {
-        setProfessions(p?.items ?? []);
+        let items = p?.items ?? [];
+        if (hospitalFilter === NO_HOSPITAL) {
+          items = items.filter((x) => !x.hospitalId);
+        } else if (hospitalFilter) {
+          items = items.filter((x) => x.hospitalId === hospitalFilter);
+        }
+        setProfessions(items);
         setTotalCount(p?.totalCount ?? 0);
         setHospitals(h ?? []);
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Veriler yüklenemedi."))
       .finally(() => setLoading(false));
-  }, [page, pageSize, searchQuery]);
+  }, [page, pageSize, searchQuery, hospitalFilter]);
 
   useEffect(() => {
     const token = getToken();
@@ -102,20 +110,23 @@ export default function AdminDepartmentsPage() {
     loadData();
   }, [router, loadData]);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(0);
-    setSearchQuery(searchText);
-  };
-
-  const handleClearFilters = () => {
-    setSearchText("");
-    setSearchQuery("");
-    setPage(0);
-  };
-
   function handleOpenAdd() {
-    setForm({ code: "", name: "", targetInstitution: 1, hospitalId: "" });
+    setEditingId(null);
+    setForm({ code: "", name: "", targetInstitution: 1, hospitalId: "", isActive: true });
+    setFields({});
+    setFormError("");
+    setIsModalOpen(true);
+  }
+
+  function handleOpenEdit(p: Profession) {
+    setEditingId(p.id);
+    setForm({
+      code: p.code,
+      name: p.name,
+      targetInstitution: p.targetInstitution || 1,
+      hospitalId: p.hospitalId || "",
+      isActive: p.isActive !== false,
+    });
     setFields({});
     setFormError("");
     setIsModalOpen(true);
@@ -137,72 +148,118 @@ export default function AdminDepartmentsPage() {
     if (!token) return;
     setSaving(true);
 
+    const body = {
+      code: form.code.trim(),
+      name: form.name.trim(),
+      targetInstitution: form.targetInstitution,
+      hospitalId: form.hospitalId || "",
+      isActive: form.isActive,
+    };
+
     try {
-      await api(
-        API.admin.createProfession,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            code: form.code.trim(),
-            name: form.name.trim(),
-            targetInstitution: form.targetInstitution,
-            hospitalId: form.hospitalId || undefined,
-          }),
-        },
-        token
-      );
-      setSuccessMsg("Klinik bölüm/branş başarıyla oluşturuldu.");
+      if (editingId) {
+        await api(API.admin.professionUpdate(editingId), { method: "PUT", body: JSON.stringify(body) }, token);
+        setSuccessMsg("Klinik bölüm/branş güncellendi.");
+      } else {
+        await api(API.admin.createProfession, { method: "POST", body: JSON.stringify(body) }, token);
+        setSuccessMsg("Klinik bölüm/branş oluşturuldu.");
+      }
       setIsModalOpen(false);
       loadData();
       setTimeout(() => setSuccessMsg(""), 4000);
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Bölüm oluşturulamadı.");
+      if (err instanceof ApiError) {
+        if (Object.keys(err.fields).length > 0) setFields(err.fields);
+        setFormError(err.message);
+      } else {
+        setFormError(editingId ? "Bölüm güncellenemedi." : "Bölüm oluşturulamadı.");
+      }
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <AdminAppShell title="Bölüm & Branş Yönetimi" description="Uzman hekimlerin bağlı olduğu klinik branşları ve hastane ilişkilerini yapılandırın">
+    <AdminAppShell
+      title="Bölüm & Branş Yönetimi"
+      description="Uzman hekimlerin bağlı olduğu klinik branşları ve hastane ilişkilerini yapılandırın"
+    >
       {error ? <FormAlert title="Hata" message={error} /> : null}
       {successMsg ? (
-        <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl p-4 text-xs font-semibold mb-6 flex justify-between items-center shadow-sm">
+        <div className="mb-6 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-semibold text-emerald-800 shadow-sm">
           <span>{successMsg}</span>
-          <button onClick={() => setSuccessMsg("")} className="text-emerald-600 hover:text-emerald-800">
+          <button type="button" onClick={() => setSuccessMsg("")} className="text-emerald-600 hover:text-emerald-800">
             <X className="h-4 w-4" />
           </button>
         </div>
       ) : null}
 
-      <div className="mb-4 flex min-w-0 flex-col justify-between gap-3 print:hidden md:mb-6 md:flex-row md:items-end">
-        {/* Premium Filter Area */}
-        <form onSubmit={handleSearchSubmit} className="admin-filter-bar min-w-0 flex-grow rounded-xl border border-slate-200/80 bg-white p-3 shadow-premium sm:rounded-2xl sm:p-5">
-          <div className="sm:col-span-2 flex flex-col gap-1.5">
-            <label htmlFor="search" className="text-xs font-bold text-slate-700 tracking-wide">Arama</label>
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                id="search"
-                className="pl-10 h-10 border-slate-200 focus-visible:ring-primary/20 focus-visible:border-primary bg-white rounded-xl shadow-inner-sm"
-                placeholder="Bölüm adı veya kod yazın..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-              />
+      <div className="mb-4 flex min-w-0 flex-col justify-between gap-3 md:mb-6 md:flex-row md:items-end">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setPage(0);
+            setSearchQuery(searchText);
+          }}
+          className="admin-filter-bar min-w-0 flex-grow space-y-3 rounded-xl border bg-white p-3 sm:rounded-2xl sm:p-4"
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label htmlFor="search" className="text-xs font-semibold">
+                Arama
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="search"
+                  className="h-10 rounded-xl pl-9"
+                  placeholder="Bölüm adı veya kod"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                />
+              </div>
             </div>
+            <FormSelect
+              id="hospitalFilter"
+              label="Hastane"
+              value={hospitalFilter || undefined}
+              onChange={(e) => {
+                setPage(0);
+                setHospitalFilter(e.target.value);
+              }}
+              placeholder="Tüm hastaneler"
+              options={[
+                { value: NO_HOSPITAL, label: "Genel / Bağımsız" },
+                ...hospitals.map((h) => ({ value: h.id, label: h.name })),
+              ]}
+            />
           </div>
-          <div className="flex gap-2.5 justify-end mt-1">
-            <Button type="button" variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 font-bold hover:bg-slate-100 rounded-xl">
-              Temizle
-            </Button>
-            <Button type="submit" size="sm" className="h-9 gap-1.5 font-bold shadow-md shadow-primary/10 rounded-xl px-5">
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" size="sm" className="h-9 gap-1.5 rounded-xl px-4 font-semibold">
               <Search className="h-4 w-4" />
               Ara
             </Button>
+            {(searchQuery || searchText || hospitalFilter) && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-9 rounded-xl"
+                onClick={() => {
+                  setSearchText("");
+                  setSearchQuery("");
+                  setHospitalFilter("");
+                  setPage(0);
+                }}
+              >
+                Temizle
+              </Button>
+            )}
           </div>
         </form>
 
-        <Button onClick={handleOpenAdd} className="gap-1.5 shadow-md shadow-primary/10 h-10 self-end font-bold rounded-xl px-5">
-          <Plus className="h-4.5 w-4.5" />
+        <Button onClick={handleOpenAdd} className="h-10 gap-1.5 self-end rounded-xl px-5 font-bold">
+          <Plus className="h-4 w-4" />
           Branş Ekle
         </Button>
       </div>
@@ -213,41 +270,67 @@ export default function AdminDepartmentsPage() {
           <Skeleton className="h-10 w-full rounded-xl" />
         </div>
       ) : professions.length === 0 ? (
-        <p className="p-12 text-center text-sm text-slate-500 italic bg-white rounded-2xl border border-dashed shadow-sm">
+        <p className="rounded-2xl border border-dashed bg-white p-12 text-center text-sm italic text-muted-foreground shadow-sm">
           Tanımlı klinik bölüm bulunamadı.
         </p>
       ) : (
         <div className="flex flex-col gap-4">
-          <Card className="shadow-premium overflow-hidden rounded-xl border-slate-200/80 bg-white/95 sm:rounded-2xl">
-            <CardHeader className="border-b bg-slate-50/50 px-3 py-3 sm:px-6 sm:py-5">
-              <CardTitle className="flex items-center gap-2 text-sm font-bold text-slate-800 sm:text-base">
+          <Card className="overflow-hidden rounded-xl bg-white/95 sm:rounded-2xl">
+            <CardHeader className="border-b bg-muted/40 px-3 py-3 sm:px-6 sm:py-5">
+              <CardTitle className="flex items-center gap-2 text-sm font-bold sm:text-base">
                 <Layers className="h-5 w-5 text-primary" />
                 Bölümler & Klinik Branşlar
               </CardTitle>
-              <CardDescription className="text-xs">Sistemdeki aktif klinik çalışma alanları</CardDescription>
+              <CardDescription className="text-xs">Sistemdeki klinik çalışma alanları</CardDescription>
             </CardHeader>
             <CardContent className="admin-table-scroll p-0">
               <Table>
-                <TableHeader className="bg-slate-50/30">
+                <TableHeader className="bg-muted/30">
                   <TableRow>
-                    <TableHead className="w-12 text-center py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">#</TableHead>
-                    <TableHead className="py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Bölüm Adı</TableHead>
-                    <TableHead className="py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Kod</TableHead>
-                    <TableHead className="py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Bağlı Hastane</TableHead>
-                    <TableHead className="py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Hedef Kurum</TableHead>
-                    <TableHead className="py-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Durum</TableHead>
+                    <TableHead className="py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Bölüm Adı
+                    </TableHead>
+                    <TableHead className="py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Kod
+                    </TableHead>
+                    <TableHead className="py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Hastane
+                    </TableHead>
+                    <TableHead className="py-3 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Durum
+                    </TableHead>
+                    <TableHead className="py-3 text-right text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      İşlem
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {professions.map((p, i) => (
-                    <TableRow key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                      <TableCell className="text-center font-mono text-xs text-slate-400 py-4">{page * pageSize + i + 1}</TableCell>
-                      <TableCell className="font-semibold text-slate-800 py-4">{p.name}</TableCell>
-                      <TableCell className="py-4"><Badge variant="outline" className="font-mono text-xs font-semibold">{p.code}</Badge></TableCell>
-                      <TableCell className="text-slate-600 py-4 text-xs font-semibold">{p.hospitalName || "Genel / Bağımsız"}</TableCell>
-                      <TableCell className="font-mono text-xs text-slate-500 py-4">{p.targetInstitution}</TableCell>
+                  {professions.map((p) => (
+                    <TableRow key={p.id} className="hover:bg-muted/40">
+                      <TableCell className="py-4 font-semibold">{p.name}</TableCell>
                       <TableCell className="py-4">
-                        <Badge variant="default">Aktif</Badge>
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {p.code}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-4 text-xs text-muted-foreground">
+                        {p.hospitalName || "Genel / Bağımsız"}
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <Badge variant={p.isActive ? "default" : "secondary"}>
+                          {p.isActive ? "Aktif" : "Pasif"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-4 text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 rounded-full p-0"
+                          onClick={() => handleOpenEdit(p)}
+                          aria-label="Düzenle"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -256,10 +339,9 @@ export default function AdminDepartmentsPage() {
             </CardContent>
           </Card>
 
-          {/* Premium Pagination */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50 border border-slate-200/50 rounded-2xl px-6 py-4 mt-2 shadow-sm">
-            <div className="text-xs font-semibold text-slate-500 tracking-wide font-sans">
-              Toplam <span className="text-primary font-bold">{totalCount}</span> branştan <span className="text-slate-800 font-bold">{page * pageSize + 1} - {Math.min((page + 1) * pageSize, totalCount)}</span> arası gösteriliyor
+          <div className="mt-2 flex flex-col items-center justify-between gap-4 rounded-2xl border bg-muted/40 px-6 py-4 sm:flex-row">
+            <div className="text-xs font-semibold text-muted-foreground">
+              Toplam <span className="font-bold text-primary">{totalCount}</span> branş
             </div>
             <div className="flex items-center gap-1.5">
               <Button
@@ -267,47 +349,17 @@ export default function AdminDepartmentsPage() {
                 size="sm"
                 disabled={page === 0}
                 onClick={() => setPage((p) => p - 1)}
-                className="h-8 w-8 p-0 rounded-lg border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-all duration-150"
+                className="h-8 w-8 rounded-lg p-0"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              
-              <div className="flex items-center gap-1">
-                {(() => {
-                  const totalPages = Math.ceil(totalCount / pageSize);
-                  const pages = [];
-                  const startPage = Math.max(0, page - 1);
-                  const endPage = Math.min(totalPages - 1, page + 1);
-
-                  for (let i = startPage; i <= endPage; i++) {
-                    const active = i === page;
-                    pages.push(
-                      <Button
-                        key={i}
-                        variant={active ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setPage(i)}
-                        className={cn(
-                          "h-8 min-w-[32px] px-2 text-xs font-bold rounded-lg transition-all duration-150",
-                          active 
-                            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/10" 
-                            : "border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
-                        )}
-                      >
-                        {i + 1}
-                      </Button>
-                    );
-                  }
-                  return pages;
-                })()}
-              </div>
-
+              <span className="px-2 text-xs font-bold">{page + 1}</span>
               <Button
                 variant="outline"
                 size="sm"
                 disabled={(page + 1) * pageSize >= totalCount}
                 onClick={() => setPage((p) => p + 1)}
-                className="h-8 w-8 p-0 rounded-lg border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-all duration-150"
+                className="h-8 w-8 rounded-lg p-0"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -316,36 +368,35 @@ export default function AdminDepartmentsPage() {
         </div>
       )}
 
-      {/* Department Add Modal Overlay */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-md shadow-2xl border-slate-200 bg-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <Card className="w-full max-w-md bg-white shadow-2xl">
             <form onSubmit={handleSubmit} noValidate>
               <CardHeader className="relative border-b pb-4">
-                <CardTitle className="text-base text-slate-800 font-bold">
-                  Bölüm (Branş) Ekle
+                <CardTitle className="text-base font-bold">
+                  {editingId ? "Bölüm Düzenle" : "Bölüm (Branş) Ekle"}
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Hastaneye bağlı veya genel klinik bölüm/branş tanımlayın.
+                  Hastaneye bağlı veya genel klinik bölüm tanımlayın.
                 </CardDescription>
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-4 top-4 p-1 rounded-full hover:bg-slate-200"
+                  className="absolute right-4 top-4 rounded-full p-1"
                   onClick={() => setIsModalOpen(false)}
                 >
                   <X className="h-5 w-5" />
                 </Button>
               </CardHeader>
 
-              <CardContent className="pt-6 flex flex-col gap-4">
+              <CardContent className="flex flex-col gap-4 pt-6">
                 {formError ? <FormAlert title="Hata" message={formError} /> : null}
 
                 <TextInput
                   id="name"
                   label="Branş Adı"
-                  placeholder="Örn: Kardiyoloji veya Göz Hastalıkları"
+                  placeholder="Örn: Kardiyoloji"
                   value={form.name}
                   onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                   error={fields.name}
@@ -354,10 +405,11 @@ export default function AdminDepartmentsPage() {
                 <TextInput
                   id="code"
                   label="Branş Kodu"
-                  placeholder="Örn: kardiyoloji veya goz"
+                  placeholder="Örn: kardiyoloji"
                   value={form.code}
                   onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
                   error={fields.code}
+                  disabled={!!editingId}
                 />
 
                 <TextInput
@@ -373,20 +425,46 @@ export default function AdminDepartmentsPage() {
 
                 <FormSelect
                   id="hospitalId"
-                  label="Bağlı Olduğu Hastane (İsteğe bağlı)"
-                  placeholder="Genel / Hastaneden bağımsız"
-                  value={form.hospitalId}
-                  onChange={(e) => setForm((f) => ({ ...f, hospitalId: e.target.value }))}
-                  options={hospitals.map((h) => ({ value: h.id, label: h.name }))}
+                  label="Bağlı Olduğu Hastane"
+                  placeholder="Genel / Bağımsız"
+                  value={form.hospitalId || NO_HOSPITAL}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      hospitalId: e.target.value === NO_HOSPITAL ? "" : e.target.value,
+                    }))
+                  }
+                  options={[
+                    { value: NO_HOSPITAL, label: "Genel / Bağımsız" },
+                    ...hospitals.map((h) => ({ value: h.id, label: h.name })),
+                  ]}
                 />
+
+                {editingId ? (
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={form.isActive}
+                      onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
+                    />
+                    Aktif
+                  </label>
+                ) : null}
               </CardContent>
 
-              <CardFooter className="border-t pt-4 flex gap-2 justify-end bg-slate-50/50">
-                <Button type="button" variant="outline" size="sm" onClick={() => setIsModalOpen(false)} disabled={saving} className="font-bold rounded-xl">
+              <CardFooter className="flex justify-end gap-2 border-t bg-muted/40 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsModalOpen(false)}
+                  disabled={saving}
+                  className="rounded-xl font-bold"
+                >
                   İptal
                 </Button>
-                <Button type="submit" size="sm" disabled={saving} className="font-bold rounded-xl">
-                  {saving ? "Kaydediliyor..." : "Kaydet"}
+                <Button type="submit" size="sm" disabled={saving} className="rounded-xl font-bold">
+                  {saving ? "Kaydediliyor..." : editingId ? "Güncelle" : "Kaydet"}
                 </Button>
               </CardFooter>
             </form>

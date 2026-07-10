@@ -110,7 +110,7 @@ export function PortalLogin({ area }: { area: AppArea }) {
   return (
     <AuthShell badge={cfg.badge}>
       <div className="flex w-full flex-col gap-4">
-        <Card className="w-full overflow-hidden rounded-2xl border-slate-200/60 bg-card/85 shadow-premium-lg backdrop-blur-md">
+        <Card className="w-full overflow-hidden rounded-2xl /60 bg-card/85 backdrop-blur-md">
           <CardHeader className="space-y-1.5 px-5 pb-4 pt-6 sm:px-6">
             <CardTitle className="text-center text-xl font-bold tracking-tight sm:text-2xl">
               {cfg.title}
@@ -123,17 +123,31 @@ export function PortalLogin({ area }: { area: AppArea }) {
             <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
               {formError ? <FormAlert title="Giriş yapılamadı" message={formError} /> : null}
 
-              <FormField id="nationalIdentifier" label="TC Kimlik No" error={fields.nationalIdentifier}>
+              <FormField
+                id="nationalIdentifier"
+                label={area === "patient" ? "TC Kimlik No / Pasaport No" : "TC Kimlik No"}
+                error={fields.nationalIdentifier}
+              >
                 <Input
                   id="nationalIdentifier"
-                  inputMode="numeric"
+                  inputMode={area === "patient" ? "text" : "numeric"}
                   autoComplete="username"
-                  maxLength={11}
+                  maxLength={area === "patient" ? 20 : 11}
                   required
                   value={nationalId}
-                  onChange={(e) => setNationalId(e.target.value)}
-                  className="h-12 border-slate-200 bg-white text-base focus-visible:border-primary focus-visible:ring-primary sm:h-11 sm:text-sm"
-                  placeholder="11 haneli TC kimlik numaranız"
+                  onChange={(e) =>
+                    setNationalId(
+                      area === "patient"
+                        ? e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase().slice(0, 20)
+                        : e.target.value.replace(/\D/g, "").slice(0, 11)
+                    )
+                  }
+                  className="h-12 bg-white text-base focus-visible:border-primary focus-visible:ring-primary sm:h-11 sm:text-sm"
+                  placeholder={
+                    area === "patient"
+                      ? "TC kimlik veya pasaport numaranız"
+                      : "11 haneli TC kimlik numaranız"
+                  }
                 />
               </FormField>
 
@@ -145,7 +159,7 @@ export function PortalLogin({ area }: { area: AppArea }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 error={fields.password}
-                className="h-12 border-slate-200 bg-white text-base focus-visible:border-primary focus-visible:ring-primary sm:h-11 sm:text-sm"
+                className="h-12 bg-white text-base focus-visible:border-primary focus-visible:ring-primary sm:h-11 sm:text-sm"
                 placeholder="••••••••"
               />
 
@@ -164,7 +178,7 @@ export function PortalLogin({ area }: { area: AppArea }) {
 
               <Button
                 type="submit"
-                className="mt-1 h-12 w-full gap-2 text-base font-semibold shadow-sm transition-all hover:shadow-md sm:h-11 sm:text-sm"
+                className="mt-1 h-12 w-full gap-2 text-base font-semibold shadow-sm transition-all sm:h-11 sm:text-sm"
                 disabled={loading}
               >
                 {loading ? (
@@ -179,10 +193,10 @@ export function PortalLogin({ area }: { area: AppArea }) {
             </form>
           </CardContent>
 
-          <CardFooter className="flex-col items-stretch gap-3 border-t border-slate-100/80 bg-slate-50/50 px-5 py-5 sm:px-6">
+          <CardFooter className="flex-col items-stretch gap-3 border-t /80 bg-muted/40 px-5 py-5 sm:px-6">
             {area === "patient" ? (
               <div className="flex flex-col items-center gap-3 text-center">
-                <p className="text-sm font-medium text-slate-700">Hesabınız yok mu?</p>
+                <p className="text-sm font-medium text-foreground">Hesabınız yok mu?</p>
                 <Button
                   variant="outline"
                   className="h-12 w-full gap-2 text-base font-semibold sm:h-11 sm:text-sm"

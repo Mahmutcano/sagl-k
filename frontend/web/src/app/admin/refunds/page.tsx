@@ -161,10 +161,10 @@ export default function AdminRefundsPage() {
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-12 lg:items-start lg:gap-6">
         {/* Left Card: Refund Request Form */}
-        <Card className="min-w-0 overflow-hidden rounded-xl border-slate-200/80 bg-white/95 shadow-premium sm:rounded-2xl lg:col-span-5">
+        <Card className="min-w-0 overflow-hidden rounded-xl /80 bg-white/95 sm:rounded-2xl lg:col-span-5">
           <form onSubmit={submit} noValidate>
-            <CardHeader className="border-b bg-slate-50/50 px-3 py-3 sm:px-6 sm:py-5">
-              <CardTitle className="flex items-center gap-2 text-sm font-bold text-slate-800 sm:text-base">
+            <CardHeader className="border-b bg-muted/40 px-3 py-3 sm:px-6 sm:py-5">
+              <CardTitle className="flex items-center gap-2 text-sm font-bold text-foreground sm:text-base">
                 <RefreshCw className="h-5 w-5 text-primary" />
                 İade Talebi Oluştur
               </CardTitle>
@@ -191,7 +191,7 @@ export default function AdminRefundsPage() {
                 error={fields.amount}
               />
               <div className="flex flex-col gap-1">
-                <label htmlFor="reason" className="text-xs font-semibold text-slate-700">İade Gerekçesi</label>
+                <label htmlFor="reason" className="text-xs font-semibold text-foreground">İade Gerekçesi</label>
                 <textarea
                   id="reason"
                   rows={3}
@@ -205,7 +205,7 @@ export default function AdminRefundsPage() {
                 )}
               </div>
             </CardContent>
-            <CardFooter className="border-t pt-4 flex justify-end bg-slate-50/50">
+            <CardFooter className="border-t pt-4 flex justify-end bg-muted/40">
               <Button type="submit" disabled={saving} className="font-bold">
                 {saving ? "Gönderiliyor..." : "İade Talebini Başlat"}
               </Button>
@@ -214,21 +214,21 @@ export default function AdminRefundsPage() {
         </Card>
 
         {/* Right Card: Paged Payments Table */}
-        <Card className="min-w-0 overflow-hidden rounded-xl border-slate-200/80 bg-white/95 shadow-premium sm:rounded-2xl lg:col-span-7">
-          <CardHeader className="border-b bg-slate-50/50 px-3 py-3 sm:px-6 sm:py-5">
-            <CardTitle className="text-base text-slate-800 font-bold">Ödemeler Listesi</CardTitle>
+        <Card className="min-w-0 overflow-hidden rounded-xl /80 bg-white/95 sm:rounded-2xl lg:col-span-7">
+          <CardHeader className="border-b bg-muted/40 px-3 py-3 sm:px-6 sm:py-5">
+            <CardTitle className="text-base text-foreground font-bold">Ödemeler Listesi</CardTitle>
             <CardDescription className="text-xs">İade işlemi yapmak istediğiniz ödemeyi seçin</CardDescription>
           </CardHeader>
           <CardContent className="pt-4 flex flex-col gap-4">
             {/* Premium Filter controls */}
-            <form onSubmit={handleSearchSubmit} className="grid gap-3 sm:grid-cols-2 items-end p-4 bg-white border border-slate-200/60 rounded-2xl shadow-sm">
+            <form onSubmit={handleSearchSubmit} className="grid gap-3 sm:grid-cols-2 items-end p-4 bg-white border /60 rounded-2xl shadow-sm">
               <div className="sm:col-span-2 flex flex-col gap-1.5">
-                <label htmlFor="search" className="text-xs font-bold text-slate-700">Arama</label>
+                <label htmlFor="search" className="text-xs font-bold text-foreground">Arama</label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
                     id="search"
-                    className="pl-9 h-9 text-xs border-slate-200 rounded-xl"
+                    className="pl-9 h-9 text-xs rounded-xl"
                     placeholder="Hasta adı veya başvuru no..."
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
@@ -249,7 +249,7 @@ export default function AdminRefundsPage() {
                 onChange={(val) => { setPage(0); setEndDate(val); }}
                 className="col-span-1"
               />
-              <div className="sm:col-span-2 flex justify-end gap-2 mt-2 pt-2 border-t border-slate-100">
+              <div className="sm:col-span-2 flex justify-end gap-2 mt-2 pt-2 border-t ">
                 <Button type="button" variant="ghost" size="sm" className="h-8 text-xs font-bold rounded-lg" onClick={handleClearFilters}>
                   Temizle
                 </Button>
@@ -267,31 +267,31 @@ export default function AdminRefundsPage() {
                 <Skeleton className="h-8 w-full rounded-xl" />
               </div>
             ) : payments.length === 0 ? (
-              <div className="text-center py-10 text-xs text-slate-500 font-medium italic border border-dashed rounded-xl p-4">Ödeme kaydı bulunamadı.</div>
+              <div className="text-center py-10 text-xs text-muted-foreground font-medium italic border border-dashed rounded-xl p-4">Ödeme kaydı bulunamadı.</div>
             ) : (
-              <div className="admin-table-scroll overflow-x-auto rounded-xl border border-slate-200/60">
+              <div className="admin-table-scroll overflow-x-auto rounded-xl border /60">
                 <Table>
-                  <TableHeader className="bg-slate-50/50">
+                  <TableHeader className="bg-muted/40">
                     <TableRow>
-                      <TableHead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider py-2 px-4">Hasta / Payer</TableHead>
-                      <TableHead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider py-2 px-4">Tutar</TableHead>
-                      <TableHead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider py-2 px-4">Tarih</TableHead>
-                      <TableHead className="text-[10px] font-bold text-slate-400 uppercase tracking-wider py-2 px-4 text-right">İşlem</TableHead>
+                      <TableHead className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider py-2 px-4">Hasta / Payer</TableHead>
+                      <TableHead className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider py-2 px-4">Tutar</TableHead>
+                      <TableHead className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider py-2 px-4">Tarih</TableHead>
+                      <TableHead className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider py-2 px-4 text-right">İşlem</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {payments.map((p) => {
                       const isPicked = form.paymentId === p.id;
                       return (
-                        <TableRow key={p.id} className={`hover:bg-slate-50/50 transition-colors cursor-pointer ${isPicked ? "bg-primary/5 hover:bg-primary/5" : ""}`} onClick={() => pickPayment(p)}>
-                          <TableCell className="py-2.5 px-4 font-semibold text-slate-800 text-xs">
+                        <TableRow key={p.id} className={`hover:bg-muted/40 transition-colors cursor-pointer ${isPicked ? "bg-primary/5 hover:bg-primary/5" : ""}`} onClick={() => pickPayment(p)}>
+                          <TableCell className="py-2.5 px-4 font-semibold text-foreground text-xs">
                             <span className="block">{p.patientName || "—"}</span>
-                            <span className="block text-[9px] text-slate-400 font-mono mt-0.5">{p.id.slice(0, 8)}…</span>
+                            <span className="block text-[9px] text-muted-foreground font-mono mt-0.5">{p.id.slice(0, 8)}…</span>
                           </TableCell>
-                          <TableCell className="py-2.5 px-4 text-slate-900 font-bold text-xs">
+                          <TableCell className="py-2.5 px-4 text-foreground font-bold text-xs">
                             {p.amount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} {p.currency}
                           </TableCell>
-                          <TableCell className="py-2.5 px-4 text-[10px] text-slate-500 font-mono">
+                          <TableCell className="py-2.5 px-4 text-[10px] text-muted-foreground font-mono">
                             {p.createdAt ? new Date(p.createdAt).toLocaleDateString("tr-TR") : "—"}
                           </TableCell>
                           <TableCell className="py-2.5 px-4 text-right">
@@ -324,9 +324,9 @@ export default function AdminRefundsPage() {
             )}
 
             {/* Premium Pagination for Refunds page */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50 border border-slate-200/50 rounded-2xl px-4 py-3 mt-2 shadow-sm">
-              <div className="text-[10px] font-semibold text-slate-500 tracking-wide font-sans">
-                Toplam <span className="text-primary font-bold">{totalCount}</span> kayıttan <span className="text-slate-800 font-bold">{page * pageSize + 1} - {Math.min((page + 1) * pageSize, totalCount)}</span> arası
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-muted/40 border /50 rounded-2xl px-4 py-3 mt-2 shadow-sm">
+              <div className="text-[10px] font-semibold text-muted-foreground tracking-wide font-sans">
+                Toplam <span className="text-primary font-bold">{totalCount}</span> kayıttan <span className="text-foreground font-bold">{page * pageSize + 1} - {Math.min((page + 1) * pageSize, totalCount)}</span> arası
               </div>
               <div className="flex items-center gap-1.5">
                 <Button
@@ -334,7 +334,7 @@ export default function AdminRefundsPage() {
                   size="sm"
                   disabled={page === 0}
                   onClick={() => setPage((p) => p - 1)}
-                  className="h-7 w-7 p-0 rounded-lg border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-all duration-150"
+                  className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-40 transition-all duration-150"
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </Button>
@@ -358,7 +358,7 @@ export default function AdminRefundsPage() {
                             "h-7 min-w-[28px] px-1.5 text-[10px] font-bold rounded-lg transition-all duration-150",
                             active 
                               ? "bg-primary text-primary-foreground shadow-sm shadow-primary/10" 
-                              : "border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                              : " text-muted-foreground hover:bg-muted hover:text-foreground"
                           )}
                         >
                           {i + 1}
@@ -374,7 +374,7 @@ export default function AdminRefundsPage() {
                   size="sm"
                   disabled={(page + 1) * pageSize >= totalCount}
                   onClick={() => setPage((p) => p + 1)}
-                  className="h-7 w-7 p-0 rounded-lg border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-all duration-150"
+                  className="h-7 w-7 p-0 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-40 transition-all duration-150"
                 >
                   <ChevronRight className="h-3.5 w-3.5" />
                 </Button>

@@ -87,6 +87,7 @@ func NewRouter(d Deps) http.Handler {
 	profileH := NewProfileHandler(d.DB, d.Notify, d.Audit, d.Cfg.OTPTTL)
 	adminUserH := NewAdminUserHandler(d.DB, d.Audit)
 	chatH := NewChatHandler(d.Chat, d.DB, d.JWT)
+	contactH := NewContactHandler(d.DB, d.Notify, d.Cfg.ContactInboxEmail)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -113,6 +114,7 @@ func NewRouter(d Deps) http.Handler {
 		api.Get("/professions", appH.ListProfessions)
 		api.Get("/care-providers", appH.ListCareProviders)
 		api.Get("/public/applications/{id}/verify", appH.VerifyApplicationPublicly)
+		api.With(authLimit).Post("/public/contact", contactH.Submit)
 
 		api.Route("/applications", func(ar chi.Router) {
 			ar.Use(authmw.Auth(d.JWT))
@@ -122,6 +124,7 @@ func NewRouter(d Deps) http.Handler {
 			ar.Post("/mine", appH.PagingPatient)
 			ar.With(authmw.RequireRole("nurse", "admin", "developer")).Post("/queue/nurse", appH.PagingNurse)
 			ar.With(authmw.RequireRole("doctor", "admin", "developer")).Post("/queue/doctor", appH.PagingDoctor)
+			ar.With(authmw.RequireRole("doctor", "admin", "developer")).Get("/queue/doctor/stats", appH.DoctorQueueStats)
 
 			ar.Get("/{id}/preview", appH.PreviewApplication)
 			ar.Get("/{id}", appH.ApplicationDetail)
@@ -176,6 +179,7 @@ func NewRouter(d Deps) http.Handler {
 			ar.Put("/hospitals/{id}", adminH.UpdateHospital)
 			ar.Get("/professions", adminH.ListProfessionsAdmin)
 			ar.Post("/professions", adminH.CreateProfession)
+			ar.Put("/professions/{id}", adminH.UpdateProfession)
 			ar.Get("/doctors", adminH.ListDoctors)
 			ar.Get("/doctors/{id}", adminH.GetDoctor)
 			ar.Post("/doctors", adminH.CreateDoctor)
@@ -186,6 +190,12 @@ func NewRouter(d Deps) http.Handler {
 			ar.Post("/refunds", adminH.CreateRefund)
 			ar.Get("/notifications", adminH.ListNotifications)
 			ar.Get("/notifications/{id}", adminH.GetNotificationDetail)
+			ar.Get("/sms-otp-logs", adminH.ListSMSOTPLogs)
+			ar.Get("/contact-messages", adminH.ListContactMessages)
+			ar.Patch("/contact-messages/{id}", adminH.UpdateContactMessage)
+			ar.Get("/accounting/settings", adminH.GetAccountingSettings)
+			ar.Put("/accounting/settings", adminH.UpdateAccountingSettings)
+			ar.Get("/accounting/report", adminH.ListAccountingReport)
 			ar.Get("/integrations/erciyes/health", erciyesH.Health)
 			ar.Get("/users", adminUserH.ListUsers)
 			ar.Get("/users/{id}", adminUserH.GetUser)

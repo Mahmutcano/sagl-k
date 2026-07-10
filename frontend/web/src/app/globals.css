@@ -1,65 +1,76 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  /* Premium medical-clinical color palette using oklch for uniform chroma/lightness */
-  --background: oklch(98.5% 0.006 230deg);       /* Soft cool ice-blue slate background */
-  --foreground: oklch(20% 0.025 230deg);         /* Deep navy slate for high-readability text */
-  --card: oklch(100% 0 0deg);                    /* Pure white cards */
-  --card-foreground: oklch(20% 0.025 230deg);
-  --popover: oklch(100% 0 0deg);
-  --popover-foreground: oklch(20% 0.025 230deg);
-  --primary: oklch(56% 0.16 235deg);             /* Vibrant clinical royal blue */
-  --primary-foreground: oklch(99.5% 0 0deg);
-  --secondary: oklch(95% 0.015 235deg);          /* Light ice-blue secondary background */
-  --secondary-foreground: oklch(40% 0.1 235deg);  /* Contrast text for secondary elements */
-  --muted: oklch(96.2% 0.008 230deg);            /* Soft cool grey for disabled/muted states */
-  --muted-foreground: oklch(48% 0.018 230deg);   /* Readable grey for captions/hints */
-  --accent: oklch(93.8% 0.038 210deg);           /* Muted clinical teal accent background */
-  --accent-foreground: oklch(36% 0.13 210deg);   /* Muted teal text */
-  --destructive: oklch(58% 0.185 24deg);         /* Premium crimson/coral red */
-  --destructive-foreground: oklch(99.5% 0 0deg);
-  --border: oklch(92.5% 0.008 230deg);           /* Very clean, light grey-blue border */
-  --input: oklch(92.5% 0.008 230deg);
-  --ring: oklch(56% 0.16 235deg);                /* Matches primary color */
-  --radius: 0.75rem;                             /* Rounded corners for components */
-
-  --success: oklch(68% 0.15 145deg);             /* Healthy clinical green */
-  --warning: oklch(82% 0.12 75deg);              /* Warm yellow-amber */
-  --error: oklch(58% 0.185 24deg);
-}
 
 @layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+    --success: 142 71% 45%;
+    --warning: 38 92% 50%;
+    --error: 0 84.2% 60.2%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground antialiased min-h-[100vh] flex flex-col;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
-  }
-  label {
-    margin: 0 !important;
-    padding: 0 !important;
   }
 }
 
 html {
-  font-size: 15px;
   -webkit-text-size-adjust: 100%;
 }
 
-@media (max-width: 639px) {
-  html {
-    font-size: 14px;
-  }
-}
-
-/* Mobile browser chrome — notch & home indicator safe areas */
+/* Mobile safe areas */
 .safe-top {
   padding-top: env(safe-area-inset-top, 0px);
 }
-
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -79,280 +90,97 @@ html {
   }
 }
 
-/* Touch-friendly tap targets */
 .touch-manipulation {
   touch-action: manipulation;
 }
 
-/* Premium shadows & transitions */
-.shadow-premium {
-  box-shadow: 0 4px 20px -2px rgba(148, 163, 184, 0.08), 0 2px 8px -1px rgba(148, 163, 184, 0.04);
-}
-.shadow-premium-lg {
-  box-shadow: 0 12px 30px -4px rgba(148, 163, 184, 0.12), 0 4px 12px -2px rgba(148, 163, 184, 0.06);
-}
-.shadow-premium-xl {
-  box-shadow: 0 20px 40px -6px rgba(148, 163, 184, 0.16), 0 8px 20px -4px rgba(148, 163, 184, 0.08);
-}
-
-/* App shell subtle mesh background matching CMS theme */
-.app-shell {
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -20%, color-mix(in oklab, var(--primary) 4%, transparent), transparent),
-    var(--background);
-}
-
-/* Premium dark auth sidebar matching CMS dark/clinical layout */
-.auth-sidebar {
-  background: linear-gradient(135deg, oklch(25% 0.08 235deg) 0%, oklch(12% 0.04 235deg) 100%);
-  color: var(--primary-foreground);
-  border-right: 1px solid oklch(20% 0.05 235deg);
-}
-
-.auth-sidebar-glow {
-  background:
-    radial-gradient(circle at 20% 80%, color-mix(in oklab, var(--primary) 15%, transparent), transparent 60%),
-    radial-gradient(circle at 80% 20%, color-mix(in oklab, var(--primary) 20%, transparent), transparent 50%);
-  opacity: 0.85;
-}
-
-/* Landing Page Glow & Layout */
+/* Landing helpers (logic pages unchanged) */
 .landing-glow {
   background:
-    radial-gradient(ellipse 90% 60% at 50% -10%, color-mix(in oklab, var(--primary) 10%, transparent), transparent 70%),
-    radial-gradient(ellipse 60% 40% at 100% 50%, color-mix(in oklab, var(--primary) 5%, transparent), transparent 60%);
+    radial-gradient(ellipse 90% 60% at 50% -10%, hsl(var(--primary) / 0.08), transparent 70%),
+    radial-gradient(ellipse 60% 40% at 100% 50%, hsl(var(--primary) / 0.04), transparent 60%);
 }
 
 .landing-gradient-text {
-  background: linear-gradient(135deg, var(--primary) 0%, color-mix(in oklab, var(--primary) 50%, var(--foreground)) 100%);
+  background: linear-gradient(135deg, hsl(var(--foreground)) 0%, hsl(var(--muted-foreground)) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 
 .landing-step-num {
-  color: color-mix(in oklab, var(--primary) 55%, var(--foreground));
+  color: hsl(var(--foreground));
 }
 
 .landing-hero-photo {
-  box-shadow:
-    0 1px 2px color-mix(in oklab, var(--foreground) 4%, transparent),
-    0 18px 40px -18px color-mix(in oklab, var(--foreground) 18%, transparent);
+  box-shadow: 0 18px 40px -18px hsl(var(--foreground) / 0.18);
 }
 
-.landing-card-main {
-  animation: landing-float 6s ease-in-out infinite;
-  box-shadow: 0 10px 30px rgba(148, 163, 184, 0.1);
+.app-shell {
+  background: hsl(var(--background));
 }
 
-.landing-card-float {
-  animation: landing-float 6s ease-in-out infinite 1.5s;
-  box-shadow: 0 12px 35px color-mix(in oklab, var(--primary) 8%, rgba(148, 163, 184, 0.12));
+.auth-sidebar {
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
 }
 
-@keyframes landing-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+.auth-sidebar-glow {
+  opacity: 0.4;
 }
 
-/* Interactive list cards */
+.shadow-premium,
+.shadow-premium-lg,
+.shadow-premium-xl {
+  box-shadow: 0 1px 2px hsl(var(--foreground) / 0.04);
+}
+
 .interactive-card {
-  box-shadow: 0 0 0 1px transparent;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: border-color 0.15s ease;
 }
 
 .interactive-card:hover {
-  transform: translateY(-2px);
-  border-color: color-mix(in oklab, var(--primary) 20%, var(--border));
-  box-shadow: 0 10px 25px -5px rgba(148, 163, 184, 0.12);
+  border-color: hsl(var(--border));
 }
 
-.interactive-card:focus-visible {
-  outline: none;
-  box-shadow:
-    0 0 0 2px var(--background),
-    0 0 0 4px var(--ring);
-}
-
-/* Large Form overrides for superior UX, readability, and spaciousness */
+/* Forms: shadcn defaults — only mobile iOS zoom prevention */
 .large-form {
-  padding: 1.5rem !important;
-  border-radius: 1.25rem !important;
-  box-shadow: 0 15px 35px -5px rgba(148, 163, 184, 0.12) !important;
-}
-
-@media (min-width: 640px) {
-  .large-form {
-    padding: 2.5rem !important;
-  }
-}
-
-.large-form [class*="CardHeader"] {
-  padding: 0 0 2rem 0 !important;
-}
-
-.large-form [class*="CardContent"] {
-  padding: 0 0 2rem 0 !important;
-}
-
-.large-form [class*="CardFooter"] {
-  padding: 2rem 0 0 0 !important;
-  display: flex;
-  gap: 1rem;
-}
-
-.large-form [class*="CardTitle"] {
-  font-size: 1.85rem !important;
-  line-height: 2.25rem !important;
-  font-weight: 800 !important;
-  letter-spacing: -0.03em !important;
-}
-
-.large-form [class*="CardDescription"] {
-  font-size: 1rem !important;
-  line-height: 1.5rem !important;
-  margin-top: 0.5rem !important;
-}
-
-/* Form controls — gri zemin, kurumsal */
-.large-form input,
-.large-form textarea,
-.large-form button[role="combobox"],
-.large-form select {
-  font-size: 0.9375rem !important;
-  line-height: 1.4rem !important;
-  border-radius: 0.5rem !important;
-  border-width: 1px !important;
-  border-color: oklch(90% 0.008 230deg) !important;
-  background-color: oklch(96.5% 0.004 230deg) !important;
-  box-shadow: none !important;
-  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease !important;
-}
-
-.large-form input {
-  height: 2.75rem !important;
-  padding-left: 0.875rem !important;
-  padding-right: 0.875rem !important;
-}
-
-.large-form button[role="combobox"] {
-  height: 2.75rem !important;
-  padding-left: 0.875rem !important;
-  padding-right: 0.875rem !important;
-}
-
-.large-form textarea {
-  padding: 0.75rem 0.875rem !important;
-  min-height: 110px !important;
-}
-
-.large-form input:focus,
-.large-form textarea:focus,
-.large-form button[role="combobox"]:focus-within,
-.large-form select:focus {
-  background-color: #fff !important;
-  border-color: var(--primary) !important;
-  box-shadow: 0 0 0 2px color-mix(in oklab, var(--primary) 15%, transparent) !important;
-  outline: none !important;
-}
-
-.large-form label {
-  font-size: 0.875rem !important;
-  font-weight: 500 !important;
-  color: oklch(40% 0.02 230deg) !important;
-  margin-bottom: 0 !important;
-  letter-spacing: 0;
-}
-
-.large-form [id$="-hint"] {
-  font-size: 0.8125rem !important;
-  line-height: 1.25rem !important;
-  margin-top: 0.25rem !important;
-}
-
-.large-form [id$="-error"] {
-  font-size: 0.8125rem !important;
-  font-weight: 500 !important;
-  margin-top: 0.25rem !important;
-  color: var(--error) !important;
-}
-
-.large-form .grid {
-  gap: 1.25rem !important;
-}
-
-/* Action buttons only — password eye toggle excluded via aria-label */
-.large-form form > button:not([aria-label]),
-.large-form .form-step-footer button,
-.large-form [class*="CardFooter"] > button,
-.large-form [class*="CardFooter"] a {
-  height: 2.75rem !important;
-  font-size: 0.9375rem !important;
-  font-weight: 600 !important;
-  padding-left: 1.25rem !important;
-  padding-right: 1.25rem !important;
-  border-radius: 0.5rem !important;
-  transform: none !important;
-}
-
-.large-form form > button:not([aria-label]):hover,
-.large-form .form-step-footer button:hover {
-  transform: none !important;
+  /* no visual overrides — use shadcn Card/Input as-is */
 }
 
 @media (max-width: 639px) {
-  .large-form {
-    padding: 1rem !important;
-    border-radius: 1rem !important;
-  }
-
-  .large-form [class*="CardHeader"] {
-    padding: 0 0 1.25rem 0 !important;
-  }
-
-  .large-form [class*="CardContent"] {
-    padding: 0 0 1.25rem 0 !important;
-  }
-
-  .large-form [class*="CardFooter"] {
-    padding: 1.25rem 0 0 0 !important;
-    flex-direction: column;
-  }
-
-  .large-form [class*="CardTitle"] {
-    font-size: 1.35rem !important;
-    line-height: 1.65rem !important;
-  }
-
   .large-form input,
+  .large-form textarea,
   .large-form button[role="combobox"],
-  .large-form button:not(.h-auto) {
-    height: 2.875rem !important;
-    font-size: 1rem !important;
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
+  .large-form select,
+  .application-form-flow input,
+  .application-form-flow textarea,
+  .application-form-flow button[role="combobox"],
+  .admin-shell input,
+  .admin-shell textarea,
+  .admin-shell button[role="combobox"],
+  .admin-shell select {
+    font-size: 16px !important;
   }
 
-  .large-form button:not(.h-auto) {
+  .application-form-flow .form-step-footer {
+    position: sticky;
+    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+    z-index: 20;
+    margin-left: -0.25rem;
+    margin-right: -0.25rem;
+    padding: 0.75rem 0.25rem 0.5rem;
+    background: hsl(var(--background) / 0.95);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid hsl(var(--border));
+  }
+
+  .application-form-flow .form-step-footer > * {
     width: 100%;
-  }
-
-  .large-form .grid {
-    gap: 1.25rem !important;
+    justify-content: center;
   }
 }
 
-/* Scrollable document previews on narrow screens */
-.doc-preview-frame {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-.doc-preview-frame iframe {
-  min-width: min(100%, 320px);
-}
-
-/* Başvuru formu akışı — mobil öncelikli */
 .application-form-flow {
   width: 100%;
   min-width: 0;
@@ -363,57 +191,15 @@ html {
   min-width: 0;
 }
 
-@media (max-width: 639px) {
-  .application-form-flow .application-form-card.large-form {
-    padding: 0.875rem !important;
-    border-radius: 1rem !important;
-    box-shadow: 0 4px 16px -4px rgba(148, 163, 184, 0.15) !important;
-  }
-
-  .application-form-flow .application-form-card [class*="CardHeader"] {
-    padding: 0 0 1rem 0 !important;
-  }
-
-  .application-form-flow .application-form-card [class*="CardContent"] {
-    padding: 0 0 1rem 0 !important;
-    scroll-margin-bottom: 7rem;
-  }
-
-  .application-form-flow .form-step-footer {
-    position: sticky;
-    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
-    z-index: 20;
-    margin-left: -0.25rem;
-    margin-right: -0.25rem;
-    padding: 0.75rem 0.25rem 0.5rem !important;
-    background: color-mix(in oklab, var(--background) 92%, transparent);
-    backdrop-filter: blur(10px);
-    border-top: 1px solid var(--border);
-    box-shadow: 0 -4px 20px -8px rgba(0, 0, 0, 0.08);
-  }
-
-  .application-form-flow .form-step-footer > * {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .application-form-flow .form-choice-card {
-    padding: 1rem !important;
-  }
-
-  .application-form-flow .form-choice-card [class*="CardTitle"] {
-    font-size: 1.15rem !important;
-    line-height: 1.4rem !important;
-  }
-
-  .application-form-flow input,
-  .application-form-flow textarea,
-  .application-form-flow button[role="combobox"] {
-    font-size: 16px !important; /* iOS zoom önleme */
-  }
+.doc-preview-frame {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-/* Admin panel — mobile fit */
+.doc-preview-frame iframe {
+  min-width: min(100%, 320px);
+}
+
 .admin-shell {
   width: 100%;
   max-width: 100vw;
@@ -452,19 +238,4 @@ html {
 
 .admin-shell .admin-table-scroll table {
   min-width: 640px;
-}
-
-@media (max-width: 767px) {
-  .admin-shell .admin-table-scroll th,
-  .admin-shell .admin-table-scroll td {
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
-  }
-
-  .admin-shell input,
-  .admin-shell textarea,
-  .admin-shell button[role="combobox"],
-  .admin-shell select {
-    font-size: 16px !important;
-  }
 }

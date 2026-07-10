@@ -27,7 +27,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var errs validate.Errors
-	validate.NationalID(&errs, "nationalIdentifier", req.NationalIdentifier)
+	validate.LoginIdentifier(&errs, "nationalIdentifier", req.NationalIdentifier)
 	if strings.TrimSpace(req.Password) == "" {
 		errs.Add("password", "required", "Şifre zorunludur.")
 	} else if len(req.Password) > validate.MaxPasswordLength {
@@ -37,6 +37,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		validate.Fail(w, errs)
 		return
 	}
+	req.NationalIdentifier = strings.TrimSpace(req.NationalIdentifier)
 	res, err := h.svc.Login(r.Context(), req)
 	if err != nil {
 		// Uniform message prevents user enumeration.
@@ -66,22 +67,33 @@ func (h *AuthHandler) AgreementsForRegister(w http.ResponseWriter, r *http.Reque
 
 func validateRegister(req *authsvc.RegisterInitRequest) validate.Errors {
 	var errs validate.Errors
+	req.FirstName = validate.FormatPersonName(req.FirstName)
+	req.LastName = validate.FormatPersonName(req.LastName)
 	validate.PersonName(&errs, "firstName", req.FirstName, "Ad")
 	validate.PersonName(&errs, "lastName", req.LastName, "Soyad")
-	validate.NationalID(&errs, "nationalIdentifier", req.NationalIdentifier)
-	validate.PhoneTR(&errs, "phoneNumber", req.PhoneNumber)
+	validate.NationalityCode(&errs, "nationality", req.Nationality)
+
+	req.Nationality = strings.ToUpper(strings.TrimSpace(req.Nationality))
+	req.PhoneCountryCode = validate.NormalizeCountryCode(req.PhoneCountryCode)
+	req.PhoneNumber = validate.NormalizeNationalPhone(req.PhoneCountryCode, req.PhoneNumber)
+	req.PassportNumber = strings.ToUpper(strings.TrimSpace(req.PassportNumber))
+	req.NationalIdentifier = strings.TrimSpace(req.NationalIdentifier)
+
+	isTR := req.Nationality == "TR"
+	if isTR {
+		validate.NationalID(&errs, "nationalIdentifier", req.NationalIdentifier)
+		validate.MatchGenderTCKN(&errs, "nationalIdentifier", "gender", req.NationalIdentifier, req.Gender)
+		req.PassportNumber = ""
+	} else {
+		validate.PassportNumber(&errs, "passportNumber", req.PassportNumber)
+		req.NationalIdentifier = ""
+	}
+
+	validate.PhoneNational(&errs, "phoneNumber", req.PhoneCountryCode, req.PhoneNumber)
 	validate.Email(&errs, "email", req.Email)
 	validate.Password(&errs, "password", req.Password)
 	validate.DateOfBirth(&errs, "dateOfBirth", req.DateOfBirth)
 	validate.Gender(&errs, "gender", req.Gender)
-	validate.MatchGenderTCKN(&errs, "nationalIdentifier", "gender", req.NationalIdentifier, req.Gender)
-	if req.Nationality == "" {
-		req.Nationality = "TR"
-	}
-	if len(req.Nationality) < 2 || len(req.Nationality) > 3 {
-		errs.Add("nationality", "format", "Uyruk kodu 2–3 karakter olmalıdır (ör. TR).")
-	}
-	req.PhoneNumber = validate.NormalizePhoneTR(req.PhoneNumber)
 	return errs
 }
 
@@ -93,6 +105,10 @@ func (h *AuthHandler) InitiateRegister(w http.ResponseWriter, r *http.Request) {
 	errs := validateRegister(&req)
 	if errs.Has() {
 		validate.Fail(w, errs)
+		return
+	}
+	if conflictErrs := h.svc.CheckRegisterUniqueness(r.Context(), req); conflictErrs.Has() {
+		validate.Fail(w, conflictErrs)
 		return
 	}
 	challenge, err := h.svc.InitiateRegister(r.Context(), req)
@@ -127,8 +143,11 @@ func (h *AuthHandler) CompleteRegister(w http.ResponseWriter, r *http.Request) {
 		validate.Fail(w, errs)
 		return
 	}
+	if conflictErrs := h.svc.CheckRegisterUniqueness(r.Context(), body.RegisterInitRequest); conflictErrs.Has() {
+		validate.Fail(w, conflictErrs)
+		return
+	}
 	body.Code = strings.TrimSpace(body.Code)
-	body.RegisterInitRequest.PhoneNumber = validate.NormalizePhoneTR(body.RegisterInitRequest.PhoneNumber)
 	res, err := h.svc.CompleteRegister(r.Context(), body.RegisterInitRequest.PhoneNumber, body.Code, body.RegisterInitRequest)
 	if err != nil {
 		response.Fail(w, http.StatusBadRequest, "AUTH031", response.SafeMessage(err, "Kayıt tamamlanamadı. Kod geçersiz veya süresi dolmuş olabilir."))
@@ -139,19 +158,21 @@ func (h *AuthHandler) CompleteRegister(w http.ResponseWriter, r *http.Request) {
 
 func (h *AuthHandler) InitiateForgotPassword(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		PhoneNumber string `json:"phoneNumber"`
+		PhoneNumber      string `json:"phoneNumber"`
+		PhoneCountryCode string `json:"phoneCountryCode"`
 	}
 	if !validate.DecodeJSON(w, r, &req) {
 		return
 	}
 	var errs validate.Errors
-	validate.PhoneTR(&errs, "phoneNumber", req.PhoneNumber)
+	req.PhoneCountryCode = validate.NormalizeCountryCode(req.PhoneCountryCode)
+	req.PhoneNumber = validate.NormalizeNationalPhone(req.PhoneCountryCode, req.PhoneNumber)
+	validate.PhoneNational(&errs, "phoneNumber", req.PhoneCountryCode, req.PhoneNumber)
 	if errs.Has() {
 		validate.Fail(w, errs)
 		return
 	}
-	req.PhoneNumber = validate.NormalizePhoneTR(req.PhoneNumber)
-	challenge, err := h.svc.InitiateForgotPassword(r.Context(), req.PhoneNumber)
+	challenge, err := h.svc.InitiateForgotPassword(r.Context(), req.PhoneNumber, req.PhoneCountryCode)
 	res := map[string]interface{}{
 		"sent":             true,
 		"expiresInSeconds": challenge.ExpiresInSeconds,
@@ -163,28 +184,31 @@ func (h *AuthHandler) InitiateForgotPassword(w http.ResponseWriter, r *http.Requ
 	// Always OK to avoid phone enumeration; expiry still returned for UX when sent.
 	if err != nil {
 		res["expiresInSeconds"] = 600
+		res["expiresAt"] = time.Now().UTC().Add(10 * time.Minute).Format(time.RFC3339)
 	}
 	response.OK(w, res)
 }
 
 func (h *AuthHandler) CompleteForgotPassword(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		PhoneNumber string `json:"phoneNumber"`
-		Code        string `json:"code"`
-		Password    string `json:"password"`
+		PhoneNumber      string `json:"phoneNumber"`
+		PhoneCountryCode string `json:"phoneCountryCode"`
+		Code             string `json:"code"`
+		Password         string `json:"password"`
 	}
 	if !validate.DecodeJSON(w, r, &req) {
 		return
 	}
 	var errs validate.Errors
-	validate.PhoneTR(&errs, "phoneNumber", req.PhoneNumber)
+	req.PhoneCountryCode = validate.NormalizeCountryCode(req.PhoneCountryCode)
+	req.PhoneNumber = validate.NormalizeNationalPhone(req.PhoneCountryCode, req.PhoneNumber)
+	validate.PhoneNational(&errs, "phoneNumber", req.PhoneCountryCode, req.PhoneNumber)
 	validate.OTP(&errs, "code", req.Code)
 	validate.Password(&errs, "password", req.Password)
 	if errs.Has() {
 		validate.Fail(w, errs)
 		return
 	}
-	req.PhoneNumber = validate.NormalizePhoneTR(req.PhoneNumber)
 	if err := h.svc.CompleteForgotPassword(r.Context(), req.PhoneNumber, req.Code, req.Password); err != nil {
 		response.Fail(w, http.StatusBadRequest, "AUTH051", "Kod geçersiz veya süresi dolmuş.")
 		return

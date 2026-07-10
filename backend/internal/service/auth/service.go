@@ -2,9 +2,11 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"medical-consultation-platform/backend/internal/config"
 	jwtmgr "medical-consultation-platform/backend/internal/pkg/jwt"
 	"medical-consultation-platform/backend/internal/pkg/password"
+	"medical-consultation-platform/backend/internal/pkg/validate"
 	"medical-consultation-platform/backend/internal/repository"
 	"medical-consultation-platform/backend/internal/service/notification"
 )
@@ -44,6 +47,8 @@ type RegisterInitRequest struct {
 	FirstName          string `json:"firstName"`
 	LastName           string `json:"lastName"`
 	NationalIdentifier string `json:"nationalIdentifier"`
+	PassportNumber     string `json:"passportNumber"`
+	PhoneCountryCode   string `json:"phoneCountryCode"`
 	PhoneNumber        string `json:"phoneNumber"`
 	Email              string `json:"email"`
 	Password           string `json:"password"`
@@ -56,14 +61,20 @@ func (s *Service) Login(ctx context.Context, req LoginRequest) (*LoginResult, er
 	if strings.TrimSpace(req.Password) == "" {
 		return nil, errors.New("invalid credentials")
 	}
+	id := strings.TrimSpace(req.NationalIdentifier)
 	var hash, role, firstName, lastName string
 	var userID uuid.UUID
 	var isDoctor, isNurse, isDeveloper bool
 	err := s.db.Pool.QueryRow(ctx, `
 		SELECT id, password_hash, role, first_name, last_name,
 			role = 'doctor', role = 'nurse', is_developer
-		FROM users WHERE national_identifier = $1 AND is_active = true
-	`, req.NationalIdentifier).Scan(&userID, &hash, &role, &firstName, &lastName, &isDoctor, &isNurse, &isDeveloper)
+		FROM users
+		WHERE is_active = true
+		  AND (
+			national_identifier = $1
+			OR UPPER(COALESCE(passport_number, '')) = UPPER($1)
+		  )
+	`, id).Scan(&userID, &hash, &role, &firstName, &lastName, &isDoctor, &isNurse, &isDeveloper)
 	if err != nil {
 		return nil, errors.New("invalid credentials")
 	}
@@ -118,7 +129,88 @@ func (s *Service) newOTPChallenge() OTPChallenge {
 	}
 }
 
+// CheckRegisterUniqueness returns field errors when TC/passport, phone or email already exist.
+func (s *Service) CheckRegisterUniqueness(ctx context.Context, req RegisterInitRequest) validate.Errors {
+	var errs validate.Errors
+
+	if nid := strings.TrimSpace(req.NationalIdentifier); nid != "" {
+		var exists bool
+		_ = s.db.Pool.QueryRow(ctx, `
+			SELECT EXISTS(SELECT 1 FROM users WHERE national_identifier = $1)
+		`, nid).Scan(&exists)
+		if exists {
+			errs.Add("nationalIdentifier", "unique", "Bu TC Kimlik No zaten kullanılıyor. Giriş yapmayı deneyin.")
+		}
+	}
+	if pp := strings.ToUpper(strings.TrimSpace(req.PassportNumber)); pp != "" {
+		var exists bool
+		_ = s.db.Pool.QueryRow(ctx, `
+			SELECT EXISTS(SELECT 1 FROM users WHERE UPPER(COALESCE(passport_number, '')) = $1)
+		`, pp).Scan(&exists)
+		if exists {
+			errs.Add("passportNumber", "unique", "Bu pasaport numarası zaten kullanılıyor. Giriş yapmayı deneyin.")
+		}
+	}
+
+	var phoneExists bool
+	_ = s.db.Pool.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM users
+			WHERE phone_number = $1 AND COALESCE(phone_country_code, '+90') = $2
+		)
+	`, req.PhoneNumber, req.PhoneCountryCode).Scan(&phoneExists)
+	if phoneExists {
+		errs.Add("phoneNumber", "unique", "Bu telefon numarası zaten kullanılıyor. Giriş yapmayı deneyin.")
+	}
+
+	var emailExists bool
+	_ = s.db.Pool.QueryRow(ctx, `
+		SELECT EXISTS(SELECT 1 FROM users WHERE LOWER(email) = LOWER($1))
+	`, req.Email).Scan(&emailExists)
+	if emailExists {
+		errs.Add("email", "unique", "Bu e-posta adresi zaten kullanılıyor. Giriş yapmayı deneyin.")
+	}
+
+	return errs
+}
+
+func (s *Service) logSMSOTP(ctx context.Context, purpose, e164, country, national, code, first, last, email, status, errMsg string, userID *uuid.UUID) {
+	_, _ = s.db.Pool.Exec(ctx, `
+		INSERT INTO sms_otp_logs (
+			purpose, phone_e164, phone_country_code, phone_number, otp_code,
+			first_name, last_name, email, user_id, status, error_message
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+	`, purpose, e164, country, national, code, first, last, email, userID, status, nullIfEmpty(errMsg))
+}
+
+func nullIfEmpty(s string) *string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	return &s
+}
+
+func (s *Service) generatePatientNumber(ctx context.Context) (string, error) {
+	year := time.Now().Year() % 100
+	for i := 0; i < 12; i++ {
+		n, err := rand.Int(rand.Reader, big.NewInt(900000))
+		if err != nil {
+			return "", err
+		}
+		candidate := fmt.Sprintf("HST-%02d-%06d", year, n.Int64()+100000)
+		var exists bool
+		_ = s.db.Pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM users WHERE patient_number = $1)`, candidate).Scan(&exists)
+		if !exists {
+			return candidate, nil
+		}
+	}
+	return "", errors.New("hasta numarası üretilemedi")
+}
+
 func (s *Service) InitiateRegister(ctx context.Context, req RegisterInitRequest) (OTPChallenge, error) {
+	req.FirstName = validate.FormatPersonName(req.FirstName)
+	req.LastName = validate.FormatPersonName(req.LastName)
+
 	hash, err := password.Hash(req.Password)
 	if err != nil {
 		return OTPChallenge{}, err
@@ -129,18 +221,28 @@ func (s *Service) InitiateRegister(ctx context.Context, req RegisterInitRequest)
 	raw, _ := json.Marshal(pending)
 	mins := s.otpMinutes()
 	challenge := s.newOTPChallenge()
+	smsTo := req.PhoneCountryCode + req.PhoneNumber
+	if !strings.HasPrefix(smsTo, "+") {
+		smsTo = "+" + smsTo
+	}
 	code, err := s.notify.SendSMS(
 		ctx,
-		req.PhoneNumber,
+		smsTo,
 		"register_otp",
 		fmt.Sprintf("Kayıt doğrulama. Kod %d dakika geçerlidir", mins),
 		nil,
 		nil,
 	)
+	status := "sent"
+	errMsg := ""
 	if err != nil {
+		status = "failed"
+		errMsg = err.Error()
+		s.logSMSOTP(ctx, "register", smsTo, req.PhoneCountryCode, req.PhoneNumber, "", req.FirstName, req.LastName, req.Email, status, errMsg, nil)
 		return OTPChallenge{}, err
 	}
 	challenge.Code = code
+	s.logSMSOTP(ctx, "register", smsTo, req.PhoneCountryCode, req.PhoneNumber, code, req.FirstName, req.LastName, req.Email, status, "", nil)
 
 	emailBody := fmt.Sprintf(
 		"Kayıt doğrulama kodunuz: %s\n\nBu kod %d dakika geçerlidir. Lütfen kayıt ekranına girerek işleminizi tamamlayın.",
@@ -162,6 +264,9 @@ func (s *Service) InitiateRegister(ctx context.Context, req RegisterInitRequest)
 func (s *Service) CompleteRegister(ctx context.Context, phone, code string, req RegisterInitRequest) (*LoginResult, error) {
 	phone = strings.TrimSpace(phone)
 	code = strings.TrimSpace(code)
+	req.FirstName = validate.FormatPersonName(req.FirstName)
+	req.LastName = validate.FormatPersonName(req.LastName)
+
 	var expires time.Time
 	var used *time.Time
 	err := s.db.Pool.QueryRow(ctx, `
@@ -174,12 +279,35 @@ func (s *Service) CompleteRegister(ctx context.Context, phone, code string, req 
 	}
 	hash, _ := password.Hash(req.Password)
 	dob, _ := time.Parse("2006-01-02", req.DateOfBirth)
+
+	country := strings.TrimSpace(req.PhoneCountryCode)
+	if country == "" {
+		country = "+90"
+	}
+	var nationalID *string
+	var passport *string
+	if nid := strings.TrimSpace(req.NationalIdentifier); nid != "" {
+		nationalID = &nid
+	}
+	if pp := strings.ToUpper(strings.TrimSpace(req.PassportNumber)); pp != "" {
+		passport = &pp
+	}
+
+	patientNo, err := s.generatePatientNumber(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	var userID uuid.UUID
 	err = s.db.Pool.QueryRow(ctx, `
-		INSERT INTO users (email, phone_number, password_hash, first_name, last_name, national_identifier, date_of_birth, gender, nationality, is_phone_verified, role)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,'patient')
+		INSERT INTO users (
+			email, phone_number, phone_country_code, password_hash,
+			first_name, last_name, national_identifier, passport_number,
+			date_of_birth, gender, nationality, patient_number, is_phone_verified, role
+		)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'patient')
 		RETURNING id
-	`, req.Email, phone, hash, req.FirstName, req.LastName, req.NationalIdentifier, dob, req.Gender, req.Nationality).Scan(&userID)
+	`, req.Email, phone, country, hash, req.FirstName, req.LastName, nationalID, passport, dob, req.Gender, req.Nationality, patientNo).Scan(&userID)
 	if err != nil {
 		return nil, registerInsertErr(err)
 	}
@@ -192,6 +320,8 @@ func (s *Service) CompleteRegister(ctx context.Context, phone, code string, req 
 		RefreshToken: refresh,
 		User: map[string]interface{}{
 			"id": userID.String(), "role": "patient",
+			"firstName": req.FirstName, "lastName": req.LastName,
+			"patientNumber": patientNo,
 			"isDoctor": false, "isNurse": false, "isDeveloper": false,
 		},
 	}, nil
@@ -229,24 +359,46 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (*LoginResul
 	}, nil
 }
 
-func (s *Service) InitiateForgotPassword(ctx context.Context, phone string) (OTPChallenge, error) {
-	var email string
-	_ = s.db.Pool.QueryRow(ctx, "SELECT email FROM users WHERE phone_number = $1 AND is_active = true", phone).Scan(&email)
+func (s *Service) InitiateForgotPassword(ctx context.Context, phone, countryCode string) (OTPChallenge, error) {
+	if countryCode == "" {
+		countryCode = "+90"
+	}
+	var email, firstName, lastName string
+	var userID uuid.UUID
+	_ = s.db.Pool.QueryRow(ctx, `
+		SELECT id, email, first_name, last_name FROM users
+		WHERE phone_number = $1 AND COALESCE(phone_country_code, '+90') = $2 AND is_active = true
+	`, phone, countryCode).Scan(&userID, &email, &firstName, &lastName)
 
 	mins := s.otpMinutes()
 	challenge := s.newOTPChallenge()
+	smsTo := countryCode + phone
 	code, err := s.notify.SendSMS(
 		ctx,
-		phone,
+		smsTo,
 		"forgot_password",
 		fmt.Sprintf("Şifre sıfırlama. Kod %d dakika geçerlidir", mins),
 		nil,
 		nil,
 	)
+	status := "sent"
+	errMsg := ""
 	if err != nil {
+		status = "failed"
+		errMsg = err.Error()
+		var uid *uuid.UUID
+		if userID != uuid.Nil {
+			uid = &userID
+		}
+		s.logSMSOTP(ctx, "forgot_password", smsTo, countryCode, phone, "", firstName, lastName, email, status, errMsg, uid)
 		return OTPChallenge{}, err
 	}
 	challenge.Code = code
+	var uid *uuid.UUID
+	if userID != uuid.Nil {
+		uid = &userID
+	}
+	s.logSMSOTP(ctx, "forgot_password", smsTo, countryCode, phone, code, firstName, lastName, email, status, "", uid)
 
 	if email != "" {
 		emailBody := fmt.Sprintf(
@@ -298,6 +450,12 @@ func registerInsertErr(err error) error {
 			return errors.New("Bu e-posta adresi zaten kayıtlı. Giriş yapmayı deneyin.")
 		case strings.Contains(c, "phone"):
 			return errors.New("Bu telefon numarası zaten kayıtlı. Giriş yapmayı deneyin.")
+		case strings.Contains(c, "national"):
+			return errors.New("Bu TC Kimlik No zaten kullanılıyor. Giriş yapmayı deneyin.")
+		case strings.Contains(c, "passport"):
+			return errors.New("Bu pasaport numarası zaten kullanılıyor. Giriş yapmayı deneyin.")
+		case strings.Contains(c, "patient_number"):
+			return errors.New("Hasta numarası çakışması oluştu. Lütfen tekrar deneyin.")
 		default:
 			return errors.New("Bu bilgilerle zaten bir hesap var. Giriş yapmayı deneyin.")
 		}

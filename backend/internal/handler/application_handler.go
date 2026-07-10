@@ -240,6 +240,14 @@ func (h *ApplicationHandler) ApplicationDetail(w http.ResponseWriter, r *http.Re
 		response.Fail(w, http.StatusNotFound, "APP021", "Başvuru bulunamadı.")
 		return
 	}
+
+	if claims := authmw.ClaimsFromContext(r.Context()); claims != nil && claims.Role == "doctor" {
+		_, _ = h.db.Pool.Exec(r.Context(), `
+			UPDATE applications SET doctor_opened_at = now()
+			WHERE id = $1 AND doctor_opened_at IS NULL
+		`, appID)
+	}
+
 	payload := map[string]interface{}{
 		"applicationId":     appID.String(),
 		"applicationNumber": appNumber,
@@ -642,6 +650,69 @@ type doctorQueueRequest struct {
 	SortBy   string `json:"sortBy"`
 	SortDir  string `json:"sortDir"`
 	Category string `json:"category"`
+	DateFrom string `json:"dateFrom"`
+	DateTo   string `json:"dateTo"`
+}
+
+// DoctorQueueStats returns aggregate counts for the doctor's özet panel.
+func (h *ApplicationHandler) DoctorQueueStats(w http.ResponseWriter, r *http.Request) {
+	claims := authmw.ClaimsFromContext(r.Context())
+	if claims == nil {
+		response.Fail(w, http.StatusUnauthorized, "AUTH001", "Oturum gerekli.")
+		return
+	}
+
+	draftExists := `
+		EXISTS (
+			SELECT 1 FROM application_temporal_reports t
+			WHERE t.application_id = a.id
+			  AND t.data IS NOT NULL
+			  AND t.data::text NOT IN ('{}', 'null', '""')
+			  AND length(trim(t.data::text)) > 2
+		)`
+
+	var total, waiting, draft, concluded int
+	err := h.db.Pool.QueryRow(r.Context(), fmt.Sprintf(`
+		SELECT
+			COUNT(*)::int,
+			COUNT(*) FILTER (WHERE a.status_code NOT IN (0, 3, 6, 7, 9) AND NOT %s)::int,
+			COUNT(*) FILTER (WHERE a.status_code != 6 AND %s)::int,
+			COUNT(*) FILTER (WHERE a.status_code = 6)::int
+		FROM applications a
+		WHERE a.doctor_user_id = $1 AND a.status_code != 0
+	`, draftExists, draftExists), claims.UserID).Scan(&total, &waiting, &draft, &concluded)
+	if err != nil {
+		response.Fail(w, http.StatusInternalServerError, "APP050", "Özet istatistikleri alınamadı.")
+		return
+	}
+
+	var sharePercent, consultationFee float64
+	_ = h.db.Pool.QueryRow(r.Context(), `
+		SELECT COALESCE(cp.revenue_share_percent, 70), COALESCE(cp.consultation_fee, 1500)
+		FROM care_providers cp
+		WHERE cp.user_id = $1
+		LIMIT 1
+	`, claims.UserID).Scan(&sharePercent, &consultationFee)
+	if consultationFee <= 0 {
+		consultationFee = 1500
+	}
+	if sharePercent <= 0 {
+		sharePercent = 70
+	}
+
+	estimatedGross := float64(concluded) * consultationFee
+	estimatedDoctorShare := estimatedGross * sharePercent / 100
+
+	response.OK(w, map[string]interface{}{
+		"total":                total,
+		"waitingReport":        waiting,
+		"draft":                draft,
+		"concluded":            concluded,
+		"consultationFee":      consultationFee,
+		"revenueSharePercent":  sharePercent,
+		"estimatedGross":       estimatedGross,
+		"estimatedDoctorShare": estimatedDoctorShare,
+	})
 }
 
 func (h *ApplicationHandler) PagingPatient(w http.ResponseWriter, r *http.Request) {
@@ -739,6 +810,49 @@ func (h *ApplicationHandler) PagingDoctor(w http.ResponseWriter, r *http.Request
 	}
 
 	offset := req.Page * req.PageSize
+
+	dateFrom := strings.TrimSpace(req.DateFrom)
+	dateTo := strings.TrimSpace(req.DateTo)
+	var dateClause string
+	args := []interface{}{claims.UserID, search}
+	argN := 3
+	if dateFrom != "" {
+		dateClause += fmt.Sprintf(" AND a.created_at::date >= $%d::date", argN)
+		args = append(args, dateFrom)
+		argN++
+	}
+	if dateTo != "" {
+		dateClause += fmt.Sprintf(" AND a.created_at::date <= $%d::date", argN)
+		args = append(args, dateTo)
+		argN++
+	}
+
+	countQuery := fmt.Sprintf(`
+		SELECT COUNT(*)
+		FROM applications a
+		JOIN users u ON u.id = a.owner_user_id
+		LEFT JOIN application_represented_persons rp ON rp.application_id = a.id
+		WHERE a.doctor_user_id = $1 AND a.status_code != 0
+		  %s
+		  %s
+		  AND ($2 = '' OR (
+		    CASE
+		      WHEN a.is_for_relative AND rp.id IS NOT NULL THEN trim(rp.first_name || ' ' || rp.last_name)
+		      ELSE trim(u.first_name || ' ' || u.last_name)
+		    END ILIKE '%%' || $2 || '%%'
+		    OR COALESCE(a.application_number, '') ILIKE '%%' || $2 || '%%'
+		    OR COALESCE(a.ecommerce_number, '') ILIKE '%%' || $2 || '%%'
+		  ))
+	`, categoryClause, dateClause)
+
+	var totalCount int
+	if err := h.db.Pool.QueryRow(r.Context(), countQuery, args...).Scan(&totalCount); err != nil {
+		response.Fail(w, http.StatusInternalServerError, "APP060", "Başvurular listelenemedi.")
+		return
+	}
+
+	limitArg := argN
+	offsetArg := argN + 1
 	query := fmt.Sprintf(`
 		SELECT a.id::text, a.status_code, a.application_number, a.ecommerce_number, a.profession_name, a.created_at,
 		       CASE
@@ -751,6 +865,7 @@ func (h *ApplicationHandler) PagingDoctor(w http.ResponseWriter, r *http.Request
 		LEFT JOIN application_represented_persons rp ON rp.application_id = a.id
 		WHERE a.doctor_user_id = $1 AND a.status_code != 0
 		  %s
+		  %s
 		  AND ($2 = '' OR (
 		    CASE
 		      WHEN a.is_for_relative AND rp.id IS NOT NULL THEN trim(rp.first_name || ' ' || rp.last_name)
@@ -760,10 +875,11 @@ func (h *ApplicationHandler) PagingDoctor(w http.ResponseWriter, r *http.Request
 		    OR COALESCE(a.ecommerce_number, '') ILIKE '%%' || $2 || '%%'
 		  ))
 		ORDER BY %s %s NULLS LAST
-		LIMIT $3 OFFSET $4
-	`, draftExists, categoryClause, sortColumn, sortDir)
+		LIMIT $%d OFFSET $%d
+	`, draftExists, categoryClause, dateClause, sortColumn, sortDir, limitArg, offsetArg)
 
-	rows, err := h.db.Pool.Query(r.Context(), query, claims.UserID, search, req.PageSize, offset)
+	queryArgs := append(append([]interface{}{}, args...), req.PageSize, offset)
+	rows, err := h.db.Pool.Query(r.Context(), query, queryArgs...)
 	if err != nil {
 		response.Fail(w, http.StatusInternalServerError, "APP060", "Başvurular listelenemedi.")
 		return
@@ -771,13 +887,16 @@ func (h *ApplicationHandler) PagingDoctor(w http.ResponseWriter, r *http.Request
 	defer rows.Close()
 	items := h.scanDoctorQueueRows(rows)
 	response.OK(w, map[string]interface{}{
-		"items":    items,
-		"page":     req.Page,
-		"pageSize": req.PageSize,
-		"search":   search,
-		"sortBy":   sortBy,
-		"sortDir":  strings.ToLower(sortDir),
-		"category": category,
+		"items":      items,
+		"page":       req.Page,
+		"pageSize":   req.PageSize,
+		"totalCount": totalCount,
+		"search":     search,
+		"sortBy":     sortBy,
+		"sortDir":    strings.ToLower(sortDir),
+		"category":   category,
+		"dateFrom":   dateFrom,
+		"dateTo":     dateTo,
 	})
 }
 
@@ -1016,7 +1135,21 @@ func (h *ApplicationHandler) UpdateFinalReport(w http.ResponseWriter, r *http.Re
 		response.Fail(w, http.StatusBadRequest, "APP103", response.SafeMessage(err, "Rapor güncellenemedi."))
 		return
 	}
-	response.OK(w, map[string]bool{"updated": true})
+	var ownerID uuid.UUID
+	var email *string
+	var appNumber *string
+	_ = h.db.Pool.QueryRow(r.Context(), `
+		SELECT a.owner_user_id, u.email, a.application_number
+		FROM applications a JOIN users u ON u.id = a.owner_user_id WHERE a.id = $1
+	`, appID).Scan(&ownerID, &email, &appNumber)
+	if email != nil && *email != "" {
+		displayNo := appID.String()
+		if appNumber != nil && *appNumber != "" {
+			displayNo = *appNumber
+		}
+		h.notify.SendReportUpdatedEmail(r.Context(), ownerID, *email, displayNo)
+	}
+	response.OK(w, map[string]bool{"updated": true, "patientNotified": true})
 }
 
 func (h *ApplicationHandler) PreviewDoctorReport(w http.ResponseWriter, r *http.Request) {

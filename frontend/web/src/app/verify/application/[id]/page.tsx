@@ -18,7 +18,7 @@ export default function VerifyPage({ params }: { params: { id: string } }) {
   const apiURL = `/api/v1/public/applications/${params.id}/verify?code=${code}`;
 
   return (
-    <div className="w-full min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4 sm:p-8">
+    <div className="w-full min-h-screen bg-muted flex flex-col items-center justify-center p-4 sm:p-8">
       <div className="w-full max-w-4xl bg-white rounded-xl shadow-lg border overflow-hidden flex flex-col h-[90vh]">
         <div className="bg-primary text-primary-foreground px-6 py-4 flex items-center justify-between shrink-0">
           <div>
@@ -34,11 +34,11 @@ export default function VerifyPage({ params }: { params: { id: string } }) {
             className="w-full h-full border-none"
           />
         </div>
-        <div className="bg-slate-50 border-t px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+        <div className="bg-muted border-t px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
           <p className="text-xs text-muted-foreground text-center sm:text-left">
             Bu belge 5070 Sayılı Elektronik İmza Kanununa göre güvenli elektronik imza ile kayıt altına alınmıştır.
           </p>
-          <Button variant="outline" size="sm" type="button" onClick={() => window.print()} className="cursor-pointer font-semibold shadow-sm hover:shadow-md transition-all">
+          <Button variant="outline" size="sm" type="button" onClick={() => window.print()} className="cursor-pointer font-semibold shadow-sm transition-all">
             Yazdır / PDF Kaydet
           </Button>
         </div>

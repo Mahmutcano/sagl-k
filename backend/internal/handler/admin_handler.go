@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -33,12 +34,30 @@ func NewAdminHandler(db *repository.DB, payment *paysvc.Service, audit *audit.Lo
 }
 
 func (h *AdminHandler) ListApplications(w http.ResponseWriter, r *http.Request) {
+	page := 0
+	pageSize := 20
+	if v := strings.TrimSpace(r.URL.Query().Get("page")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			page = n
+		}
+	}
+	if v := strings.TrimSpace(r.URL.Query().Get("pageSize")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 200 {
+			pageSize = n
+		}
+	}
+	offset := page * pageSize
+
+	var totalCount int
+	_ = h.db.Pool.QueryRow(r.Context(), `SELECT COUNT(*) FROM applications`).Scan(&totalCount)
+
 	rows, err := h.db.Pool.Query(r.Context(), `
 		SELECT a.id::text, a.status_code, a.application_number, a.ecommerce_number, u.first_name || ' ' || u.last_name, a.created_at
 		FROM applications a
 		JOIN users u ON u.id = a.owner_user_id
-		ORDER BY a.created_at DESC LIMIT 100
-	`)
+		ORDER BY a.created_at DESC
+		LIMIT $1 OFFSET $2
+	`, pageSize, offset)
 	if err != nil {
 		response.Fail(w, http.StatusInternalServerError, "ADM001", "Başvurular listelenemedi.")
 		return
@@ -61,7 +80,12 @@ func (h *AdminHandler) ListApplications(w http.ResponseWriter, r *http.Request) 
 			"createdAt":         createdAt,
 		})
 	}
-	response.OK(w, items)
+	response.OK(w, map[string]interface{}{
+		"items":      items,
+		"page":       page,
+		"pageSize":   pageSize,
+		"totalCount": totalCount,
+	})
 }
 
 func (h *AdminHandler) ApplicationHistory(w http.ResponseWriter, r *http.Request) {
@@ -72,29 +96,185 @@ func (h *AdminHandler) ApplicationHistory(w http.ResponseWriter, r *http.Request
 		validate.Fail(w, errs)
 		return
 	}
-	rows, err := h.db.Pool.Query(r.Context(), `
-		SELECT old_status_code, new_status_code, note, created_at
-		FROM application_status_history WHERE application_id = $1 ORDER BY created_at
-	`, appID)
+
+	type event struct {
+		At      time.Time
+		Type    string
+		Title   string
+		Detail  string
+		Actor   string
+		Meta    map[string]interface{}
+	}
+	events := []event{}
+
+	var createdAt time.Time
+	var doctorOpenedAt, reportViewedAt *time.Time
+	var appNumber string
+	err = h.db.Pool.QueryRow(r.Context(), `
+		SELECT created_at, doctor_opened_at, report_viewed_at, COALESCE(application_number, '')
+		FROM applications WHERE id = $1
+	`, appID).Scan(&createdAt, &doctorOpenedAt, &reportViewedAt, &appNumber)
 	if err != nil {
-		response.Fail(w, http.StatusInternalServerError, "ADM011", "Geçmiş alınamadı.")
+		response.Fail(w, http.StatusNotFound, "ADM011", "Başvuru bulunamadı.")
 		return
 	}
-	defer rows.Close()
-	items := []map[string]interface{}{}
-	for rows.Next() {
-		var old *int
-		var newStatus int
-		var note *string
-		var createdAt interface{}
-		if err := rows.Scan(&old, &newStatus, &note, &createdAt); err != nil {
-			continue
-		}
-		items = append(items, map[string]interface{}{
-			"oldStatusCode": old, "newStatusCode": newStatus, "note": note, "createdAt": createdAt,
+	events = append(events, event{
+		At: createdAt, Type: "created", Title: "Başvuru oluşturuldu",
+		Detail: appNumber, Meta: map[string]interface{}{"applicationNumber": appNumber},
+	})
+
+	if doctorOpenedAt != nil {
+		events = append(events, event{
+			At: *doctorOpenedAt, Type: "doctor_opened", Title: "Doktor başvuruyu inceledi",
+			Detail: "Hekim başvuru detayını ilk kez açtı",
 		})
 	}
-	response.OK(w, items)
+	if reportViewedAt != nil {
+		events = append(events, event{
+			At: *reportViewedAt, Type: "report_viewed", Title: "Hasta raporu görüntüledi",
+			Detail: "Sonuç raporu hasta tarafından açıldı",
+		})
+	}
+
+	statusRows, err := h.db.Pool.Query(r.Context(), `
+		SELECT h.old_status_code, h.new_status_code, h.note, h.created_at,
+		       COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), '')
+		FROM application_status_history h
+		LEFT JOIN users u ON u.id = h.actor_user_id
+		WHERE h.application_id = $1
+		ORDER BY h.created_at
+	`, appID)
+	if err == nil {
+		defer statusRows.Close()
+		for statusRows.Next() {
+			var old *int
+			var newStatus int
+			var note *string
+			var at time.Time
+			var actor string
+			if err := statusRows.Scan(&old, &newStatus, &note, &at, &actor); err != nil {
+				continue
+			}
+			detail := ""
+			if note != nil {
+				detail = *note
+			}
+			events = append(events, event{
+				At: at, Type: "status", Title: "Durum güncellendi",
+				Detail: detail, Actor: actor,
+				Meta: map[string]interface{}{
+					"oldStatusCode": old, "newStatusCode": newStatus, "note": note,
+				},
+			})
+		}
+	}
+
+	payRows, err := h.db.Pool.Query(r.Context(), `
+		SELECT id::text, amount::float8, status::text, created_at, paid_at
+		FROM payments WHERE application_id = $1 ORDER BY created_at
+	`, appID)
+	if err == nil {
+		defer payRows.Close()
+		for payRows.Next() {
+			var pid, status string
+			var amount float64
+			var created time.Time
+			var paidAt *time.Time
+			if err := payRows.Scan(&pid, &amount, &status, &created, &paidAt); err != nil {
+				continue
+			}
+			events = append(events, event{
+				At: created, Type: "payment_created", Title: "Ödeme kaydı oluşturuldu",
+				Detail: fmt.Sprintf("%.2f TRY · %s", amount, status),
+				Meta: map[string]interface{}{"paymentId": pid, "amount": amount, "status": status},
+			})
+			if paidAt != nil {
+				events = append(events, event{
+					At: *paidAt, Type: "payment_paid", Title: "Ödeme alındı",
+					Detail: fmt.Sprintf("%.2f TRY", amount),
+					Meta: map[string]interface{}{"paymentId": pid, "amount": amount},
+				})
+			}
+		}
+	}
+
+	draftRows, err := h.db.Pool.Query(r.Context(), `
+		SELECT t.created_at, t.updated_at,
+		       COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), '')
+		FROM application_temporal_reports t
+		LEFT JOIN users u ON u.id = t.author_user_id
+		WHERE t.application_id = $1
+		ORDER BY t.created_at
+	`, appID)
+	if err == nil {
+		defer draftRows.Close()
+		for draftRows.Next() {
+			var created, updated time.Time
+			var actor string
+			if err := draftRows.Scan(&created, &updated, &actor); err != nil {
+				continue
+			}
+			events = append(events, event{
+				At: created, Type: "draft_created", Title: "Taslak rapor yazıldı",
+				Actor: actor,
+			})
+			if updated.After(created.Add(time.Second)) {
+				events = append(events, event{
+					At: updated, Type: "draft_updated", Title: "Taslak rapor güncellendi",
+					Actor: actor,
+				})
+			}
+		}
+	}
+
+	var finalAt *time.Time
+	var finalAuthor string
+	_ = h.db.Pool.QueryRow(r.Context(), `
+		SELECT f.created_at, COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), '')
+		FROM application_final_reports f
+		LEFT JOIN users u ON u.id = f.author_user_id
+		WHERE f.application_id = $1
+	`, appID).Scan(&finalAt, &finalAuthor)
+	if finalAt != nil {
+		events = append(events, event{
+			At: *finalAt, Type: "final_report", Title: "Nihai rapor yazıldı",
+			Actor: finalAuthor,
+		})
+	}
+
+	sort.SliceStable(events, func(i, j int) bool {
+		return events[i].At.Before(events[j].At)
+	})
+
+	items := make([]map[string]interface{}, 0, len(events))
+	statusHistory := []map[string]interface{}{}
+	for _, e := range events {
+		item := map[string]interface{}{
+			"type":      e.Type,
+			"title":     e.Title,
+			"detail":    e.Detail,
+			"actor":     e.Actor,
+			"createdAt": e.At,
+		}
+		for k, v := range e.Meta {
+			item[k] = v
+		}
+		items = append(items, item)
+		if e.Type == "status" {
+			statusHistory = append(statusHistory, map[string]interface{}{
+				"oldStatusCode": e.Meta["oldStatusCode"],
+				"newStatusCode": e.Meta["newStatusCode"],
+				"note":          e.Meta["note"],
+				"createdAt":     e.At,
+				"actor":         e.Actor,
+			})
+		}
+	}
+
+	response.OK(w, map[string]interface{}{
+		"events":        items,
+		"statusHistory": statusHistory,
+	})
 }
 
 func (h *AdminHandler) ListHospitals(w http.ResponseWriter, r *http.Request) {
@@ -229,7 +409,8 @@ func (h *AdminHandler) ListDoctors(w http.ResponseWriter, r *http.Request) {
 	_ = h.db.Pool.QueryRow(r.Context(), countQuery, args...).Scan(&totalCount)
 
 	query := fmt.Sprintf(`
-		SELECT cp.id::text, cp.full_name, COALESCE(cp.title, ''), cp.profession_code, COALESCE(h.name, ''), cp.is_active
+		SELECT cp.id::text, cp.full_name, COALESCE(cp.title, ''), cp.profession_code, COALESCE(h.name, ''), cp.is_active,
+		       COALESCE(cp.revenue_share_percent, 70)::float8
 		FROM care_providers cp
 		LEFT JOIN hospitals h ON h.id = cp.hospital_id
 		%s
@@ -247,11 +428,13 @@ func (h *AdminHandler) ListDoctors(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id, name, title, pcode, hospital string
 		var active bool
-		if err := rows.Scan(&id, &name, &title, &pcode, &hospital, &active); err != nil {
+		var share float64
+		if err := rows.Scan(&id, &name, &title, &pcode, &hospital, &active, &share); err != nil {
 			continue
 		}
 		items = append(items, map[string]interface{}{
 			"id": id, "fullName": name, "title": title, "professionCode": pcode, "hospitalName": hospital, "isActive": active,
+			"revenueSharePercent": share,
 		})
 	}
 
@@ -275,9 +458,10 @@ func (h *AdminHandler) CreateDoctor(w http.ResponseWriter, r *http.Request) {
 		Email              string   `json:"email"`
 		PhoneNumber        string   `json:"phoneNumber"`
 		Password           string   `json:"password"`
-		ConsultationFee    float64  `json:"consultationFee"`
-		SmsEnabled         *bool    `json:"smsEnabled"`
-		EmailEnabled       *bool    `json:"emailEnabled"`
+		ConsultationFee       float64  `json:"consultationFee"`
+		RevenueSharePercent   *float64 `json:"revenueSharePercent"`
+		SmsEnabled            *bool    `json:"smsEnabled"`
+		EmailEnabled          *bool    `json:"emailEnabled"`
 	}
 	if !validate.DecodeJSON(w, r, &req) {
 		return
@@ -289,6 +473,13 @@ func (h *AdminHandler) CreateDoctor(w http.ResponseWriter, r *http.Request) {
 	validate.Email(&errs, "email", req.Email)
 	validate.PhoneTR(&errs, "phoneNumber", req.PhoneNumber)
 	validate.Password(&errs, "password", req.Password)
+	share := 70.0
+	if req.RevenueSharePercent != nil {
+		share = *req.RevenueSharePercent
+	}
+	if share < 0 || share > 100 {
+		errs.Add("revenueSharePercent", "range", "Doktor payı 0–100 arasında olmalıdır.")
+	}
 	if req.HospitalID != "" {
 		validate.UUID(&errs, "hospitalId", req.HospitalID, "Hastane kimliği")
 	}
@@ -326,8 +517,8 @@ func (h *AdminHandler) CreateDoctor(w http.ResponseWriter, r *http.Request) {
 
 	var userID uuid.UUID
 	err = tx.QueryRow(r.Context(), `
-		INSERT INTO users (email, phone_number, password_hash, first_name, last_name, national_identifier, role, is_active)
-		VALUES ($1,$2,$3,$4,$5,$6,'doctor',true)
+		INSERT INTO users (email, phone_number, phone_country_code, password_hash, first_name, last_name, national_identifier, role, is_active)
+		VALUES ($1,$2,'+90',$3,$4,$5,$6,'doctor',true)
 		RETURNING id
 	`, req.Email, req.PhoneNumber, hash, firstName, lastName, req.NationalIdentifier).Scan(&userID)
 	if err != nil {
@@ -359,9 +550,9 @@ func (h *AdminHandler) CreateDoctor(w http.ResponseWriter, r *http.Request) {
 
 	var id uuid.UUID
 	err = tx.QueryRow(r.Context(), `
-		INSERT INTO care_providers (user_id, full_name, title, profession_code, target_institution, hospital_id, identity_number, consultation_fee, is_active, sms_enabled, email_enabled)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,true,$9,$10) RETURNING id
-	`, userID, req.FullName, req.Title, primaryProfCode, req.TargetInstitution, hospitalID, req.NationalIdentifier, fee, smsVal, emailVal).Scan(&id)
+		INSERT INTO care_providers (user_id, full_name, title, profession_code, target_institution, hospital_id, identity_number, consultation_fee, revenue_share_percent, is_active, sms_enabled, email_enabled)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10,$11) RETURNING id
+	`, userID, req.FullName, req.Title, primaryProfCode, req.TargetInstitution, hospitalID, req.NationalIdentifier, fee, share, smsVal, emailVal).Scan(&id)
 	if err != nil {
 		response.Fail(w, http.StatusBadRequest, "ADM035", response.SafeMessage(err, "Doktor kaydı oluşturulamadı."))
 		return
@@ -415,6 +606,7 @@ func (h *AdminHandler) GetDoctor(w http.ResponseWriter, r *http.Request) {
 		TargetInstitution int
 		IsActive          bool
 		ConsultationFee   float64
+		RevenueShare      float64
 		IdentityNumber    *string
 		Email             string
 		PhoneNumber       string
@@ -424,14 +616,16 @@ func (h *AdminHandler) GetDoctor(w http.ResponseWriter, r *http.Request) {
 
 	err = h.db.Pool.QueryRow(r.Context(), `
 		SELECT cp.id, cp.user_id, cp.hospital_id, cp.full_name, cp.title, cp.profession_code,
-		       cp.target_institution, cp.is_active, cp.consultation_fee, cp.identity_number,
+		       cp.target_institution, cp.is_active, cp.consultation_fee,
+		       COALESCE(cp.revenue_share_percent, 70),
+		       COALESCE(NULLIF(cp.identity_number, ''), NULLIF(u.national_identifier, '')),
 		       u.email, u.phone_number, cp.sms_enabled, cp.email_enabled
 		FROM care_providers cp
 		JOIN users u ON u.id = cp.user_id
 		WHERE cp.id = $1
 	`, docID).Scan(
 		&cp.ID, &cp.UserID, &cp.HospitalID, &cp.FullName, &cp.Title, &cp.ProfessionCode,
-		&cp.TargetInstitution, &cp.IsActive, &cp.ConsultationFee, &cp.IdentityNumber,
+		&cp.TargetInstitution, &cp.IsActive, &cp.ConsultationFee, &cp.RevenueShare, &cp.IdentityNumber,
 		&cp.Email, &cp.PhoneNumber, &cp.SmsEnabled, &cp.EmailEnabled,
 	)
 	if err != nil {
@@ -485,11 +679,12 @@ func (h *AdminHandler) GetDoctor(w http.ResponseWriter, r *http.Request) {
 		"hospitalId":         hospitalIDStr,
 		"nationalIdentifier": identityStr,
 		"email":              cp.Email,
-		"phoneNumber":        cp.PhoneNumber,
-		"consultationFee":    cp.ConsultationFee,
-		"isActive":           cp.IsActive,
-		"smsEnabled":         cp.SmsEnabled,
-		"emailEnabled":       cp.EmailEnabled,
+		"phoneNumber":        validate.NormalizePhoneTR(cp.PhoneNumber),
+		"consultationFee":      cp.ConsultationFee,
+		"revenueSharePercent":  cp.RevenueShare,
+		"isActive":             cp.IsActive,
+		"smsEnabled":           cp.SmsEnabled,
+		"emailEnabled":         cp.EmailEnabled,
 	})
 }
 
@@ -510,6 +705,7 @@ func (h *AdminHandler) UpdateDoctor(w http.ResponseWriter, r *http.Request) {
 		PhoneNumber        string   `json:"phoneNumber"`
 		Password           string   `json:"password"`
 		ConsultationFee    float64  `json:"consultationFee"`
+		RevenueSharePercent *float64 `json:"revenueSharePercent"`
 		IsActive           bool     `json:"isActive"`
 		SmsEnabled         *bool    `json:"smsEnabled"`
 		EmailEnabled       *bool    `json:"emailEnabled"`
@@ -521,20 +717,29 @@ func (h *AdminHandler) UpdateDoctor(w http.ResponseWriter, r *http.Request) {
 
 	var errs validate.Errors
 	validate.PersonName(&errs, "fullName", req.FullName, "Doktor adı")
-	validate.NationalID(&errs, "nationalIdentifier", req.NationalIdentifier)
 	validate.Email(&errs, "email", req.Email)
 	validate.PhoneTR(&errs, "phoneNumber", req.PhoneNumber)
 	if req.Password != "" {
 		validate.Password(&errs, "password", req.Password)
 	}
-	if req.HospitalID != "" {
+	share := 70.0
+	if req.RevenueSharePercent != nil {
+		share = *req.RevenueSharePercent
+	}
+	if share < 0 || share > 100 {
+		errs.Add("revenueSharePercent", "range", "Doktor payı 0–100 arasında olmalıdır.")
+	}
+	if req.HospitalID != "" && req.HospitalID != "_none" {
 		validate.UUID(&errs, "hospitalId", req.HospitalID, "Hastane kimliği")
+	} else {
+		req.HospitalID = ""
 	}
 	if errs.Has() {
 		validate.Fail(w, errs)
 		return
 	}
 	req.PhoneNumber = validate.NormalizePhoneTR(req.PhoneNumber)
+	req.FullName = validate.FormatPersonName(req.FullName)
 
 	var hospitalID *uuid.UUID
 	if req.HospitalID != "" {
@@ -542,13 +747,40 @@ func (h *AdminHandler) UpdateDoctor(w http.ResponseWriter, r *http.Request) {
 		hospitalID = &parsed
 	}
 
-	// Fetch doctor to get user_id
+	// Fetch doctor to get user_id + current national id
 	var userID uuid.UUID
-	err = h.db.Pool.QueryRow(r.Context(), `SELECT user_id FROM care_providers WHERE id = $1`, docID).Scan(&userID)
+	var currentNID string
+	err = h.db.Pool.QueryRow(r.Context(), `
+		SELECT cp.user_id,
+		       COALESCE(NULLIF(cp.identity_number, ''), NULLIF(u.national_identifier, ''), '')
+		FROM care_providers cp
+		JOIN users u ON u.id = cp.user_id
+		WHERE cp.id = $1
+	`, docID).Scan(&userID, &currentNID)
 	if err != nil {
 		response.Fail(w, http.StatusNotFound, "ADM038", "Doktor bulunamadı.")
 		return
 	}
+
+	nid := strings.TrimSpace(req.NationalIdentifier)
+	if nid == "" {
+		nid = currentNID
+	}
+	// Re-validate TCKN only when changed (legacy records may fail checksum).
+	if nid != currentNID {
+		var nidErrs validate.Errors
+		validate.NationalID(&nidErrs, "nationalIdentifier", nid)
+		if nidErrs.Has() {
+			validate.Fail(w, nidErrs)
+			return
+		}
+	} else if nid == "" {
+		var nidErrs validate.Errors
+		nidErrs.Add("nationalIdentifier", "required", "TC Kimlik Numarası zorunludur.")
+		validate.Fail(w, nidErrs)
+		return
+	}
+	req.NationalIdentifier = nid
 
 	tx, err := h.db.Pool.Begin(r.Context())
 	if err != nil {
@@ -557,14 +789,23 @@ func (h *AdminHandler) UpdateDoctor(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 
-	// Unique check for email, phone, TC
+	// Unique check for email, phone, TC (normalized phone)
 	var exists bool
-	_ = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND id <> $2)`, req.Email, userID).Scan(&exists)
+	_ = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM users WHERE lower(email) = lower($1) AND id <> $2)`, req.Email, userID).Scan(&exists)
 	if exists {
 		response.Fail(w, http.StatusBadRequest, "ADM032", "Bu e-posta adresi başka bir kullanıcı tarafından kullanılıyor.")
 		return
 	}
-	_ = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM users WHERE phone_number = $1 AND id <> $2)`, req.PhoneNumber, userID).Scan(&exists)
+	_ = tx.QueryRow(r.Context(), `
+		SELECT EXISTS(
+			SELECT 1 FROM users
+			WHERE id <> $2 AND (
+				phone_number = $1
+				OR regexp_replace(phone_number, '[^0-9]', '', 'g') = $1
+				OR regexp_replace(phone_number, '^0', '', 'g') = $1
+			)
+		)
+	`, req.PhoneNumber, userID).Scan(&exists)
 	if exists {
 		response.Fail(w, http.StatusBadRequest, "ADM032", "Bu telefon numarası başka bir kullanıcı tarafından kullanılıyor.")
 		return
@@ -589,13 +830,13 @@ func (h *AdminHandler) UpdateDoctor(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, err = tx.Exec(r.Context(), `
-			UPDATE users SET email = $1, phone_number = $2, password_hash = $3, first_name = $4, last_name = $5,
+			UPDATE users SET email = $1, phone_number = $2, phone_country_code = '+90', password_hash = $3, first_name = $4, last_name = $5,
 			                 national_identifier = $6, is_active = $7, updated_at = now()
 			WHERE id = $8
 		`, req.Email, req.PhoneNumber, hash, firstName, lastName, req.NationalIdentifier, req.IsActive, userID)
 	} else {
 		_, err = tx.Exec(r.Context(), `
-			UPDATE users SET email = $1, phone_number = $2, first_name = $3, last_name = $4,
+			UPDATE users SET email = $1, phone_number = $2, phone_country_code = '+90', first_name = $3, last_name = $4,
 			                 national_identifier = $5, is_active = $6, updated_at = now()
 			WHERE id = $7
 		`, req.Email, req.PhoneNumber, firstName, lastName, req.NationalIdentifier, req.IsActive, userID)
@@ -627,10 +868,10 @@ func (h *AdminHandler) UpdateDoctor(w http.ResponseWriter, r *http.Request) {
 	_, err = tx.Exec(r.Context(), `
 		UPDATE care_providers
 		SET full_name = $1, title = $2, profession_code = $3, hospital_id = $4,
-		    identity_number = $5, consultation_fee = $6, is_active = $7,
-		    sms_enabled = $8, email_enabled = $9, updated_at = now()
-		WHERE id = $10
-	`, req.FullName, req.Title, primaryProfCode, hospitalID, req.NationalIdentifier, fee, req.IsActive, smsVal, emailVal, docID)
+		    identity_number = $5, consultation_fee = $6, revenue_share_percent = $7, is_active = $8,
+		    sms_enabled = $9, email_enabled = $10, updated_at = now()
+		WHERE id = $11
+	`, req.FullName, req.Title, primaryProfCode, hospitalID, req.NationalIdentifier, fee, share, req.IsActive, smsVal, emailVal, docID)
 	if err != nil {
 		response.Fail(w, http.StatusInternalServerError, "ADM040", "Doktor tablosu güncellenemedi.")
 		return
@@ -761,6 +1002,62 @@ func (h *AdminHandler) CreateProfession(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	response.OK(w, map[string]string{"id": id.String()})
+}
+
+func (h *AdminHandler) UpdateProfession(w http.ResponseWriter, r *http.Request) {
+	profID, err := uuid.Parse(chi.URLParam(r, "id"))
+	if err != nil {
+		response.Fail(w, http.StatusBadRequest, "ADM083", "Geçersiz branş ID.")
+		return
+	}
+	var req struct {
+		Code              string `json:"code"`
+		Name              string `json:"name"`
+		TargetInstitution int    `json:"targetInstitution"`
+		HospitalID        string `json:"hospitalId"`
+		IsActive          *bool  `json:"isActive"`
+	}
+	if !validate.DecodeJSON(w, r, &req) {
+		return
+	}
+	var errs validate.Errors
+	validate.ProfessionCode(&errs, "code", req.Code)
+	if strings.TrimSpace(req.Name) == "" {
+		errs.Add("name", "required", "Bölüm adı zorunludur.")
+	}
+	validate.TargetInstitution(&errs, "targetInstitution", req.TargetInstitution)
+	if req.HospitalID != "" && req.HospitalID != "_none" {
+		validate.UUID(&errs, "hospitalId", req.HospitalID, "Hastane kimliği")
+	} else {
+		req.HospitalID = ""
+	}
+	if errs.Has() {
+		validate.Fail(w, errs)
+		return
+	}
+	var hospitalID *uuid.UUID
+	if req.HospitalID != "" {
+		parsed, _ := uuid.Parse(req.HospitalID)
+		hospitalID = &parsed
+	}
+	active := true
+	if req.IsActive != nil {
+		active = *req.IsActive
+	}
+	tag, err := h.db.Pool.Exec(r.Context(), `
+		UPDATE professions
+		SET code = $1, name = $2, target_institution = $3, hospital_id = $4, is_active = $5
+		WHERE id = $6
+	`, strings.TrimSpace(req.Code), strings.TrimSpace(req.Name), req.TargetInstitution, hospitalID, active, profID)
+	if err != nil {
+		response.Fail(w, http.StatusBadRequest, "ADM084", response.SafeMessage(err, "Bölüm güncellenemedi. Kod benzersiz olmalıdır."))
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		response.Fail(w, http.StatusNotFound, "ADM085", "Bölüm bulunamadı.")
+		return
+	}
+	response.OK(w, map[string]bool{"success": true})
 }
 
 func (h *AdminHandler) GetPaymentInvoice(w http.ResponseWriter, r *http.Request) {
@@ -1268,7 +1565,11 @@ func (h *AdminHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) {
 	actionFilter := strings.TrimSpace(r.URL.Query().Get("action"))
 	search := strings.TrimSpace(r.URL.Query().Get("search"))
 
-	whereClauses := []string{}
+	whereClauses := []string{
+		// Focus on patient & doctor activity; exclude admin operator actions.
+		`(u.role IS NULL OR u.role IN ('patient','doctor','nurse'))`,
+		`(l.action NOT LIKE 'admin_%')`,
+	}
 	args := []interface{}{}
 	argIdx := 1
 
@@ -1279,7 +1580,13 @@ func (h *AdminHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if search != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf("(u.email ILIKE $%d OR u.first_name || ' ' || u.last_name ILIKE $%d OR l.ip_address::text ILIKE $%d)", argIdx, argIdx, argIdx))
+		whereClauses = append(whereClauses, fmt.Sprintf(`(
+			u.email ILIKE $%d
+			OR u.first_name || ' ' || u.last_name ILIKE $%d
+			OR l.ip_address::text ILIKE $%d
+			OR l.action ILIKE $%d
+			OR l.payload::text ILIKE $%d
+		)`, argIdx, argIdx, argIdx, argIdx, argIdx))
 		args = append(args, "%"+search+"%")
 		argIdx++
 	}
@@ -1295,7 +1602,7 @@ func (h *AdminHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) {
 
 	query := fmt.Sprintf(`
 		SELECT l.id::text, l.action, l.entity_type, l.entity_id::text, l.payload, l.ip_address::text, l.created_at,
-		       u.email, u.first_name || ' ' || u.last_name
+		       u.email, COALESCE(u.first_name || ' ' || u.last_name, ''), COALESCE(u.role::text, '')
 		FROM audit_logs l
 		LEFT JOIN users u ON u.id = l.user_id
 		%s
@@ -1312,28 +1619,24 @@ func (h *AdminHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) {
 
 	items := []map[string]interface{}{}
 	for rows.Next() {
-		var id, action, entityType, ipAddress, userEmail, userName string
+		var id, action, entityType, userName, userRole string
 		var entityID *string
 		var payload []byte
 		var createdAt interface{}
+		var ipNull, emailNull *string
 
-		var ipNull, emailNull, nameNull, entityNull *string
-		err := rows.Scan(&id, &action, &entityType, &entityNull, &payload, &ipNull, &createdAt, &emailNull, &nameNull)
+		err := rows.Scan(&id, &action, &entityType, &entityID, &payload, &ipNull, &createdAt, &emailNull, &userName, &userRole)
 		if err != nil {
 			continue
 		}
 
+		ipAddress := ""
 		if ipNull != nil {
 			ipAddress = *ipNull
 		}
+		userEmail := ""
 		if emailNull != nil {
 			userEmail = *emailNull
-		}
-		if nameNull != nil {
-			userName = *nameNull
-		}
-		if entityNull != nil {
-			entityID = entityNull
 		}
 
 		var payloadObj interface{}
@@ -1350,7 +1653,8 @@ func (h *AdminHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) {
 			"ipAddress":  ipAddress,
 			"createdAt":  createdAt,
 			"userEmail":  userEmail,
-			"userName":   userName,
+			"userName":   strings.TrimSpace(userName),
+			"userRole":   userRole,
 		})
 	}
 	response.OK(w, map[string]interface{}{

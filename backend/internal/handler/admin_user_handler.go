@@ -223,9 +223,8 @@ func (h *AdminUserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	validate.Email(&errs, "email", req.Email)
 	validate.NationalID(&errs, "nationalIdentifier", req.NationalIdentifier)
-	if req.PhoneNumber == "" {
-		errs.Add("phoneNumber", "required", "Telefon numarası zorunludur.")
-	}
+	req.PhoneNumber = validate.NormalizePhoneTR(req.PhoneNumber)
+	validate.PhoneTR(&errs, "phoneNumber", req.PhoneNumber)
 
 	if req.Gender != nil && *req.Gender != 1 && *req.Gender != 2 {
 		errs.Add("gender", "invalid", "Geçersiz cinsiyet seçimi.")
@@ -291,7 +290,7 @@ func (h *AdminUserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	if hashUpdated {
 		_, updateErr = h.db.Pool.Exec(r.Context(), `
 			UPDATE users
-			SET first_name = $1, last_name = $2, email = $3, phone_number = $4,
+			SET first_name = $1, last_name = $2, email = $3, phone_number = $4, phone_country_code = '+90',
 				national_identifier = $5, date_of_birth = $6, gender = $7,
 				role = $8, is_active = $9, password_hash = $10, updated_at = now()
 			WHERE id = $11
@@ -299,7 +298,7 @@ func (h *AdminUserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	} else {
 		_, updateErr = h.db.Pool.Exec(r.Context(), `
 			UPDATE users
-			SET first_name = $1, last_name = $2, email = $3, phone_number = $4,
+			SET first_name = $1, last_name = $2, email = $3, phone_number = $4, phone_country_code = '+90',
 				national_identifier = $5, date_of_birth = $6, gender = $7,
 				role = $8, is_active = $9, updated_at = now()
 			WHERE id = $10

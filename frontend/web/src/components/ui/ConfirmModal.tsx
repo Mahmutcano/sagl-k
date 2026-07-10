@@ -1,5 +1,14 @@
-import React from "react";
-import { Button } from "./button";
+"use client";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -22,37 +31,27 @@ export function ConfirmModal({
   cancelText = "Vazgeç",
   variant = "default",
 }: ConfirmModalProps) {
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Overlay */}
-      <div 
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity" 
-        onClick={onCancel}
-      />
-      
-      {/* Modal Content */}
-      <div className="relative w-full max-w-md rounded-lg border bg-background p-6 shadow-lg animate-in fade-in zoom-in-95 duration-200">
-        <h3 className="text-lg font-semibold leading-none tracking-tight mb-2">
-          {title}
-        </h3>
-        <p className="text-sm text-muted-foreground mb-6">
-          {message}
-        </p>
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" type="button" onClick={onCancel}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
+      <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className="whitespace-pre-wrap">{message}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
+          <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={onCancel}>
             {cancelText}
           </Button>
-          <Button 
-            variant={variant === "destructive" ? "destructive" : "default"} 
+          <Button
             type="button"
-            onClick={onConfirm}
+            variant={variant === "destructive" ? "destructive" : "default"}
+            className="w-full sm:w-auto"
+            onClick={() => void onConfirm()}
           >
             {confirmText}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

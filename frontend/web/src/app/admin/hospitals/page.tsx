@@ -162,10 +162,10 @@ export default function AdminHospitalsPage() {
         </div>
       ) : null}
 
-      <Card className="shadow-md border-slate-200">
-        <CardHeader className="bg-slate-50/50">
-          <CardTitle className="text-base text-slate-800 flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-slate-500" />
+      <Card className=" ">
+        <CardHeader className="bg-muted/40">
+          <CardTitle className="text-base text-foreground flex items-center gap-2">
+            <Building2 className="h-5 w-5 text-muted-foreground" />
             Hastaneler & Kurumlar
           </CardTitle>
         </CardHeader>
@@ -193,7 +193,7 @@ export default function AdminHospitalsPage() {
                 {hospitals.map((h, i) => (
                   <TableRow key={h.id} className="hover:bg-muted/10">
                     <TableCell className="text-center font-mono text-xs text-muted-foreground">{i + 1}</TableCell>
-                    <TableCell className="font-semibold text-slate-800">{h.name}</TableCell>
+                    <TableCell className="font-semibold text-foreground">{h.name}</TableCell>
                     <TableCell className="font-mono text-xs">{h.code}</TableCell>
                     <TableCell className="font-mono text-xs">{h.targetInstitution}</TableCell>
                     <TableCell>
@@ -223,10 +223,10 @@ export default function AdminHospitalsPage() {
       {/* Hospital Edit/Add Modal Overlay */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <Card className="w-full max-w-md shadow-2xl border-slate-200 bg-white">
+          <Card className="w-full max-w-md shadow-2xl bg-white">
             <form onSubmit={handleSubmit} noValidate>
               <CardHeader className="relative border-b pb-4">
-                <CardTitle className="text-base text-slate-800">
+                <CardTitle className="text-base text-foreground">
                   {editingId ? "Hastane Düzenle" : "Yeni Hastane Ekle"}
                 </CardTitle>
                 <CardDescription>
@@ -286,14 +286,14 @@ export default function AdminHospitalsPage() {
                       onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
                       className="rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
                     />
-                    <label htmlFor="isActive" className="text-xs font-semibold text-slate-700 cursor-pointer select-none">
+                    <label htmlFor="isActive" className="text-xs font-semibold text-foreground cursor-pointer select-none">
                       Kurum Aktif / Görünür (Hastalara ve hekimlere listelenir)
                     </label>
                   </div>
                 )}
               </CardContent>
 
-              <CardContent className="border-t pt-4 flex gap-2 justify-end bg-slate-50/50">
+              <CardContent className="border-t pt-4 flex gap-2 justify-end bg-muted/40">
                 <Button type="button" variant="outline" size="sm" onClick={() => setIsModalOpen(false)} disabled={saving}>
                   İptal
                 </Button>

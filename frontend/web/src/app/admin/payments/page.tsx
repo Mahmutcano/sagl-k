@@ -204,14 +204,14 @@ export default function AdminPaymentsPage() {
 
       <div className="mb-4 flex min-w-0 flex-col gap-3 print:hidden lg:mb-6 lg:flex-row lg:items-start lg:justify-between">
         {/* Premium Filter Area */}
-        <form onSubmit={handleSearchSubmit} className="admin-filter-bar min-w-0 flex-1 rounded-xl border border-slate-200/80 bg-white p-3 shadow-premium sm:rounded-2xl sm:p-5">
+        <form onSubmit={handleSearchSubmit} className="admin-filter-bar min-w-0 flex-1 rounded-xl border /80 bg-white p-3 sm:rounded-2xl sm:p-5">
           <div className="flex min-w-0 flex-col gap-1.5 sm:col-span-2 lg:col-span-2">
-            <label htmlFor="search" className="text-xs font-bold tracking-wide text-slate-700">Arama</label>
+            <label htmlFor="search" className="text-xs font-bold tracking-wide text-foreground">Arama</label>
             <div className="relative min-w-0">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="search"
-                className="h-10 rounded-xl border-slate-200 bg-white pl-10 shadow-inner-sm focus-visible:border-primary focus-visible:ring-primary/20"
+                className="h-10 rounded-xl bg-white pl-10 focus-visible:border-primary focus-visible:ring-primary/20"
                 placeholder="Hasta adı, başvuru no..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
@@ -230,18 +230,18 @@ export default function AdminPaymentsPage() {
             value={endDate}
             onChange={(val) => { setPage(0); setEndDate(val); }}
           />
-          <div className="col-span-full flex flex-col-reverse gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:justify-end sm:gap-2.5">
-            <Button type="button" variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 rounded-xl px-4 font-bold text-slate-500 hover:bg-slate-100 hover:text-slate-800">
+          <div className="col-span-full flex flex-col-reverse gap-2 border-t pt-3 sm:flex-row sm:justify-end sm:gap-2.5">
+            <Button type="button" variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 rounded-xl px-4 font-bold text-muted-foreground hover:bg-muted hover:text-foreground">
               Filtreleri Temizle
             </Button>
-            <Button type="submit" size="sm" className="h-9 gap-1.5 rounded-xl px-5 font-bold shadow-md shadow-primary/10">
+            <Button type="submit" size="sm" className="h-9 gap-1.5 rounded-xl px-5 font-bold shadow-primary/10">
               <Search className="h-4 w-4" />
               Filtrele
             </Button>
           </div>
         </form>
 
-        <Button onClick={handleExport} disabled={exporting} variant="outline" className="h-10 w-full gap-2 self-stretch rounded-xl border-slate-200 font-bold shadow-sm hover:bg-slate-50 print:hidden lg:w-auto lg:self-end">
+        <Button onClick={handleExport} disabled={exporting} variant="outline" className="h-10 w-full gap-2 self-stretch rounded-xl font-bold shadow-sm hover:bg-muted print:hidden lg:w-auto lg:self-end">
           <Download className="h-4 w-4" />
           {exporting ? "Dışa Aktarılıyor..." : "CSV İndir"}
         </Button>
@@ -254,34 +254,34 @@ export default function AdminPaymentsPage() {
           <Skeleton className="h-10 w-full rounded-xl" />
         </div>
       ) : payments.length === 0 ? (
-        <Card className="rounded-2xl shadow-premium border-slate-200">
+        <Card className="rounded-2xl ">
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <CardHeader className="p-0">
-              <CardTitle className="text-lg font-bold text-slate-800">Ödeme kaydı bulunamadı</CardTitle>
+              <CardTitle className="text-lg font-bold text-foreground">Ödeme kaydı bulunamadı</CardTitle>
               <CardDescription>Belirttiğiniz kriterlere uygun veya sistemde kayıtlı ödeme bulunmuyor.</CardDescription>
             </CardHeader>
           </CardContent>
         </Card>
       ) : (
         <div className="flex flex-col gap-4">
-          <Card className="print:hidden shadow-premium overflow-hidden rounded-xl border-slate-200/80 bg-white/95 sm:rounded-2xl">
+          <Card className="print:hidden overflow-hidden rounded-xl /80 bg-white/95 sm:rounded-2xl">
             <CardContent className="admin-table-scroll p-0">
               <Table>
-                <TableHeader className="bg-slate-50/50">
+                <TableHeader className="bg-muted/40">
                   <TableRow>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Hasta Adı</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Başvuru</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Sağlayıcı</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tutar</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Durum</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tarih</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right">İşlem</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Hasta Adı</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Başvuru</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Sağlayıcı</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Tutar</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Durum</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Tarih</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider text-right">İşlem</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {payments.map((p) => (
-                    <TableRow key={p.id} className="hover:bg-slate-50/50 transition-colors">
-                      <TableCell className="px-6 py-4 font-semibold text-slate-800">
+                    <TableRow key={p.id} className="hover:bg-muted/40 transition-colors">
+                      <TableCell className="px-6 py-4 font-semibold text-foreground">
                         {p.patientName || "—"}
                       </TableCell>
                       <TableCell className="px-6 py-4">
@@ -292,8 +292,8 @@ export default function AdminPaymentsPage() {
                           {p.applicationId.slice(0, 8)}…
                         </Link>
                       </TableCell>
-                      <TableCell className="px-6 py-4 capitalize text-slate-600 font-medium">{p.provider}</TableCell>
-                      <TableCell className="px-6 py-4 font-bold text-slate-900">
+                      <TableCell className="px-6 py-4 capitalize text-muted-foreground font-medium">{p.provider}</TableCell>
+                      <TableCell className="px-6 py-4 font-bold text-foreground">
                         {p.amount.toLocaleString("tr-TR", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
@@ -328,9 +328,9 @@ export default function AdminPaymentsPage() {
           </Card>
 
           {/* Premium Pagination */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50 border border-slate-200/50 rounded-2xl px-6 py-4 mt-2 print:hidden shadow-sm">
-            <div className="text-xs font-semibold text-slate-500 tracking-wide font-sans">
-              Toplam <span className="text-primary font-bold">{totalCount}</span> kayıttan <span className="text-slate-800 font-bold">{page * pageSize + 1} - {Math.min((page + 1) * pageSize, totalCount)}</span> arası gösteriliyor
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-muted/40 border /50 rounded-2xl px-6 py-4 mt-2 print:hidden shadow-sm">
+            <div className="text-xs font-semibold text-muted-foreground tracking-wide font-sans">
+              Toplam <span className="text-primary font-bold">{totalCount}</span> kayıttan <span className="text-foreground font-bold">{page * pageSize + 1} - {Math.min((page + 1) * pageSize, totalCount)}</span> arası gösteriliyor
             </div>
             <div className="flex items-center gap-1.5">
               <Button
@@ -338,7 +338,7 @@ export default function AdminPaymentsPage() {
                 size="sm"
                 disabled={page === 0}
                 onClick={() => setPage((p) => p - 1)}
-                className="h-8 w-8 p-0 rounded-lg border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40 transition-all duration-150"
+                className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 transition-all duration-150"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -362,7 +362,7 @@ export default function AdminPaymentsPage() {
                           "h-8 min-w-[32px] px-2 text-xs font-bold rounded-lg transition-all duration-150",
                           active 
                             ? "bg-primary text-primary-foreground shadow-sm shadow-primary/10" 
-                            : "border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                            : " text-muted-foreground hover:bg-muted hover:text-foreground"
                         )}
                       >
                         {i + 1}
@@ -378,7 +378,7 @@ export default function AdminPaymentsPage() {
                 size="sm"
                 disabled={(page + 1) * pageSize >= totalCount}
                 onClick={() => setPage((p) => p + 1)}
-                className="h-8 w-8 p-0 rounded-lg border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40 transition-all duration-150"
+                className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40 transition-all duration-150"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -393,14 +393,14 @@ export default function AdminPaymentsPage() {
           <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh] print:max-h-none print:shadow-none print:rounded-none">
 
             {/* Modal Header */}
-            <div className="flex justify-between items-center p-4 border-b bg-slate-50 print:hidden">
-              <span className="text-sm font-bold text-slate-600 font-mono">E-Makbuz Detayı</span>
+            <div className="flex justify-between items-center p-4 border-b bg-muted print:hidden">
+              <span className="text-sm font-bold text-muted-foreground font-mono">E-Makbuz Detayı</span>
               <div className="flex gap-2">
                 <Button onClick={handlePrint} size="sm" className="gap-1.5 font-bold">
                   <Printer className="h-4 w-4" />
                   Yazdır / PDF Kaydet
                 </Button>
-                <Button onClick={() => setSelectedInvoice(null)} variant="ghost" size="sm" className="p-1 rounded-full hover:bg-slate-200">
+                <Button onClick={() => setSelectedInvoice(null)} variant="ghost" size="sm" className="p-1 rounded-full hover:bg-muted">
                   <X className="h-5 w-5" />
                 </Button>
               </div>
@@ -412,40 +412,40 @@ export default function AdminPaymentsPage() {
               {/* Receipt Branding */}
               <div className="flex justify-between items-start border-b pb-6 mb-6">
                 <div>
-                  <h2 className="text-xl font-extrabold tracking-tight text-slate-900">TIBBİ DANIŞMANLIK</h2>
-                  <p className="text-xs text-slate-500 font-semibold mt-0.5">{selectedInvoice.hospitalName || "Erciyes Üniversitesi Tıp Fakültesi Hastaneleri"}</p>
+                  <h2 className="text-xl font-extrabold tracking-tight text-foreground">TIBBİ DANIŞMANLIK</h2>
+                  <p className="text-xs text-muted-foreground font-semibold mt-0.5">{selectedInvoice.hospitalName || "Erciyes Üniversitesi Tıp Fakültesi Hastaneleri"}</p>
                 </div>
                 <div className="text-right">
                   <h3 className="text-base font-extrabold text-primary">E-HİZMET MAKBUZU</h3>
-                  <p className="text-xs text-slate-500 font-mono mt-0.5">Tarih: {new Date(selectedInvoice.createdAt).toLocaleString("tr-TR")}</p>
+                  <p className="text-xs text-muted-foreground font-mono mt-0.5">Tarih: {new Date(selectedInvoice.createdAt).toLocaleString("tr-TR")}</p>
                 </div>
               </div>
 
               {/* Invoice Meta Grid */}
               <div className="grid grid-cols-2 gap-6 text-sm mb-6 border-b pb-6">
                 <div>
-                  <span className="text-xs text-slate-400 font-bold block mb-1 uppercase tracking-wider">Hizmet Alan (Hasta)</span>
-                  <p className="font-bold text-slate-800">{selectedInvoice.patientName}</p>
+                  <span className="text-xs text-muted-foreground font-bold block mb-1 uppercase tracking-wider">Hizmet Alan (Hasta)</span>
+                  <p className="font-bold text-foreground">{selectedInvoice.patientName}</p>
                   {selectedInvoice.patientNationalId && (
-                    <p className="text-xs text-slate-600 font-mono mt-0.5">T.C.: {selectedInvoice.patientNationalId}</p>
+                    <p className="text-xs text-muted-foreground font-mono mt-0.5">T.C.: {selectedInvoice.patientNationalId}</p>
                   )}
-                  <p className="text-xs text-slate-600 mt-0.5">Tel: {selectedInvoice.patientPhone}</p>
-                  <p className="text-xs text-slate-600">E-Posta: {selectedInvoice.patientEmail}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Tel: {selectedInvoice.patientPhone}</p>
+                  <p className="text-xs text-muted-foreground">E-Posta: {selectedInvoice.patientEmail}</p>
                 </div>
                 <div className="text-right">
-                  <span className="text-xs text-slate-400 font-bold block mb-1 uppercase tracking-wider">Hizmet Veren (Hekim)</span>
-                  <p className="font-bold text-slate-800">{selectedInvoice.doctorName || "Atanmamış / Havuz"}</p>
+                  <span className="text-xs text-muted-foreground font-bold block mb-1 uppercase tracking-wider">Hizmet Veren (Hekim)</span>
+                  <p className="font-bold text-foreground">{selectedInvoice.doctorName || "Atanmamış / Havuz"}</p>
                   {selectedInvoice.professionName && (
-                    <p className="text-xs text-slate-600 mt-0.5">Klinik: {selectedInvoice.professionName}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Klinik: {selectedInvoice.professionName}</p>
                   )}
-                  <p className="text-xs text-slate-600 mt-0.5">Kurum: {selectedInvoice.hospitalName || "Erciyes Hastanesi"}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Kurum: {selectedInvoice.hospitalName || "Erciyes Hastanesi"}</p>
                 </div>
               </div>
 
               {/* Receipt Details Table */}
               <div className="border rounded-xl overflow-hidden mb-6">
                 <table className="w-full text-sm text-left">
-                  <thead className="bg-slate-50 border-b text-slate-600 font-bold text-xs">
+                  <thead className="bg-muted border-b text-muted-foreground font-bold text-xs">
                     <tr>
                       <th className="p-3.5">Hizmet Açıklaması</th>
                       <th className="p-3.5 text-right">Referans No</th>
@@ -454,13 +454,13 @@ export default function AdminPaymentsPage() {
                   </thead>
                   <tbody>
                     <tr className="border-b">
-                      <td className="p-3.5 font-semibold text-slate-800">
+                      <td className="p-3.5 font-semibold text-foreground">
                         Tıbbi İkinci Görüş Raporlama ve Klinik Danışmanlık Hizmeti
                       </td>
                       <td className="p-3.5 text-right font-mono text-xs text-muted-foreground">
                         {selectedInvoice.ecommerceNumber || selectedInvoice.applicationId.slice(0, 8)}
                       </td>
-                      <td className="p-3.5 text-right font-extrabold text-slate-900">
+                      <td className="p-3.5 text-right font-extrabold text-foreground">
                         {selectedInvoice.amount.toLocaleString("tr-TR", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
@@ -476,7 +476,7 @@ export default function AdminPaymentsPage() {
               <div className="flex justify-end mb-8">
                 <div className="w-64 text-sm space-y-1.5 border-t pt-3">
                   <div className="flex justify-between">
-                    <span className="text-slate-500 font-medium">Ara Toplam:</span>
+                    <span className="text-muted-foreground font-medium">Ara Toplam:</span>
                     <span className="font-semibold">
                       {selectedInvoice.amount.toLocaleString("tr-TR", {
                         minimumFractionDigits: 2,
@@ -485,10 +485,10 @@ export default function AdminPaymentsPage() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-500 font-medium">KDV (%0 / Muaf):</span>
+                    <span className="text-muted-foreground font-medium">KDV (%0 / Muaf):</span>
                     <span>0,00 {selectedInvoice.currency}</span>
                   </div>
-                  <div className="flex justify-between border-t pt-1.5 font-bold text-base text-slate-900">
+                  <div className="flex justify-between border-t pt-1.5 font-bold text-base text-foreground">
                     <span>Toplam Ödeme:</span>
                     <span>
                       {selectedInvoice.amount.toLocaleString("tr-TR", {
@@ -501,31 +501,31 @@ export default function AdminPaymentsPage() {
               </div>
 
               {/* Transaction Footers */}
-              <div className="bg-slate-50/50 rounded-xl p-4 text-xs text-slate-600 space-y-1.5 border border-slate-100">
-                <p><span className="font-bold text-slate-500">Ödeme Durumu:</span> {selectedInvoice.status.toUpperCase()}</p>
-                <p><span className="font-bold text-slate-500">Ödeme Kanalı:</span> Param</p>
+              <div className="bg-muted/40 rounded-xl p-4 text-xs text-muted-foreground space-y-1.5 border ">
+                <p><span className="font-bold text-muted-foreground">Ödeme Durumu:</span> {selectedInvoice.status.toUpperCase()}</p>
+                <p><span className="font-bold text-muted-foreground">Ödeme Kanalı:</span> Param</p>
                 {selectedInvoice.providerTransactionId && (
-                  <p className="font-mono"><span className="font-bold font-sans text-slate-500">İşlem (TX) ID:</span> {selectedInvoice.providerTransactionId}</p>
+                  <p className="font-mono"><span className="font-bold font-sans text-muted-foreground">İşlem (TX) ID:</span> {selectedInvoice.providerTransactionId}</p>
                 )}
                 {selectedInvoice.paidAt && (
-                  <p><span className="font-bold text-slate-500">Ödeme Zamanı:</span> {new Date(selectedInvoice.paidAt).toLocaleString("tr-TR")}</p>
+                  <p><span className="font-bold text-muted-foreground">Ödeme Zamanı:</span> {new Date(selectedInvoice.paidAt).toLocaleString("tr-TR")}</p>
                 )}
                 {selectedInvoice.invoiceNumber ? (
                   <>
-                    <p className="pt-2 border-t border-slate-200"><span className="font-bold text-slate-500">Fatura (Bizim Hesap):</span> {selectedInvoice.invoiceNumber}</p>
+                    <p className="pt-2 border-t "><span className="font-bold text-muted-foreground">Fatura (Bizim Hesap):</span> {selectedInvoice.invoiceNumber}</p>
                     {selectedInvoice.invoiceId && (
-                      <p className="font-mono"><span className="font-bold font-sans text-slate-500">Fatura ID:</span> {selectedInvoice.invoiceId}</p>
+                      <p className="font-mono"><span className="font-bold font-sans text-muted-foreground">Fatura ID:</span> {selectedInvoice.invoiceId}</p>
                     )}
                     {selectedInvoice.invoiceStatus && (
-                      <p><span className="font-bold text-slate-500">Fatura Durumu:</span> {selectedInvoice.invoiceStatus.toUpperCase()}</p>
+                      <p><span className="font-bold text-muted-foreground">Fatura Durumu:</span> {selectedInvoice.invoiceStatus.toUpperCase()}</p>
                     )}
                   </>
                 ) : selectedInvoice.invoiceError ? (
-                  <p className="pt-2 border-t border-slate-200 text-amber-700"><span className="font-bold">Fatura hatası:</span> {selectedInvoice.invoiceError}</p>
+                  <p className="pt-2 border-t text-amber-700"><span className="font-bold">Fatura hatası:</span> {selectedInvoice.invoiceError}</p>
                 ) : null}
               </div>
 
-              <div className="text-center mt-12 text-[10px] font-medium text-slate-400 border-t pt-4">
+              <div className="text-center mt-12 text-[10px] font-medium text-muted-foreground border-t pt-4">
                 Bu belge dijital olarak oluşturulmuştur ve ıslak imza gerektirmez. Sorgulama ve doğrulama için başvuru ID kullanılabilir.
               </div>
 

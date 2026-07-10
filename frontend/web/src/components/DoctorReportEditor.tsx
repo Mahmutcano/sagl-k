@@ -256,7 +256,7 @@ export function DoctorReportEditor({
           method: "PUT",
           body: JSON.stringify({ reportJson: dataStr }),
         }, token);
-        setMsg("Rapor başarıyla güncellendi.");
+        setMsg("Rapor güncellendi. Hastaya bilgilendirme gönderildi.");
       } else {
         await api(API.applications.conclude(applicationId), {
           method: "POST",
@@ -289,7 +289,7 @@ export function DoctorReportEditor({
   }
 
   if (!loaded) {
-    return <div className="text-sm text-slate-500 py-8 text-center">Rapor yükleniyor...</div>;
+    return <div className="text-sm text-muted-foreground py-8 text-center">Rapor yükleniyor...</div>;
   }
 
   const alerts = (
@@ -314,7 +314,7 @@ export function DoctorReportEditor({
       title={isConcluded ? "Raporu Güncelle" : "Raporu Onayla ve Gönder"}
       message={
         isConcluded
-          ? "Rapor güncellenecek. Hastaya yeni bildirim gönderilmeyecektir. Devam etmek istiyor musunuz?"
+          ? "Rapor güncellenecek ve hastaya 'raporunuz güncellendi' bildirimi gönderilecektir. Devam etmek istiyor musunuz?"
           : "Rapor hastaya iletilecek ve başvuru sonuçlandırılacak. Bu işlem geri alınamaz. Önizlemeyi kontrol ettiniz mi?"
       }
       confirmText={isConcluded ? "Evet, Güncelle" : "Evet, Gönder"}
@@ -330,11 +330,11 @@ export function DoctorReportEditor({
       <div className="flex flex-col gap-4">
         {alerts}
 
-        <Card className="shadow-premium border-primary/20 bg-white border-2">
+        <Card className=" border-primary/20 bg-white border-2">
           <CardHeader className="bg-primary/[0.03] border-b py-5 px-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <CardTitle className="text-base text-slate-800 font-bold flex items-center gap-2">
+                <CardTitle className="text-base text-foreground font-bold flex items-center gap-2">
                   <Eye className="h-5 w-5 text-primary" />
                   Rapor Önizleme
                 </CardTitle>
@@ -364,13 +364,13 @@ export function DoctorReportEditor({
               <iframe
                 title="Rapor önizleme"
                 srcDoc={previewHtml}
-                className="w-full h-[min(75vh,800px)] rounded-xl border border-slate-200 bg-white"
+                className="w-full h-[min(75vh,800px)] rounded-xl border bg-white"
                 sandbox="allow-same-origin allow-modals"
               />
             ) : null}
           </CardContent>
 
-          <CardFooter className="border-t pt-4 px-4 sm:px-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-between bg-slate-50/50">
+          <CardFooter className="border-t pt-4 px-4 sm:px-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-between bg-muted/40">
             <Button
               variant="outline"
               disabled={busy}
@@ -399,7 +399,7 @@ export function DoctorReportEditor({
               <Button
                 disabled={busy || previewLoading || !previewHtml}
                 onClick={() => setConfirmOpen(true)}
-                className="gap-2 h-10 px-6 rounded-xl font-bold shadow-md shadow-primary/10 w-full sm:w-auto"
+                className="gap-2 h-10 px-6 rounded-xl font-bold shadow-primary/10 w-full sm:w-auto"
               >
                 {isConcluded ? (
                   <>
@@ -427,11 +427,11 @@ export function DoctorReportEditor({
     <div className="flex flex-col gap-4">
       {alerts}
 
-      <Card className="shadow-premium border-primary/10 bg-white border-2">
+      <Card className=" border-primary/10 bg-white border-2">
         <CardHeader className="bg-primary/[0.02] border-b py-4 px-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <CardTitle className="text-base text-slate-800 font-bold flex items-center gap-2">
+              <CardTitle className="text-base text-foreground font-bold flex items-center gap-2">
                 <FileEdit className="h-5 w-5 text-primary" />
                 {isConcluded ? "Tıbbi Uzman Raporu — Düzenleme" : "Tıbbi Uzman Raporu"}
               </CardTitle>
@@ -463,7 +463,7 @@ export function DoctorReportEditor({
                       : saveStatus === "saving"
                         ? "border-amber-300 text-amber-700 bg-amber-50"
                         : ""
-                }`}
+               }`}
               >
                 {saveStatus === "saved" ? (
                   <Cloud className="h-3 w-3" />
@@ -498,8 +498,8 @@ export function DoctorReportEditor({
                     {i + 1}
                   </span>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-800">{section.label}</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">
+                    <h3 className="text-sm font-bold text-foreground">{section.label}</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
                       {section.hint}
                       {section.required ? " (Zorunlu)" : ""}
                     </p>
@@ -517,7 +517,7 @@ export function DoctorReportEditor({
                   />
                 </FormField>
 
-                <div className="flex items-center justify-between text-xs text-slate-400 -mt-1">
+                <div className="flex items-center justify-between text-xs text-muted-foreground -mt-1">
                   <span>
                     {report[section.key].length} karakter
                     {section.minLength > 0 && section.required
@@ -537,7 +537,7 @@ export function DoctorReportEditor({
           </div>
         </CardContent>
 
-          <CardFooter className="border-t pt-4 px-4 sm:px-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-between bg-slate-50/50">
+          <CardFooter className="border-t pt-4 px-4 sm:px-6 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-between bg-muted/40">
             <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-row">
             {!isConcluded ? (
               <Button

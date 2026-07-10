@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
+import { Card, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   applicationDisplayNumber,
   isPatientCancellableStatus,
@@ -36,55 +37,51 @@ export function PatientApplicationRow({ item, onDelete, deleting }: Props) {
     : "";
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className="flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            <p className="font-semibold leading-tight text-slate-900">
-              {item.professionName ?? "Başvuru"}
-            </p>
-            <p className="text-sm text-slate-500">
-              Başvuru no: {applicationDisplayNumber(item)}
-              {item.doctorName ? ` · ${item.doctorName}` : ""}
-              {dateLabel ? ` · ${dateLabel}` : ""}
-            </p>
-            {isPatientAwaitingDoctor(item.statusCode) ? (
-              <p className="mt-1 text-xs text-slate-500">Doktorunuz tarafından raporlanıyor</p>
-            ) : null}
-          </div>
-          <StatusBadge code={item.statusCode} className="shrink-0" />
-        </div>
-
-        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 pt-3">
-          {canEdit ? (
-            <>
-              <Button size="sm" variant="outline" asChild>
-                <Link href={ROUTES.patient.editApplication(item.applicationId, "details")}>
-                  Bölüm / doktor
-                </Link>
-              </Button>
-              <Button size="sm" asChild>
-                <Link href={ROUTES.patient.editApplication(item.applicationId)}>Devam et</Link>
-              </Button>
-            </>
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
+        <div className="min-w-0 space-y-1">
+          <CardTitle className="text-base">{item.professionName ?? "Başvuru"}</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Başvuru no: {applicationDisplayNumber(item)}
+            {item.doctorName ? ` · ${item.doctorName}` : ""}
+            {dateLabel ? ` · ${dateLabel}` : ""}
+          </p>
+          {isPatientAwaitingDoctor(item.statusCode) ? (
+            <p className="text-xs text-muted-foreground">Doktorunuz tarafından raporlanıyor</p>
           ) : null}
-          <Button size="sm" variant="outline" asChild>
-            <Link href={ROUTES.patient.application(item.applicationId)}>Detay</Link>
-          </Button>
-          {canDelete && onDelete ? (
-            <Button
-              size="sm"
-              variant="destructive"
-              type="button"
-              disabled={deleting}
-              onClick={() => onDelete(item.applicationId)}
-            >
-              {deleting ? "Siliniyor..." : "Sil"}
+        </div>
+        <StatusBadge code={item.statusCode} />
+      </CardHeader>
+      <CardFooter className="flex flex-wrap justify-end gap-2 border-t pt-4">
+        {canEdit ? (
+          <>
+            <Button size="sm" variant="outline" asChild className="w-full sm:w-auto">
+              <Link href={ROUTES.patient.editApplication(item.applicationId, "details")}>
+                Bölüm / doktor
+              </Link>
             </Button>
-          ) : null}
-        </div>
-      </div>
-    </div>
+            <Button size="sm" asChild className="w-full sm:w-auto">
+              <Link href={ROUTES.patient.editApplication(item.applicationId)}>Devam et</Link>
+            </Button>
+          </>
+        ) : null}
+        <Button size="sm" variant="outline" asChild className="w-full sm:w-auto">
+          <Link href={ROUTES.patient.application(item.applicationId)}>Detay</Link>
+        </Button>
+        {canDelete && onDelete ? (
+          <Button
+            size="sm"
+            variant="destructive"
+            type="button"
+            className="w-full sm:w-auto"
+            disabled={deleting}
+            onClick={() => onDelete(item.applicationId)}
+          >
+            {deleting ? "Siliniyor..." : "Sil"}
+          </Button>
+        ) : null}
+      </CardFooter>
+    </Card>
   );
 }
 
@@ -105,11 +102,11 @@ export function ApplicationListGroup({
 }: GroupProps) {
   return (
     <section className={cn("grid gap-3", className)}>
-      <div className="space-y-1 border-b border-slate-200 pb-3">
-        <h2 className="text-lg font-semibold tracking-tight text-slate-900">{title}</h2>
-        <p className="text-sm text-slate-500">{description}</p>
+      <div className="space-y-1 border-b pb-3">
+        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+        <p className="text-sm text-muted-foreground">{description}</p>
         {stepHint ? (
-          <p className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          <p className="rounded-md border border-dashed bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
             {stepHint}
           </p>
         ) : null}

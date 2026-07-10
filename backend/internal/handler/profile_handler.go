@@ -36,6 +36,8 @@ type ProfileResponse struct {
 	LastName           string  `json:"lastName"`
 	Email              string  `json:"email"`
 	PhoneNumber        string  `json:"phoneNumber"`
+	PhoneCountryCode   string  `json:"phoneCountryCode"`
+	PatientNumber      string  `json:"patientNumber"`
 	NationalIdentifier string  `json:"nationalIdentifier"`
 	DateOfBirth        *string `json:"dateOfBirth"`
 	Gender             *int    `json:"gender"`
@@ -55,12 +57,15 @@ func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	var nationalID *string
 	var email *string
 	var phone *string
+	var phoneCC *string
+	var patientNo string
 
 	err := h.db.Pool.QueryRow(r.Context(), `
-		SELECT id::text, first_name, last_name, email, phone_number, national_identifier, date_of_birth, gender, role::text
+		SELECT id::text, first_name, last_name, email, phone_number, COALESCE(phone_country_code, '+90'),
+		       COALESCE(patient_number, ''), national_identifier, date_of_birth, gender, role::text
 		FROM users WHERE id = $1 AND is_active = true
 	`, claims.UserID).Scan(
-		&p.ID, &p.FirstName, &p.LastName, &email, &phone, &nationalID, &dob, &gender, &p.Role,
+		&p.ID, &p.FirstName, &p.LastName, &email, &phone, &phoneCC, &patientNo, &nationalID, &dob, &gender, &p.Role,
 	)
 	if err != nil {
 		response.Fail(w, http.StatusNotFound, "PROF001", "Kullanıcı profili bulunamadı.")
@@ -73,6 +78,12 @@ func (h *ProfileHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
 	if phone != nil {
 		p.PhoneNumber = *phone
 	}
+	if phoneCC != nil {
+		p.PhoneCountryCode = *phoneCC
+	} else {
+		p.PhoneCountryCode = "+90"
+	}
+	p.PatientNumber = patientNo
 	if nationalID != nil {
 		p.NationalIdentifier = *nationalID
 	}
@@ -92,6 +103,7 @@ type ProfileUpdateRequest struct {
 	LastName           string  `json:"lastName"`
 	Email              string  `json:"email"`
 	NationalIdentifier string  `json:"nationalIdentifier"`
+	PhoneCountryCode   string  `json:"phoneCountryCode"`
 	PhoneNumber        string  `json:"phoneNumber"`
 	DateOfBirth        *string `json:"dateOfBirth"`
 	Gender             *int    `json:"gender"`
@@ -117,7 +129,8 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	req.LastName = strings.TrimSpace(req.LastName)
 	req.Email = strings.TrimSpace(req.Email)
 	req.NationalIdentifier = strings.TrimSpace(req.NationalIdentifier)
-	req.PhoneNumber = strings.TrimSpace(req.PhoneNumber)
+	req.PhoneCountryCode = validate.NormalizeCountryCode(req.PhoneCountryCode)
+	req.PhoneNumber = validate.NormalizeNationalPhone(req.PhoneCountryCode, req.PhoneNumber)
 
 	if req.FirstName == "" {
 		errs.Add("firstName", "required", "Ad alanı zorunludur.")
@@ -127,6 +140,9 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	validate.Email(&errs, "email", req.Email)
 	validate.NationalID(&errs, "nationalIdentifier", req.NationalIdentifier)
+	if req.PhoneNumber != "" {
+		validate.PhoneNational(&errs, "phoneNumber", req.PhoneCountryCode, req.PhoneNumber)
+	}
 
 	if req.Gender != nil && *req.Gender != 1 && *req.Gender != 2 {
 		errs.Add("gender", "invalid", "Geçersiz cinsiyet seçimi.")
@@ -137,10 +153,11 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var currentHash, currentPhone, currentEmail, currentTC string
+	var currentHash, currentPhone, currentEmail, currentTC, currentPhoneCC string
 	err := h.db.Pool.QueryRow(r.Context(), `
-		SELECT password_hash, phone_number, email, national_identifier FROM users WHERE id = $1
-	`, claims.UserID).Scan(&currentHash, &currentPhone, &currentEmail, &currentTC)
+		SELECT password_hash, phone_number, email, national_identifier, COALESCE(phone_country_code, '+90')
+		FROM users WHERE id = $1
+	`, claims.UserID).Scan(&currentHash, &currentPhone, &currentEmail, &currentTC, &currentPhoneCC)
 	if err != nil {
 		response.Fail(w, http.StatusNotFound, "PROF002", "Kullanıcı bulunamadı.")
 		return
@@ -222,9 +239,15 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// If phone number is changed, trigger SMS OTP verification
-	if req.PhoneNumber != "" && req.PhoneNumber != currentPhone {
+	phoneChanged := req.PhoneNumber != "" && (req.PhoneNumber != currentPhone || req.PhoneCountryCode != currentPhoneCC)
+	if phoneChanged {
 		var exists bool
-		_ = h.db.Pool.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM users WHERE phone_number = $1 AND id <> $2)`, req.PhoneNumber, claims.UserID).Scan(&exists)
+		_ = h.db.Pool.QueryRow(r.Context(), `
+			SELECT EXISTS(
+				SELECT 1 FROM users
+				WHERE phone_number = $1 AND COALESCE(phone_country_code, '+90') = $2 AND id <> $3
+			)
+		`, req.PhoneNumber, req.PhoneCountryCode, claims.UserID).Scan(&exists)
 		if exists {
 			errs.Add("phoneNumber", "unique", "Bu telefon numarası başka bir kullanıcı tarafından kullanılıyor.")
 			validate.Fail(w, errs)
@@ -236,14 +259,27 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 			mins = 1
 		}
 		expiresAt := time.Now().Add(h.otpTTL)
+		smsTo := validate.ToE164(req.PhoneCountryCode, req.PhoneNumber)
 		code, err := h.notify.SendSMS(
 			r.Context(),
-			req.PhoneNumber,
+			smsTo,
 			"change_phone_otp",
 			fmt.Sprintf("Telefon güncelleme doğrulama. Kod %d dakika geçerlidir", mins),
 			&claims.UserID,
 			nil,
 		)
+		status := "sent"
+		errMsg := ""
+		if err != nil {
+			status = "failed"
+			errMsg = err.Error()
+		}
+		_, _ = h.db.Pool.Exec(r.Context(), `
+			INSERT INTO sms_otp_logs (
+				purpose, phone_e164, phone_country_code, phone_number, otp_code,
+				first_name, last_name, email, user_id, status, error_message
+			) VALUES ('change_phone',$1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,''))
+		`, smsTo, req.PhoneCountryCode, req.PhoneNumber, code, req.FirstName, req.LastName, req.Email, claims.UserID, status, errMsg)
 		if err != nil {
 			response.Fail(w, http.StatusInternalServerError, "PROF005", "Doğrulama SMS'i gönderilemedi. Profilin geri kalanı güncellendi.")
 			return
@@ -252,7 +288,7 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		_, err = h.db.Pool.Exec(r.Context(), `
 			INSERT INTO verification_tokens (user_id, phone_number, token, purpose, expires_at)
 			VALUES ($1, $2, $3, 'change_phone', $4)
-		`, claims.UserID, req.PhoneNumber, code, expiresAt)
+		`, claims.UserID, req.PhoneCountryCode+"|"+req.PhoneNumber, code, expiresAt)
 
 		if err != nil {
 			response.Fail(w, http.StatusInternalServerError, "PROF006", "Doğrulama kodu kaydedilemedi.")
@@ -295,24 +331,33 @@ func (h *ProfileHandler) VerifyProfilePhone(w http.ResponseWriter, r *http.Reque
 	}
 
 	var tokenID uuid.UUID
-	var newPhone string
+	var pendingPhone string
 	err := h.db.Pool.QueryRow(r.Context(), `
 		SELECT id, phone_number FROM verification_tokens
 		WHERE user_id = $1 AND token = $2 AND purpose = 'change_phone'
 		  AND expires_at > now() AND used_at IS NULL
 		ORDER BY created_at DESC LIMIT 1
-	`, claims.UserID, req.Code).Scan(&tokenID, &newPhone)
+	`, claims.UserID, req.Code).Scan(&tokenID, &pendingPhone)
 
 	if err != nil {
 		response.Fail(w, http.StatusForbidden, "PROF008", "Geçersiz veya süresi dolmuş doğrulama kodu.")
 		return
 	}
 
+	newPhone := pendingPhone
+	newCC := "+90"
+	if parts := strings.SplitN(pendingPhone, "|", 2); len(parts) == 2 {
+		newCC = validate.NormalizeCountryCode(parts[0])
+		newPhone = validate.NormalizeNationalPhone(newCC, parts[1])
+	} else {
+		newPhone = validate.NormalizePhoneTR(pendingPhone)
+	}
+
 	// Update user phone number
 	_, err = h.db.Pool.Exec(r.Context(), `
-		UPDATE users SET phone_number = $1, is_phone_verified = true, updated_at = now()
-		WHERE id = $2
-	`, newPhone, claims.UserID)
+		UPDATE users SET phone_number = $1, phone_country_code = $2, is_phone_verified = true, updated_at = now()
+		WHERE id = $3
+	`, newPhone, newCC, claims.UserID)
 	if err != nil {
 		response.Fail(w, http.StatusInternalServerError, "PROF009", "Telefon numarası güncellenemedi.")
 		return
@@ -324,7 +369,7 @@ func (h *ProfileHandler) VerifyProfilePhone(w http.ResponseWriter, r *http.Reque
 	`, tokenID)
 
 	h.audit.Log(r.Context(), &claims.UserID, "change_phone", "users", &claims.UserID, map[string]interface{}{
-		"phone": newPhone,
+		"phone": newPhone, "phoneCountryCode": newCC,
 	})
 
 	response.OK(w, map[string]interface{}{

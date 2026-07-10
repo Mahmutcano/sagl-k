@@ -77,7 +77,7 @@ export function FileUploadField({ files, onChange, onError, error, disabled }: P
     <div className="grid gap-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-bold text-slate-800 flex items-center gap-2">
+          <p className="text-sm font-bold text-foreground flex items-center gap-2">
             <Paperclip className="h-4 w-4 text-primary" />
             Tıbbi belgeler
           </p>
@@ -85,7 +85,7 @@ export function FileUploadField({ files, onChange, onError, error, disabled }: P
             Tetkik, rapor veya görüntüleme sonuçlarınızı ekleyin (isteğe bağlı)
           </p>
         </div>
-        <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-100 px-2 py-1 rounded-md">
+        <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-muted-foreground bg-muted px-2 py-1 rounded-md">
           {files.length}/{MAX_FILES}
         </span>
       </div>
@@ -123,10 +123,10 @@ export function FileUploadField({ files, onChange, onError, error, disabled }: P
           "relative overflow-hidden rounded-2xl border-2 border-dashed transition-all duration-200 outline-none",
           canAdd && "cursor-pointer focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
           dragOver
-            ? "border-primary bg-primary/5 scale-[1.01] shadow-lg shadow-primary/10"
+            ? "border-primary bg-primary/5 scale-[1.01]"
             : canAdd
-              ? "border-slate-200 bg-gradient-to-b from-slate-50/80 to-white hover:border-primary/40 hover:bg-primary/[0.02] hover:shadow-premium"
-              : "border-slate-100 bg-slate-50/50 opacity-60 cursor-not-allowed"
+              ? "border-muted-foreground/25 bg-muted/30 hover:border-primary/40 hover:bg-accent/40"
+              : "border-muted bg-muted/40 opacity-60 cursor-not-allowed"
         )}
       >
         <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-primary/5 blur-2xl" />
@@ -138,7 +138,7 @@ export function FileUploadField({ files, onChange, onError, error, disabled }: P
               "flex h-16 w-16 items-center justify-center rounded-2xl border shadow-sm transition-transform duration-200",
               dragOver
                 ? "scale-110 border-primary/30 bg-primary/10 text-primary"
-                : "border-slate-200 bg-white text-primary"
+                : "bg-background text-primary"
             )}
           >
             {dragOver ? (
@@ -149,10 +149,10 @@ export function FileUploadField({ files, onChange, onError, error, disabled }: P
           </div>
 
           <div className="space-y-1.5">
-            <p className="text-sm font-bold text-slate-800">
+            <p className="text-sm font-bold text-foreground">
               {dragOver ? "Dosyaları buraya bırakın" : "Belgelerinizi yükleyin"}
             </p>
-            <p className="text-xs text-slate-500 max-w-sm px-2">
+            <p className="text-xs text-muted-foreground max-w-sm px-2">
               <span className="sm:hidden">Dosya seçin veya buraya sürükleyin</span>
               <span className="hidden sm:inline">Sürükleyip bırakın veya bilgisayarınızdan seçin</span>
             </p>
@@ -162,7 +162,7 @@ export function FileUploadField({ files, onChange, onError, error, disabled }: P
             type="button"
             size="sm"
             disabled={!canAdd}
-            className="pointer-events-none gap-2 rounded-xl font-bold shadow-md shadow-primary/15 px-5 h-10"
+            className="pointer-events-none gap-2 rounded-xl font-bold shadow-primary/15 px-5 h-10"
             tabIndex={-1}
           >
             <Upload className="h-4 w-4" />
@@ -173,12 +173,12 @@ export function FileUploadField({ files, onChange, onError, error, disabled }: P
             {["PDF", "JPEG", "PNG"].map((fmt) => (
               <span
                 key={fmt}
-                className="text-[10px] font-bold uppercase tracking-wide text-slate-500 bg-white border border-slate-200 px-2.5 py-1 rounded-full shadow-sm"
+                className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground bg-white border px-2.5 py-1 rounded-full shadow-sm"
               >
                 {fmt}
               </span>
             ))}
-            <span className="text-[10px] text-slate-400">· max 10 MB</span>
+            <span className="text-[10px] text-muted-foreground">· max 10 MB</span>
           </div>
         </div>
       </div>
@@ -196,14 +196,14 @@ export function FileUploadField({ files, onChange, onError, error, disabled }: P
             return (
               <li
                 key={`${file.name}-${file.size}`}
-                className="group flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm hover:border-primary/20 hover:shadow-premium transition-all"
+                className="group flex items-center gap-3 rounded-xl border bg-white px-3 py-2.5 shadow-sm hover:border-primary/20 transition-all"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/8 text-primary border border-primary/10">
                   <Icon className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-slate-800 truncate">{file.name}</p>
-                  <p className="text-xs text-slate-400">{formatSize(file.size)}</p>
+                  <p className="text-sm font-semibold text-foreground truncate">{file.name}</p>
+                  <p className="text-xs text-muted-foreground">{formatSize(file.size)}</p>
                 </div>
                 <Button
                   type="button"
@@ -214,7 +214,7 @@ export function FileUploadField({ files, onChange, onError, error, disabled }: P
                     e.stopPropagation();
                     removeAt(index);
                   }}
-                  className="h-8 w-8 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 opacity-70 group-hover:opacity-100"
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-red-600 hover:bg-red-50 opacity-70 group-hover:opacity-100"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -223,7 +223,7 @@ export function FileUploadField({ files, onChange, onError, error, disabled }: P
           })}
         </ul>
       ) : (
-        <p className="text-center text-xs text-slate-400 italic">
+        <p className="text-center text-xs text-muted-foreground italic">
           Henüz dosya eklenmedi — yüklemek zorunlu değildir
         </p>
       )}

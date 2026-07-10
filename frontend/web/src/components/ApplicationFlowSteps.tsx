@@ -21,8 +21,8 @@ export function ApplicationFlowSteps({ current, paymentComplete, compact }: Prop
   const currentIndex = FLOW_STEPS.findIndex((s) => s.key === current);
 
   return (
-    <nav aria-label="Başvuru adımları" className="mb-5 sm:mb-6">
-      <ol className="flex w-full items-stretch gap-0 overflow-x-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <nav aria-label="Başvuru adımları" className="mb-4 sm:mb-6">
+      <ol className="flex w-full gap-1 overflow-x-auto rounded-md border bg-card p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {FLOW_STEPS.map((step, index) => {
           const done =
             index < currentIndex || (paymentComplete && step.key === "payment");
@@ -33,31 +33,24 @@ export function ApplicationFlowSteps({ current, paymentComplete, compact }: Prop
             <li
               key={step.key}
               className={cn(
-                "relative flex min-w-[4.75rem] flex-1 items-center justify-center gap-2 rounded-lg px-2 py-2.5 sm:min-w-0 sm:px-3",
+                "flex min-w-[4.5rem] flex-1 items-center justify-center gap-2 rounded-sm px-2 py-2 text-xs sm:text-sm",
                 active && "bg-primary text-primary-foreground",
-                done && !active && "bg-slate-50",
-                !done && !active && "text-slate-500"
+                done && !active && "bg-secondary text-secondary-foreground",
+                !done && !active && "text-muted-foreground"
               )}
             >
               <span
                 className={cn(
-                  "flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
-                  active && "bg-white/20 text-primary-foreground",
-                  done && !active && "bg-primary text-primary-foreground",
-                  !done && !active && "bg-slate-100 text-slate-500"
+                  "flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
+                  active && "bg-primary-foreground/20",
+                  done && !active && "bg-background",
+                  !done && !active && "bg-muted"
                 )}
                 aria-current={active ? "step" : undefined}
               >
                 {done && !active ? "✓" : index + 1}
               </span>
-              <span
-                className={cn(
-                  "truncate text-[11px] font-medium leading-tight sm:text-sm",
-                  active && "font-semibold text-primary-foreground",
-                  done && !active && "text-slate-700",
-                  !done && !active && "text-slate-500"
-                )}
-              >
+              <span className="truncate font-medium">
                 {compact ? (
                   step.short
                 ) : (
@@ -67,15 +60,6 @@ export function ApplicationFlowSteps({ current, paymentComplete, compact }: Prop
                   </>
                 )}
               </span>
-              {index < FLOW_STEPS.length - 1 ? (
-                <span
-                  className={cn(
-                    "pointer-events-none absolute -right-px top-1/2 hidden h-4 w-px -translate-y-1/2 sm:block",
-                    active || done ? "bg-transparent" : "bg-slate-200"
-                  )}
-                  aria-hidden
-                />
-              ) : null}
             </li>
           );
         })}
@@ -89,12 +73,12 @@ export function ApplicationFlowHint({ current }: { current: FlowStepKey }) {
   const step = FLOW_STEPS[index];
   const next = FLOW_STEPS[index + 1];
   return (
-    <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 sm:text-sm">
-      <span className="font-medium text-slate-800">Adım {index + 1}/4 — {step?.label}</span>
+    <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground sm:text-sm">
+      <span className="font-medium text-foreground">Adım {index + 1}/4 — {step?.label}</span>
       {next ? (
         <>
           {" · "}
-          Sıradaki: <span className="font-medium text-slate-800">{next.label}</span>
+          Sıradaki: <span className="font-medium text-foreground">{next.label}</span>
         </>
       ) : (
         <> · Son adım</>

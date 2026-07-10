@@ -27,6 +27,7 @@ type Config struct {
 	PaymentAmount        float64
 	DefaultPaymentProvider string
 	UploadDir            string
+	ContactInboxEmail    string
 }
 
 // ErciyesConfig connects to Erciyes University Hospital HIS web services.
@@ -120,6 +121,7 @@ func Load() Config {
 		PaymentAmount:          getEnvFloat("PAYMENT_AMOUNT", 1500),
 		DefaultPaymentProvider: getEnv("DEFAULT_PAYMENT_PROVIDER", "param"),
 		UploadDir:              getEnv("UPLOAD_DIR", "./uploads"),
+		ContactInboxEmail:      getEnv("CONTACT_INBOX_EMAIL", getEnv("SMTP_FROM", "")),
 		Erciyes: ErciyesConfig{
 			Mode:              getEnv("ERCIYES_MODE", "mock"),
 			BaseURL:           os.Getenv("ERCIYES_BASE_URL"),

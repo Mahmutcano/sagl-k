@@ -18,15 +18,15 @@ export function DoctorFlowSteps({ step }: { step: DoctorFlowStep }) {
         const active = i === currentIdx;
         return (
           <span key={s.id} className="flex items-center gap-2">
-            {i > 0 ? <span className="text-slate-300">→</span> : null}
+            {i > 0 ? <span className="text-muted-foreground">→</span> : null}
             <span
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors ${
                 active
                   ? "bg-primary text-white border-primary"
                   : done
                     ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                    : "bg-slate-50 text-slate-400 border-slate-200"
-              }`}
+                    : "bg-muted text-muted-foreground "
+             }`}
             >
               {done ? <Check className="h-3.5 w-3.5 shrink-0" /> : null}
               {s.label}

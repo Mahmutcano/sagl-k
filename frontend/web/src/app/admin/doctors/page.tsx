@@ -31,6 +31,7 @@ type Doctor = {
   professionCode: string;
   hospitalName?: string | null;
   isActive: boolean;
+  revenueSharePercent?: number;
 };
 
 type Hospital = { id: string; name: string; code: string };
@@ -87,6 +88,7 @@ export default function AdminDoctorsPage() {
     phoneNumber: "",
     password: "",
     consultationFee: 1000,
+    revenueSharePercent: 70,
     isActive: true,
     smsEnabled: true,
     emailEnabled: true,
@@ -170,6 +172,7 @@ export default function AdminDoctorsPage() {
       phoneNumber: "",
       password: "",
       consultationFee: 1000,
+      revenueSharePercent: 70,
       isActive: true,
       smsEnabled: true,
       emailEnabled: true,
@@ -195,6 +198,7 @@ export default function AdminDoctorsPage() {
       email: string;
       phoneNumber: string;
       consultationFee: number;
+      revenueSharePercent: number;
       isActive: boolean;
       smsEnabled: boolean;
       emailEnabled: boolean;
@@ -214,6 +218,7 @@ export default function AdminDoctorsPage() {
           phoneNumber: d.phoneNumber || "",
           password: "",
           consultationFee: d.consultationFee || 1000,
+          revenueSharePercent: d.revenueSharePercent ?? 70,
           isActive: d.isActive,
           smsEnabled: d.smsEnabled !== false,
           emailEnabled: d.emailEnabled !== false,
@@ -261,6 +266,10 @@ export default function AdminDoctorsPage() {
       f.consultationFee = "Geçerli bir muayene ücreti girin.";
     }
 
+    if (form.revenueSharePercent < 0 || form.revenueSharePercent > 100) {
+      f.revenueSharePercent = "Doktor payı 0–100 arasında olmalıdır.";
+    }
+
     if (form.professionCodes.length === 0) {
       f.professionCodes = "En az bir klinik bölüm (branş) seçilmelidir.";
     }
@@ -273,12 +282,28 @@ export default function AdminDoctorsPage() {
 
     setSaving(true);
     try {
+      const payload = {
+        fullName: form.fullName.trim(),
+        title: form.title,
+        professionCodes: form.professionCodes,
+        targetInstitution: form.targetInstitution,
+        hospitalId: form.hospitalId || "",
+        nationalIdentifier: form.nationalIdentifier.trim(),
+        email: form.email.trim(),
+        phoneNumber: form.phoneNumber.trim(),
+        consultationFee: form.consultationFee,
+        revenueSharePercent: form.revenueSharePercent,
+        isActive: form.isActive,
+        smsEnabled: form.smsEnabled,
+        emailEnabled: form.emailEnabled,
+        ...(form.password.trim() ? { password: form.password.trim() } : {}),
+      };
       if (editingId) {
         await api(
           API.admin.doctorUpdate(editingId),
           {
             method: "PUT",
-            body: JSON.stringify(form),
+            body: JSON.stringify(payload),
           },
           token
         );
@@ -288,7 +313,7 @@ export default function AdminDoctorsPage() {
           API.admin.doctors,
           {
             method: "POST",
-            body: JSON.stringify(form),
+            body: JSON.stringify({ ...payload, password: form.password.trim() }),
           },
           token
         );
@@ -297,18 +322,29 @@ export default function AdminDoctorsPage() {
       setIsModalOpen(false);
       loadData();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Hekim kaydedilemedi.");
+      if (err instanceof ApiError) {
+        if (Object.keys(err.fields).length > 0) setFields(err.fields);
+        setFormError(err.message);
+      } else {
+        setFormError("Hekim kaydedilemedi.");
+      }
     } finally {
       setSaving(false);
     }
   }
 
-  const titleOptions =
-    dynamicTitles.length > 0
-      ? dynamicTitles
-          .filter((t) => t.isActive || t.name === form.title)
-          .map((t) => ({ value: t.name, label: t.name }))
-      : DEFAULT_TITLES;
+  const titleOptions = (() => {
+    const base =
+      dynamicTitles.length > 0
+        ? dynamicTitles
+            .filter((t) => t.isActive || t.name === form.title)
+            .map((t) => ({ value: t.name, label: t.name }))
+        : DEFAULT_TITLES;
+    if (form.title && !base.some((o) => o.value === form.title)) {
+      return [{ value: form.title, label: form.title }, ...base];
+    }
+    return base;
+  })();
 
   return (
     <AdminAppShell title="Doktor Yönetimi" description="Hekim kadrosunu, uzmanlık alanlarını ve iletişim ayarlarını yönetin">
@@ -316,44 +352,45 @@ export default function AdminDoctorsPage() {
       {successMsg ? <FormAlert title="Başarılı" message={successMsg} variant="default" /> : null}
 
       <div className="mb-4 flex min-w-0 flex-col justify-between gap-3 print:hidden md:mb-6 md:flex-row md:items-end">
-        {/* Premium Filter Area */}
-        <form onSubmit={handleSearchSubmit} className="admin-filter-bar min-w-0 flex-grow rounded-xl border border-slate-200/80 bg-white p-3 shadow-premium sm:rounded-2xl sm:p-5">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="search" className="text-xs font-bold text-slate-700 tracking-wide">Arama</label>
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                id="search"
-                className="pl-10 h-10 border-slate-200 focus-visible:ring-primary/20 focus-visible:border-primary bg-white rounded-xl shadow-inner-sm"
-                placeholder="Hekim adı veya unvan..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-              />
+        <form onSubmit={handleSearchSubmit} className="admin-filter-bar min-w-0 flex-grow space-y-3 rounded-xl border bg-white p-3 sm:rounded-2xl sm:p-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label htmlFor="search" className="text-xs font-semibold">Arama</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="search"
+                  className="h-10 rounded-xl pl-9"
+                  placeholder="Hekim adı veya unvan"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                />
+              </div>
             </div>
-          </div>
-          <div>
             <FormSelect
               id="dept-filter"
-              label="Klinik Bölüm Filtresi"
-              value={departmentFilter}
+              label="Klinik bölüm"
+              value={departmentFilter || undefined}
               onChange={(e) => { setPage(0); setDepartmentFilter(e.target.value); }}
-              placeholder="Tüm Bölümler"
+              placeholder="Tüm bölümler"
               options={professions.map((p) => ({ value: p.code, label: p.name }))}
             />
           </div>
-          <div className="flex gap-2.5 justify-end mt-1">
-            <Button type="button" variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 font-bold hover:bg-slate-100 rounded-xl">
-              Temizle
-            </Button>
-            <Button type="submit" size="sm" className="h-9 gap-1.5 font-bold shadow-md shadow-primary/10 rounded-xl px-5">
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" size="sm" className="h-9 gap-1.5 rounded-xl px-4 font-semibold">
               <Search className="h-4 w-4" />
-              Filtrele
+              Ara
             </Button>
+            {(searchText || searchQuery || departmentFilter) ? (
+              <Button type="button" variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 rounded-xl">
+                Temizle
+              </Button>
+            ) : null}
           </div>
         </form>
 
-        <Button onClick={handleOpenAdd} className="gap-1.5 shadow-md shadow-primary/10 h-10 self-end font-bold rounded-xl px-5">
-          <Plus className="h-4.5 w-4.5" />
+        <Button onClick={handleOpenAdd} className="h-10 gap-1.5 self-end rounded-xl px-5 font-bold">
+          <Plus className="h-4 w-4" />
           Hekim Ekle
         </Button>
       </div>
@@ -364,32 +401,36 @@ export default function AdminDoctorsPage() {
           <Skeleton className="h-10 w-full rounded-xl" />
         </div>
       ) : doctors.length === 0 ? (
-        <p className="p-12 text-center text-sm text-slate-500 italic bg-white rounded-2xl border border-dashed shadow-sm">
+        <p className="p-12 text-center text-sm text-muted-foreground italic bg-white rounded-2xl border border-dashed shadow-sm">
           Kriterlerinize uygun hekim kaydı bulunamadı.
         </p>
       ) : (
         <div className="flex flex-col gap-4">
-          <Card className="shadow-premium overflow-hidden rounded-xl border-slate-200/80 bg-white/95 sm:rounded-2xl">
+          <Card className=" overflow-hidden rounded-xl /80 bg-white/95 sm:rounded-2xl">
             <CardContent className="admin-table-scroll p-0">
               <Table>
-                <TableHeader className="bg-slate-50/50">
+                <TableHeader className="bg-muted/40">
                   <TableRow>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Hekim Ad Soyad</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Ana Branş</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Bağlı Hastane</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Durum</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-slate-400 uppercase tracking-wider text-right">İşlem</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Hekim Ad Soyad</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Ana Branş</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Bağlı Hastane</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Pay %</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Durum</TableHead>
+                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider text-right">İşlem</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {doctors.map((d) => (
-                    <TableRow key={d.id} className="hover:bg-slate-50/50 transition-colors">
-                      <TableCell className="px-6 py-4 font-semibold text-slate-800">
-                        <span className="text-slate-400 font-medium mr-1.5">{d.title}</span>
+                    <TableRow key={d.id} className="hover:bg-muted/40 transition-colors">
+                      <TableCell className="px-6 py-4 font-semibold text-foreground">
+                        <span className="text-muted-foreground font-medium mr-1.5">{d.title}</span>
                         {d.fullName}
                       </TableCell>
-                      <TableCell className="px-6 py-4 text-slate-600 font-medium">{d.professionCode}</TableCell>
-                      <TableCell className="px-6 py-4 text-slate-500 text-xs">{d.hospitalName || "Serbest (Kurum Dışı)"}</TableCell>
+                      <TableCell className="px-6 py-4 text-muted-foreground font-medium">{d.professionCode}</TableCell>
+                      <TableCell className="px-6 py-4 text-muted-foreground text-xs">{d.hospitalName || "Serbest (Kurum Dışı)"}</TableCell>
+                      <TableCell className="px-6 py-4 text-muted-foreground font-medium">
+                        %{d.revenueSharePercent ?? 70}
+                      </TableCell>
                       <TableCell className="px-6 py-4">
                         <Badge variant={d.isActive ? "default" : "secondary"}>
                           {d.isActive ? "Aktif" : "Pasif"}
@@ -400,7 +441,7 @@ export default function AdminDoctorsPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleOpenEdit(d.id)}
-                          className="h-8 w-8 p-0 text-slate-500 hover:text-primary rounded-full"
+                          className="h-8 w-8 p-0 text-muted-foreground hover:text-primary rounded-full"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -413,9 +454,9 @@ export default function AdminDoctorsPage() {
           </Card>
 
           {/* Premium Pagination */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-50/50 border border-slate-200/50 rounded-2xl px-6 py-4 mt-2 shadow-sm">
-            <div className="text-xs font-semibold text-slate-500 tracking-wide font-sans">
-              Toplam <span className="text-primary font-bold">{totalCount}</span> hekimden <span className="text-slate-800 font-bold">{page * pageSize + 1} - {Math.min((page + 1) * pageSize, totalCount)}</span> arası listeleniyor
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-muted/40 border /50 rounded-2xl px-6 py-4 mt-2 shadow-sm">
+            <div className="text-xs font-semibold text-muted-foreground tracking-wide font-sans">
+              Toplam <span className="text-primary font-bold">{totalCount}</span> hekimden <span className="text-foreground font-bold">{page * pageSize + 1} - {Math.min((page + 1) * pageSize, totalCount)}</span> arası listeleniyor
             </div>
             <div className="flex items-center gap-1.5">
               <Button
@@ -423,7 +464,7 @@ export default function AdminDoctorsPage() {
                 size="sm"
                 disabled={page === 0}
                 onClick={() => setPage((p) => p - 1)}
-                className="h-8 w-8 p-0 rounded-lg border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-all duration-150"
+                className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-40 transition-all duration-150"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -447,7 +488,7 @@ export default function AdminDoctorsPage() {
                           "h-8 min-w-[32px] px-2 text-xs font-bold rounded-lg transition-all duration-150",
                           active 
                             ? "bg-primary text-primary-foreground shadow-sm shadow-primary/10" 
-                            : "border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                            : " text-muted-foreground hover:bg-muted hover:text-foreground"
                         )}
                       >
                         {i + 1}
@@ -463,7 +504,7 @@ export default function AdminDoctorsPage() {
                 size="sm"
                 disabled={(page + 1) * pageSize >= totalCount}
                 onClick={() => setPage((p) => p + 1)}
-                className="h-8 w-8 p-0 rounded-lg border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 transition-all duration-150"
+                className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-40 transition-all duration-150"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -475,10 +516,10 @@ export default function AdminDoctorsPage() {
       {/* Add/Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-          <Card className="w-full max-w-xl shadow-2xl border-slate-200 bg-white my-8">
+          <Card className="w-full max-w-xl shadow-2xl bg-white my-8">
             <form onSubmit={submit} noValidate>
               <CardHeader className="relative border-b pb-4">
-                <CardTitle className="text-base text-slate-800 font-bold">
+                <CardTitle className="text-base text-foreground font-bold">
                   {editingId ? "Hekim Bilgilerini Düzenle" : "Yeni Doktor Ekle"}
                 </CardTitle>
                 <CardDescription className="text-xs">
@@ -488,7 +529,7 @@ export default function AdminDoctorsPage() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="absolute right-4 top-4 p-1 rounded-full hover:bg-slate-200"
+                  className="absolute right-4 top-4 p-1 rounded-full hover:bg-muted"
                   onClick={() => setIsModalOpen(false)}
                 >
                   <X className="h-5 w-5" />
@@ -539,6 +580,19 @@ export default function AdminDoctorsPage() {
                     error={fields.consultationFee}
                   />
                 </div>
+
+                <TextInput
+                  id="revenueSharePercent"
+                  label="Doktor Kazanç Payı (%)"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.01"
+                  value={String(form.revenueSharePercent)}
+                  onChange={(e) => setForm((f) => ({ ...f, revenueSharePercent: Number(e.target.value) }))}
+                  error={fields.revenueSharePercent}
+              hint="Ödeme net tutarından doktora aktarılacak yüzde. Kalan kurum payıdır."
+                />
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <TextInput
@@ -599,7 +653,7 @@ export default function AdminDoctorsPage() {
 
                 {/* Multiselect search klinik bölüm listesi */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-slate-700">
+                  <label className="text-xs font-semibold text-foreground">
                     Hizmet Verdiği Klinik Bölümler (Branşlar)
                   </label>
                   {fields.professionCodes && (
@@ -635,7 +689,7 @@ export default function AdminDoctorsPage() {
                     className="h-8 text-xs"
                   />
 
-                  <div className="max-h-[140px] overflow-y-auto border border-slate-200 rounded-xl p-3 bg-slate-50/50 mt-1 grid gap-2">
+                  <div className="max-h-[140px] overflow-y-auto border rounded-xl p-3 bg-muted/40 mt-1 grid gap-2">
                     {professions.filter(
                       (p) =>
                         p.name.toLowerCase().includes(profSearch.toLowerCase()) ||
@@ -652,17 +706,17 @@ export default function AdminDoctorsPage() {
                         .map((p) => {
                           const checked = form.professionCodes.includes(p.code);
                           return (
-                            <div key={p.id} className="flex items-center space-x-2.5 hover:bg-slate-100/50 p-1 rounded-lg transition-colors cursor-pointer">
+                            <div key={p.id} className="flex items-center space-x-2.5 hover:bg-muted/50 p-1 rounded-lg transition-colors cursor-pointer">
                               <input
                                 type="checkbox"
                                 id={`prof-${p.code}`}
                                 checked={checked}
                                 onChange={() => handleProfessionToggle(p.code)}
-                                className="rounded border-slate-300 text-primary focus:ring-primary cursor-pointer h-4 w-4"
+                                className="rounded text-primary focus:ring-primary cursor-pointer h-4 w-4"
                               />
                               <label
                                 htmlFor={`prof-${p.code}`}
-                                className="text-xs font-semibold text-slate-700 cursor-pointer select-none leading-none w-full"
+                                className="text-xs font-semibold text-foreground cursor-pointer select-none leading-none w-full"
                               >
                                 {p.name}
                               </label>
@@ -676,7 +730,7 @@ export default function AdminDoctorsPage() {
                 {/* Welcoming preferences checkboxes */}
                 {!editingId && (
                   <div className="grid gap-2 border-t pt-3 mt-1">
-                    <span className="text-xs font-bold text-slate-600">Doktora Karşılama Bildirimi</span>
+                    <span className="text-xs font-bold text-muted-foreground">Doktora Karşılama Bildirimi</span>
                     <div className="flex flex-col sm:flex-row gap-4">
                       <div className="flex items-center space-x-2.5">
                         <input
@@ -684,9 +738,9 @@ export default function AdminDoctorsPage() {
                           id="smsEnabled"
                           checked={form.smsEnabled}
                           onChange={(e) => setForm((f) => ({ ...f, smsEnabled: e.target.checked }))}
-                          className="rounded border-slate-300 text-primary focus:ring-primary cursor-pointer h-4 w-4"
+                          className="rounded text-primary focus:ring-primary cursor-pointer h-4 w-4"
                         />
-                        <label htmlFor="smsEnabled" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                        <label htmlFor="smsEnabled" className="text-xs font-semibold text-foreground cursor-pointer">
                           SMS Gönder (Şifre ile)
                         </label>
                       </div>
@@ -696,9 +750,9 @@ export default function AdminDoctorsPage() {
                           id="emailEnabled"
                           checked={form.emailEnabled}
                           onChange={(e) => setForm((f) => ({ ...f, emailEnabled: e.target.checked }))}
-                          className="rounded border-slate-300 text-primary focus:ring-primary cursor-pointer h-4 w-4"
+                          className="rounded text-primary focus:ring-primary cursor-pointer h-4 w-4"
                         />
-                        <label htmlFor="emailEnabled" className="text-xs font-semibold text-slate-700 cursor-pointer">
+                        <label htmlFor="emailEnabled" className="text-xs font-semibold text-foreground cursor-pointer">
                           E-posta Gönder (Şifre ile)
                         </label>
                       </div>
@@ -713,11 +767,11 @@ export default function AdminDoctorsPage() {
                       id="doc-isActive"
                       checked={form.isActive}
                       onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
-                      className="rounded border-slate-300 text-primary focus:ring-primary cursor-pointer h-4 w-4"
+                      className="rounded text-primary focus:ring-primary cursor-pointer h-4 w-4"
                     />
                     <label
                       htmlFor="doc-isActive"
-                      className="text-xs font-semibold text-slate-700 cursor-pointer select-none"
+                      className="text-xs font-semibold text-foreground cursor-pointer select-none"
                     >
                       Hekim Aktif / Görünür
                     </label>
@@ -725,7 +779,7 @@ export default function AdminDoctorsPage() {
                 )}
               </CardContent>
 
-              <CardContent className="border-t pt-4 flex gap-2 justify-end bg-slate-50/50">
+              <CardContent className="border-t pt-4 flex gap-2 justify-end bg-muted/40">
                 <Button type="button" variant="outline" size="sm" onClick={() => setIsModalOpen(false)} disabled={saving} className="font-bold rounded-xl">
                   İptal
                 </Button>

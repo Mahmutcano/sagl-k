@@ -202,7 +202,7 @@ export function CustomDatePicker({
           placeholder={placeholder}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
-          className="h-10 rounded-xl border-slate-200 bg-white pr-20 text-sm shadow-inner-sm focus-visible:border-primary focus-visible:ring-primary/20"
+          className="h-10 rounded-xl bg-white pr-20 text-sm focus-visible:border-primary focus-visible:ring-primary/20"
         />
 
         <div className="absolute inset-y-0 right-1.5 flex items-center gap-0.5">
@@ -214,7 +214,7 @@ export function CustomDatePicker({
                 onChange("");
                 setInputValue("");
               }}
-              className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-muted-foreground"
               aria-label="Tarihi temizle"
             >
               <X className="h-4 w-4" />
@@ -223,7 +223,7 @@ export function CustomDatePicker({
           <button
             type="button"
             onClick={() => setIsOpen((o) => !o)}
-            className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-muted-foreground"
             aria-label="Takvimi aç"
           >
             <CalendarIcon className="h-4 w-4" />
@@ -242,12 +242,12 @@ export function CustomDatePicker({
       ) : null}
 
       {isOpen ? (
-        <div className="absolute left-0 top-[calc(100%+0.35rem)] z-50 w-[min(100vw-2rem,20rem)] rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl sm:p-4">
+        <div className="absolute left-0 top-[calc(100%+0.35rem)] z-50 w-[min(100vw-2rem,20rem)] rounded-2xl border bg-white p-3 shadow-2xl sm:p-4">
           <div className="mb-3 flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={prevMonth}
-              className="rounded-lg border border-slate-100 p-1.5 text-slate-600 hover:bg-slate-50"
+              className="rounded-lg border p-1.5 text-muted-foreground hover:bg-muted"
               aria-label="Önceki ay"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -256,7 +256,7 @@ export function CustomDatePicker({
             {yearSelect ? (
               <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
                 <select
-                  className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold"
+                  className="h-8 min-w-0 flex-1 rounded-lg border bg-white px-2 text-xs font-semibold"
                   value={month}
                   onChange={(e) => setNavDate(new Date(year, Number(e.target.value), 1))}
                   aria-label="Ay"
@@ -268,7 +268,7 @@ export function CustomDatePicker({
                   ))}
                 </select>
                 <select
-                  className="h-8 w-[5.5rem] shrink-0 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold"
+                  className="h-8 w-[5.5rem] shrink-0 rounded-lg border bg-white px-2 text-xs font-semibold"
                   value={year}
                   onChange={(e) => setNavDate(new Date(Number(e.target.value), month, 1))}
                   aria-label="Yıl"
@@ -281,7 +281,7 @@ export function CustomDatePicker({
                 </select>
               </div>
             ) : (
-              <span className="text-xs font-bold tracking-wide text-slate-800">
+              <span className="text-xs font-bold tracking-wide text-foreground">
                 {MONTH_NAMES[month]} {year}
               </span>
             )}
@@ -289,7 +289,7 @@ export function CustomDatePicker({
             <button
               type="button"
               onClick={nextMonth}
-              className="rounded-lg border border-slate-100 p-1.5 text-slate-600 hover:bg-slate-50"
+              className="rounded-lg border p-1.5 text-muted-foreground hover:bg-muted"
               aria-label="Sonraki ay"
             >
               <ChevronRight className="h-4 w-4" />
@@ -298,7 +298,7 @@ export function CustomDatePicker({
 
           <div className="mb-1 grid grid-cols-7 gap-1 text-center">
             {WEEKDAYS.map((wd) => (
-              <span key={wd} className="py-1 text-[10px] font-bold uppercase text-slate-400">
+              <span key={wd} className="py-1 text-[10px] font-bold uppercase text-muted-foreground">
                 {wd}
               </span>
             ))}
@@ -317,9 +317,9 @@ export function CustomDatePicker({
                   onClick={() => selectDay(day)}
                   className={cn(
                     "flex h-8 w-full items-center justify-center rounded-lg text-xs font-semibold transition-colors",
-                    disabled && "cursor-not-allowed text-slate-300",
+                    disabled && "cursor-not-allowed text-muted-foreground",
                     !disabled && selected && "bg-primary text-primary-foreground",
-                    !disabled && !selected && "text-slate-700 hover:bg-slate-100"
+                    !disabled && !selected && "text-foreground hover:bg-muted"
                   )}
                 >
                   {day}
