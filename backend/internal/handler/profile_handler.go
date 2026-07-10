@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -19,10 +20,14 @@ type ProfileHandler struct {
 	db     *repository.DB
 	notify *notifysvc.Service
 	audit  *audit.Logger
+	otpTTL time.Duration
 }
 
-func NewProfileHandler(db *repository.DB, notify *notifysvc.Service, audit *audit.Logger) *ProfileHandler {
-	return &ProfileHandler{db: db, notify: notify, audit: audit}
+func NewProfileHandler(db *repository.DB, notify *notifysvc.Service, audit *audit.Logger, otpTTL time.Duration) *ProfileHandler {
+	if otpTTL <= 0 {
+		otpTTL = 10 * time.Minute
+	}
+	return &ProfileHandler{db: db, notify: notify, audit: audit, otpTTL: otpTTL}
 }
 
 type ProfileResponse struct {
@@ -226,17 +231,28 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		code, err := h.notify.SendSMS(r.Context(), req.PhoneNumber, "change_phone_otp", "Telefon güncelleme doğrulama", &claims.UserID, nil)
+		mins := int(h.otpTTL.Round(time.Minute) / time.Minute)
+		if mins < 1 {
+			mins = 1
+		}
+		expiresAt := time.Now().Add(h.otpTTL)
+		code, err := h.notify.SendSMS(
+			r.Context(),
+			req.PhoneNumber,
+			"change_phone_otp",
+			fmt.Sprintf("Telefon güncelleme doğrulama. Kod %d dakika geçerlidir", mins),
+			&claims.UserID,
+			nil,
+		)
 		if err != nil {
 			response.Fail(w, http.StatusInternalServerError, "PROF005", "Doğrulama SMS'i gönderilemedi. Profilin geri kalanı güncellendi.")
 			return
 		}
 
-		// Insert verification token
 		_, err = h.db.Pool.Exec(r.Context(), `
 			INSERT INTO verification_tokens (user_id, phone_number, token, purpose, expires_at)
-			VALUES ($1, $2, $3, 'change_phone', now() + INTERVAL '10 minutes')
-		`, claims.UserID, req.PhoneNumber, code)
+			VALUES ($1, $2, $3, 'change_phone', $4)
+		`, claims.UserID, req.PhoneNumber, code, expiresAt)
 
 		if err != nil {
 			response.Fail(w, http.StatusInternalServerError, "PROF006", "Doğrulama kodu kaydedilemedi.")
@@ -245,7 +261,9 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 
 		response.OK(w, map[string]interface{}{
 			"requiresPhoneVerify": true,
-			"message":             "Profil güncellendi. Telefon numaranızın doğrulanması için yeni numaranıza SMS gönderildi.",
+			"expiresInSeconds":    int(h.otpTTL.Seconds()),
+			"expiresAt":           expiresAt.UTC().Format(time.RFC3339),
+			"message":             fmt.Sprintf("Profil güncellendi. Yeni numaranıza SMS gönderildi. Kod %d dakika geçerlidir.", mins),
 		})
 		return
 	}

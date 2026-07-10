@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"medical-consultation-platform/backend/internal/pkg/audit"
@@ -94,14 +95,18 @@ func (h *AuthHandler) InitiateRegister(w http.ResponseWriter, r *http.Request) {
 		validate.Fail(w, errs)
 		return
 	}
-	code, err := h.svc.InitiateRegister(r.Context(), req)
+	challenge, err := h.svc.InitiateRegister(r.Context(), req)
 	if err != nil {
 		response.Fail(w, http.StatusBadRequest, "AUTH021", response.SafeMessage(err, "Kayıt başlatılamadı. Bilgilerinizi kontrol edin."))
 		return
 	}
-	res := map[string]interface{}{"sent": true}
+	res := map[string]interface{}{
+		"sent":             true,
+		"expiresInSeconds": challenge.ExpiresInSeconds,
+		"expiresAt":        challenge.ExpiresAt.UTC().Format(time.RFC3339),
+	}
 	if h.svc.IsMock() {
-		res["code"] = code
+		res["code"] = challenge.Code
 	}
 	response.OK(w, res)
 }
@@ -146,10 +151,18 @@ func (h *AuthHandler) InitiateForgotPassword(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	req.PhoneNumber = validate.NormalizePhoneTR(req.PhoneNumber)
-	code, err := h.svc.InitiateForgotPassword(r.Context(), req.PhoneNumber)
-	res := map[string]interface{}{"sent": true}
+	challenge, err := h.svc.InitiateForgotPassword(r.Context(), req.PhoneNumber)
+	res := map[string]interface{}{
+		"sent":             true,
+		"expiresInSeconds": challenge.ExpiresInSeconds,
+		"expiresAt":        challenge.ExpiresAt.UTC().Format(time.RFC3339),
+	}
 	if err == nil && h.svc.IsMock() {
-		res["code"] = code
+		res["code"] = challenge.Code
+	}
+	// Always OK to avoid phone enumeration; expiry still returned for UX when sent.
+	if err != nil {
+		res["expiresInSeconds"] = 600
 	}
 	response.OK(w, res)
 }

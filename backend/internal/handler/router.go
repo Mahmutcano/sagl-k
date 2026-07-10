@@ -82,7 +82,7 @@ func NewRouter(d Deps) http.Handler {
 	appH := NewApplicationHandler(d.App, d.Payment, d.Invoice, d.Notify, d.DB, d.Cfg)
 	adminH := NewAdminHandler(d.DB, d.Payment, d.Audit, d.Notify)
 	erciyesH := NewErciyesHandler(d.Erciyes, d.DB)
-	profileH := NewProfileHandler(d.DB, d.Notify, d.Audit)
+	profileH := NewProfileHandler(d.DB, d.Notify, d.Audit, d.Cfg.OTPTTL)
 	adminUserH := NewAdminUserHandler(d.DB, d.Audit)
 
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {

@@ -12,6 +12,7 @@ import {
 } from "@/components/FormField";
 import { PasswordInput } from "@/components/PasswordInput";
 import { MessageModal } from "@/components/MessageModal";
+import { OtpExpiryBanner, DEFAULT_OTP_SECONDS } from "@/components/OtpExpiryBanner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { type FieldErrors } from "@/lib/validation";
@@ -59,6 +60,10 @@ export function ProfileSettings() {
   const [otpCode, setOtpCode] = useState("");
   const [otpError, setOtpError] = useState("");
   const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [otpExpiresIn, setOtpExpiresIn] = useState(DEFAULT_OTP_SECONDS);
+  const [otpExpiresAt, setOtpExpiresAt] = useState("");
+  const [otpResetKey, setOtpResetKey] = useState(0);
+  const [otpExpired, setOtpExpired] = useState(false);
 
   useEffect(() => {
     const token = getToken();
@@ -99,7 +104,12 @@ export function ProfileSettings() {
     setFields({});
 
     try {
-      const res = await api<{ requiresPhoneVerify: boolean; message: string }>(
+      const res = await api<{
+        requiresPhoneVerify: boolean;
+        message: string;
+        expiresInSeconds?: number;
+        expiresAt?: string;
+      }>(
         "/api/v1/profile",
         {
           method: "PUT",
@@ -117,6 +127,12 @@ export function ProfileSettings() {
       );
 
       if (res.requiresPhoneVerify) {
+        setOtpExpiresIn(res.expiresInSeconds && res.expiresInSeconds > 0 ? res.expiresInSeconds : DEFAULT_OTP_SECONDS);
+        setOtpExpiresAt(res.expiresAt ?? "");
+        setOtpResetKey((k) => k + 1);
+        setOtpExpired(false);
+        setOtpCode("");
+        setOtpError("");
         setShowOtpModal(true);
         setSuccess(res.message);
       } else {
@@ -348,10 +364,18 @@ export function ProfileSettings() {
                 <CardTitle>SMS Doğrulama</CardTitle>
                 <CardDescription>
                   Lütfen yeni telefon numaranıza gönderilen 6 haneli güvenlik doğrulama kodunu girin.
+                  Kod sınırlı süre geçerlidir.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
                 {otpError ? <p className="text-sm text-destructive font-medium">{otpError}</p> : null}
+
+                <OtpExpiryBanner
+                  expiresInSeconds={otpExpiresIn}
+                  expiresAt={otpExpiresAt || undefined}
+                  resetKey={otpResetKey}
+                  onExpired={() => setOtpExpired(true)}
+                />
 
                 <FormField id="otpCode" label="Doğrulama Kodu">
                   <input
@@ -360,14 +384,15 @@ export function ProfileSettings() {
                     inputMode="numeric"
                     maxLength={6}
                     placeholder="123456"
-                    className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-center text-xl font-bold tracking-widest placeholder:text-muted-foreground placeholder:tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    disabled={otpExpired}
+                    className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-center text-xl font-bold tracking-widest placeholder:text-muted-foreground placeholder:tracking-normal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
                   />
                 </FormField>
               </CardContent>
               <CardFooter className="border-t flex gap-2 justify-end">
-                <Button type="submit" disabled={verifyingOtp}>
+                <Button type="submit" disabled={verifyingOtp || otpExpired}>
                   {verifyingOtp ? "Doğrulanıyor..." : "Numarayı Doğrula"}
                 </Button>
                 <Button type="button" variant="ghost" onClick={() => setShowOtpModal(false)}>

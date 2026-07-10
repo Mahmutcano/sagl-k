@@ -18,6 +18,7 @@ import {
 import { AuthShell } from "@/components/AuthShell";
 import { FormAlert, TextInput } from "@/components/FormField";
 import { PasswordInput } from "@/components/PasswordInput";
+import { OtpExpiryBanner, DEFAULT_OTP_SECONDS } from "@/components/OtpExpiryBanner";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -33,6 +34,10 @@ export default function ForgotPasswordPage() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [code, setCode] = useState("");
   const [mockSmsCode, setMockSmsCode] = useState("");
+  const [otpExpiresIn, setOtpExpiresIn] = useState(DEFAULT_OTP_SECONDS);
+  const [otpExpiresAt, setOtpExpiresAt] = useState("");
+  const [otpResetKey, setOtpResetKey] = useState(0);
+  const [otpExpired, setOtpExpired] = useState(false);
   const [password, setPassword] = useState("");
   const [fields, setFields] = useState<FieldErrors>({});
   const [formError, setFormError] = useState("");
@@ -49,11 +54,17 @@ export default function ForgotPasswordPage() {
 
     setLoading(true);
     try {
-      const res = await api<{ sent?: boolean; code?: string }>(API.auth.forgotInitiate, {
+      const res = await api<{ sent?: boolean; code?: string; expiresInSeconds?: number; expiresAt?: string }>(API.auth.forgotInitiate, {
         method: "POST",
         body: JSON.stringify({ phoneNumber: normalizePhoneTR(phoneNumber) }),
       });
       setMockSmsCode(res?.code?.trim() ?? "");
+      setOtpExpiresIn(res?.expiresInSeconds && res.expiresInSeconds > 0 ? res.expiresInSeconds : DEFAULT_OTP_SECONDS);
+      setOtpExpiresAt(res?.expiresAt ?? "");
+      setOtpResetKey((k) => k + 1);
+      setOtpExpired(false);
+      setCode("");
+      setPassword("");
       setStep("reset");
     } catch (err) {
       if (err instanceof ApiError && Object.keys(err.fields).length) {
@@ -105,12 +116,18 @@ export default function ForgotPasswordPage() {
             <CardTitle>Yeni şifre</CardTitle>
             <CardDescription>
               <span className="font-medium">{normalizePhoneTR(phoneNumber)}</span> numarasına
-              gönderilen kodu ve yeni şifrenizi girin.
+              gönderilen kodu ve yeni şifrenizi girin. Kod sınırlı süre geçerlidir.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleComplete} className="flex flex-col gap-4" noValidate>
               {formError ? <FormAlert title="Hata" message={formError} /> : null}
+              <OtpExpiryBanner
+                expiresInSeconds={otpExpiresIn}
+                expiresAt={otpExpiresAt || undefined}
+                resetKey={otpResetKey}
+                onExpired={() => setOtpExpired(true)}
+              />
               <TextInput
                 id="code"
                 label="Doğrulama kodu"
@@ -119,6 +136,7 @@ export default function ForgotPasswordPage() {
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 error={fields.code}
+                disabled={otpExpired}
               />
               <PasswordInput
                 id="password"
@@ -127,8 +145,9 @@ export default function ForgotPasswordPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 error={fields.password}
+                disabled={otpExpired}
               />
-              <Button type="submit" className="w-full" disabled={loading}>
+              <Button type="submit" className="w-full" disabled={loading || otpExpired}>
                 {loading ? "Kaydediliyor..." : "Şifreyi güncelle"}
               </Button>
               {mockSmsCode ? (

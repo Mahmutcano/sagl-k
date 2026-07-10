@@ -5,7 +5,7 @@ import { ROUTES } from "@/lib/routes";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, ShieldCheck } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { ApiError, api, persistAuth, type AuthUser } from "@/lib/api";
 import { API } from "@/lib/endpoints";
 import {
@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { AuthShell } from "@/components/AuthShell";
 import { BirthDateSelect, FormAlert, FormSelect, TextInput } from "@/components/FormField";
 import { PasswordInput } from "@/components/PasswordInput";
+import { OtpExpiryBanner, DEFAULT_OTP_SECONDS } from "@/components/OtpExpiryBanner";
 import { Button } from "@/components/ui/button";
 import { AgreementModal } from "@/components/AgreementModal";
 import {
@@ -149,6 +150,10 @@ export default function RegisterPage() {
   });
   const [code, setCode] = useState("");
   const [mockSmsCode, setMockSmsCode] = useState("");
+  const [otpExpiresIn, setOtpExpiresIn] = useState(DEFAULT_OTP_SECONDS);
+  const [otpExpiresAt, setOtpExpiresAt] = useState("");
+  const [otpResetKey, setOtpResetKey] = useState(0);
+  const [otpExpired, setOtpExpired] = useState(false);
   const [agreements, setAgreements] = useState<Agreement[]>([]);
   const [acceptedAgreements, setAcceptedAgreements] = useState<Record<string, boolean>>({});
   const [fields, setFields] = useState<FieldErrors>({});
@@ -210,7 +215,7 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const res = await api<{ sent?: boolean; code?: string }>(API.auth.registerInitiate, {
+      const res = await api<{ sent?: boolean; code?: string; expiresInSeconds?: number; expiresAt?: string }>(API.auth.registerInitiate, {
         method: "POST",
         body: JSON.stringify({
           ...form,
@@ -221,6 +226,10 @@ export default function RegisterPage() {
         }),
       });
       setMockSmsCode(res?.code?.trim() ?? "");
+      setOtpExpiresIn(res?.expiresInSeconds && res.expiresInSeconds > 0 ? res.expiresInSeconds : DEFAULT_OTP_SECONDS);
+      setOtpExpiresAt(res?.expiresAt ?? "");
+      setOtpResetKey((k) => k + 1);
+      setOtpExpired(false);
       setCode("");
       setFields({});
       setFormError("");
@@ -294,7 +303,7 @@ export default function RegisterPage() {
                 <span className="font-semibold text-foreground">
                   {formatPhoneInput(normalizePhoneTR(form.phoneNumber))}
                 </span>{" "}
-                numarasına gönderilen 6 haneli kodu girin.
+                numarasına gönderilen 6 haneli kodu girin. Kod sınırlı süre geçerlidir.
               </CardDescription>
             </div>
           </CardHeader>
@@ -302,13 +311,12 @@ export default function RegisterPage() {
             <form onSubmit={handleComplete} className="flex flex-col gap-4" noValidate>
               {formError ? <FormAlert title="Doğrulama hatası" message={formError} /> : null}
 
-              <div className="flex items-start gap-3 rounded-xl border border-primary/15 bg-primary/[0.04] px-3.5 py-3 text-sm text-foreground/80">
-                <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <p>
-                  Kod birkaç dakika içinde gelir. Gelmezse bilgilerinizi kontrol edip yeniden
-                  deneyebilirsiniz.
-                </p>
-              </div>
+              <OtpExpiryBanner
+                expiresInSeconds={otpExpiresIn}
+                expiresAt={otpExpiresAt || undefined}
+                resetKey={otpResetKey}
+                onExpired={() => setOtpExpired(true)}
+              />
 
               <TextInput
                 id="code"
@@ -322,9 +330,10 @@ export default function RegisterPage() {
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 8))}
                 error={fields.code}
+                disabled={otpExpired}
               />
 
-              <Button type="submit" className="w-full gap-2" disabled={loading || code.length < 4}>
+              <Button type="submit" className="w-full gap-2" disabled={loading || code.length < 4 || otpExpired}>
                 {loading ? "Doğrulanıyor..." : (
                   <>
                     Kaydı tamamla

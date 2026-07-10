@@ -14,11 +14,8 @@ type DatePickerProps = {
   className?: string;
   error?: string;
   hint?: string;
-  /** Inclusive max date (YYYY-MM-DD). Defaults to none. */
   maxDate?: string;
-  /** Inclusive min date (YYYY-MM-DD). Defaults to none. */
   minDate?: string;
-  /** Show year/month dropdowns — useful for birth dates. */
   yearSelect?: boolean;
 };
 
@@ -133,16 +130,10 @@ export function CustomDatePicker({
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value.replace(/[^0-9.]/g, "");
-
-    if (val.length === 2 && !val.includes(".")) {
-      val = val + ".";
-    } else if (val.length === 5 && val.split(".").length === 2) {
-      val = val + ".";
-    }
-
+    if (val.length === 2 && !val.includes(".")) val = `${val}.`;
+    else if (val.length === 5 && val.split(".").length === 2) val = `${val}.`;
     if (val.length > 10) val = val.substring(0, 10);
     setInputValue(val);
-
     if (val.length === 10) {
       const iso = toIsoFormat(val);
       if (iso) commitIso(iso);
@@ -157,13 +148,8 @@ export function CustomDatePicker({
     }
   };
 
-  const prevMonth = () => {
-    setNavDate(new Date(navDate.getFullYear(), navDate.getMonth() - 1, 1));
-  };
-
-  const nextMonth = () => {
-    setNavDate(new Date(navDate.getFullYear(), navDate.getMonth() + 1, 1));
-  };
+  const prevMonth = () => setNavDate(new Date(navDate.getFullYear(), navDate.getMonth() - 1, 1));
+  const nextMonth = () => setNavDate(new Date(navDate.getFullYear(), navDate.getMonth() + 1, 1));
 
   const selectDay = (day: number) => {
     if (isDisabledDay(day)) return;
@@ -177,7 +163,6 @@ export function CustomDatePicker({
   const year = navDate.getFullYear();
   const month = navDate.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-
   let firstDayIndex = new Date(year, month, 1).getDay() - 1;
   if (firstDayIndex === -1) firstDayIndex = 6;
 
@@ -186,64 +171,64 @@ export function CustomDatePicker({
   for (let i = 1; i <= daysInMonth; i++) days.push(i);
 
   const activeDate = parseIso(value);
-  const isSelected = (day: number) => {
-    if (!activeDate) return false;
-    return (
-      activeDate.getDate() === day &&
-      activeDate.getMonth() === month &&
-      activeDate.getFullYear() === year
-    );
-  };
-
-  const handleClear = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onChange("");
-    setInputValue("");
-  };
+  const isSelected = (day: number) =>
+    !!activeDate &&
+    activeDate.getDate() === day &&
+    activeDate.getMonth() === month &&
+    activeDate.getFullYear() === year;
 
   const maxYear = max?.getFullYear() ?? new Date().getFullYear();
   const minYear = min?.getFullYear() ?? maxYear - 100;
   const yearOptions = Array.from({ length: maxYear - minYear + 1 }, (_, i) => maxYear - i);
 
   return (
-    <div ref={containerRef} className={cn("relative flex w-full flex-col gap-1", className)}>
+    <div ref={containerRef} className={cn("relative flex w-full flex-col gap-1.5", className)}>
       {label ? (
-        <label htmlFor={id} className="font-semibold leading-none text-foreground">
+        <label htmlFor={id} className="text-sm font-semibold leading-none text-foreground">
           {label}
         </label>
       ) : null}
 
       <div className="relative">
-        <CalendarIcon
-          onClick={() => setIsOpen(!isOpen)}
-          className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 cursor-pointer text-slate-400 transition-colors hover:text-slate-600"
-        />
-
         <Input
           id={id}
           type="text"
           inputMode="numeric"
-          autoComplete="bday"
+          autoComplete="off"
           value={inputValue}
           onChange={handleInputChange}
           onBlur={handleInputBlur}
-          onClick={() => setIsOpen(true)}
+          onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}
-          className="h-10 rounded-xl border-slate-200 bg-white pl-10 pr-9 text-sm shadow-inner-sm focus-visible:border-primary focus-visible:ring-primary/20"
+          className="h-10 rounded-xl border-slate-200 bg-white pr-20 text-sm shadow-inner-sm focus-visible:border-primary focus-visible:ring-primary/20"
         />
 
-        {inputValue ? (
+        <div className="absolute inset-y-0 right-1.5 flex items-center gap-0.5">
+          {inputValue ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onChange("");
+                setInputValue("");
+              }}
+              className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              aria-label="Tarihi temizle"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          ) : null}
           <button
             type="button"
-            onClick={handleClear}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-slate-400 transition-all hover:bg-slate-100 hover:text-slate-600"
-            aria-label="Tarihi temizle"
+            onClick={() => setIsOpen((o) => !o)}
+            className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            aria-label="Takvimi aç"
           >
-            <X className="h-3.5 w-3.5" />
+            <CalendarIcon className="h-4 w-4" />
           </button>
-        ) : null}
+        </div>
       </div>
 
       {error ? (
@@ -257,25 +242,23 @@ export function CustomDatePicker({
       ) : null}
 
       {isOpen ? (
-        <div className="absolute left-0 top-[calc(100%+0.35rem)] z-50 w-[min(100%,320px)] rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xl animate-in fade-in-50 zoom-in-95 duration-100">
-          <div className="mb-3.5 flex items-center justify-between gap-2">
+        <div className="absolute left-0 top-[calc(100%+0.35rem)] z-50 w-[min(100vw-2rem,20rem)] rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl sm:p-4">
+          <div className="mb-3 flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={prevMonth}
-              className="rounded-lg border border-slate-100 p-1.5 text-slate-600 transition-all hover:bg-slate-50"
+              className="rounded-lg border border-slate-100 p-1.5 text-slate-600 hover:bg-slate-50"
               aria-label="Önceki ay"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
 
             {yearSelect ? (
-              <div className="flex min-w-0 flex-1 items-center justify-center gap-1.5">
+              <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
                 <select
-                  className="max-w-[45%] truncate rounded-md border border-slate-200 bg-white px-1.5 py-1 text-xs font-bold text-slate-800"
+                  className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold"
                   value={month}
-                  onChange={(e) =>
-                    setNavDate(new Date(year, Number(e.target.value), 1))
-                  }
+                  onChange={(e) => setNavDate(new Date(year, Number(e.target.value), 1))}
                   aria-label="Ay"
                 >
                   {MONTH_NAMES.map((name, idx) => (
@@ -285,11 +268,9 @@ export function CustomDatePicker({
                   ))}
                 </select>
                 <select
-                  className="max-w-[40%] truncate rounded-md border border-slate-200 bg-white px-1.5 py-1 text-xs font-bold text-slate-800"
+                  className="h-8 w-[5.5rem] shrink-0 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold"
                   value={year}
-                  onChange={(e) =>
-                    setNavDate(new Date(Number(e.target.value), month, 1))
-                  }
+                  onChange={(e) => setNavDate(new Date(Number(e.target.value), month, 1))}
                   aria-label="Yıl"
                 >
                   {yearOptions.map((y) => (
@@ -308,7 +289,7 @@ export function CustomDatePicker({
             <button
               type="button"
               onClick={nextMonth}
-              className="rounded-lg border border-slate-100 p-1.5 text-slate-600 transition-all hover:bg-slate-50"
+              className="rounded-lg border border-slate-100 p-1.5 text-slate-600 hover:bg-slate-50"
               aria-label="Sonraki ay"
             >
               <ChevronRight className="h-4 w-4" />
@@ -335,14 +316,10 @@ export function CustomDatePicker({
                   disabled={disabled}
                   onClick={() => selectDay(day)}
                   className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold transition-all duration-100",
+                    "flex h-8 w-full items-center justify-center rounded-lg text-xs font-semibold transition-colors",
                     disabled && "cursor-not-allowed text-slate-300",
-                    !disabled &&
-                      selected &&
-                      "bg-primary text-primary-foreground shadow-sm shadow-primary/20",
-                    !disabled &&
-                      !selected &&
-                      "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                    !disabled && selected && "bg-primary text-primary-foreground",
+                    !disabled && !selected && "text-slate-700 hover:bg-slate-100"
                   )}
                 >
                   {day}

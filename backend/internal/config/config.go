@@ -13,6 +13,7 @@ type Config struct {
 	JWTSecret     string
 	JWTAccessTTL  time.Duration
 	JWTRefreshTTL time.Duration
+	OTPTTL        time.Duration
 	PortalURL     string
 	DoctorURL     string
 	AdminURL      string
@@ -82,6 +83,7 @@ func Load() Config {
 		JWTSecret:     getEnv("JWT_SECRET", "dev-secret-change-in-production-min-32-chars"),
 		JWTAccessTTL:  parseDuration(getEnv("JWT_ACCESS_TTL", "24h"), 24*time.Hour),
 		JWTRefreshTTL: parseDuration(getEnv("JWT_REFRESH_TTL", "720h"), 720*time.Hour),
+		OTPTTL:        parseDuration(getEnv("OTP_TTL", "10m"), 10*time.Minute),
 		PortalURL:     getEnv("PORTAL_URL", "http://localhost:3000"),
 		DoctorURL:     getEnv("DOCTOR_URL", "http://localhost:3000"),
 		AdminURL:      getEnv("ADMIN_URL", "http://localhost:3000"),

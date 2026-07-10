@@ -1,8 +1,8 @@
 "use client";
 
 import type { InputHTMLAttributes, ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { MessageModal } from "@/components/MessageModal";
-import { CustomDatePicker } from "@/components/CustomDatePicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -83,46 +83,153 @@ type BirthDateSelectProps = {
   onChange: (isoDate: string) => void;
 };
 
-function todayIso(): string {
+function todayParts() {
   const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return { y: d.getFullYear(), m: d.getMonth() + 1, day: d.getDate() };
 }
 
-function yearsAgoIso(years: number): string {
-  const d = new Date();
-  d.setFullYear(d.getFullYear() - years);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+function parseIsoParts(value: string): { y: string; m: string; day: string } {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return { y: "", m: "", day: "" };
+  const [y, m, day] = value.split("-");
+  return { y, m: String(Number(m)), day: String(Number(day)) };
 }
+
+function daysInMonth(year: number, month: number): number {
+  if (!year || !month) return 31;
+  return new Date(year, month, 0).getDate();
+}
+
+const BIRTH_MONTHS = [
+  "Ocak",
+  "Şubat",
+  "Mart",
+  "Nisan",
+  "Mayıs",
+  "Haziran",
+  "Temmuz",
+  "Ağustos",
+  "Eylül",
+  "Ekim",
+  "Kasım",
+  "Aralık",
+];
 
 export function BirthDateSelect({
   id = "dateOfBirth",
   label = "Doğum tarihi",
-  hint = "Takvimden seçin veya GG.AA.YYYY yazın",
+  hint,
   error,
   fieldClassName,
   value,
   onChange,
 }: BirthDateSelectProps) {
+  const today = todayParts();
+  const minYear = today.y - 100;
+  const maxYear = today.y;
+
+  const fromValue = parseIsoParts(value);
+  const [draft, setDraft] = useState(fromValue);
+
+  useEffect(() => {
+    setDraft(parseIsoParts(value));
+  }, [value]);
+
+  const yearNum = draft.y ? Number(draft.y) : 0;
+  const monthNum = draft.m ? Number(draft.m) : 0;
+  const maxDay = daysInMonth(yearNum || maxYear, monthNum || 1);
+
+  const years = Array.from({ length: maxYear - minYear + 1 }, (_, i) => maxYear - i);
+  const days = Array.from({ length: maxDay }, (_, i) => i + 1);
+
+  function updateDraft(next: { y: string; m: string; day: string }) {
+    let day = next.day;
+    if (next.y && next.m && day) {
+      const dim = daysInMonth(Number(next.y), Number(next.m));
+      if (Number(day) > dim) day = String(dim);
+    }
+    const normalized = { ...next, day };
+    setDraft(normalized);
+
+    if (!normalized.y || !normalized.m || !normalized.day) {
+      if (value) onChange("");
+      return;
+    }
+
+    const y = Number(normalized.y);
+    const m = Number(normalized.m);
+    const d = Number(normalized.day);
+    if (y > today.y || (y === today.y && m > today.m) || (y === today.y && m === today.m && d > today.day)) {
+      return;
+    }
+
+    onChange(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+  }
+
+  const selectClass =
+    "h-11 w-full min-w-0 appearance-none rounded-xl border border-slate-200 bg-white px-2.5 text-sm font-medium text-foreground shadow-sm outline-none transition-colors focus:border-primary focus:ring-2 focus:ring-primary/20";
+
   return (
-    <CustomDatePicker
-      id={id}
-      label={label}
-      hint={hint}
-      error={error}
-      value={value}
-      onChange={onChange}
-      className={fieldClassName}
-      placeholder="GG.AA.YYYY"
-      maxDate={todayIso()}
-      minDate={yearsAgoIso(100)}
-      yearSelect
-    />
+    <FormField id={id} label={label} hint={hint} error={error} className={fieldClassName}>
+      <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+        <div className="min-w-0">
+          <label htmlFor={`${id}-day`} className="mb-1 block text-[11px] font-medium text-muted-foreground">
+            Gün
+          </label>
+          <select
+            id={`${id}-day`}
+            className={selectClass}
+            value={draft.day}
+            aria-invalid={error ? true : undefined}
+            onChange={(e) => updateDraft({ ...draft, day: e.target.value })}
+          >
+            <option value="">—</option>
+            {days.map((d) => (
+              <option key={d} value={String(d)}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="min-w-0">
+          <label htmlFor={`${id}-month`} className="mb-1 block text-[11px] font-medium text-muted-foreground">
+            Ay
+          </label>
+          <select
+            id={`${id}-month`}
+            className={selectClass}
+            value={draft.m}
+            aria-invalid={error ? true : undefined}
+            onChange={(e) => updateDraft({ ...draft, m: e.target.value })}
+          >
+            <option value="">—</option>
+            {BIRTH_MONTHS.map((name, idx) => (
+              <option key={name} value={String(idx + 1)}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="min-w-0">
+          <label htmlFor={`${id}-year`} className="mb-1 block text-[11px] font-medium text-muted-foreground">
+            Yıl
+          </label>
+          <select
+            id={`${id}-year`}
+            className={selectClass}
+            value={draft.y}
+            aria-invalid={error ? true : undefined}
+            onChange={(e) => updateDraft({ ...draft, y: e.target.value })}
+          >
+            <option value="">—</option>
+            {years.map((y) => (
+              <option key={y} value={String(y)}>
+                {y}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </FormField>
   );
 }
 

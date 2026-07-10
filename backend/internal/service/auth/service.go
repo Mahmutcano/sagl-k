@@ -87,33 +87,75 @@ func (s *Service) IsMock() bool {
 	return s.cfg.SMS.Provider == "" || s.cfg.SMS.Provider == "mock"
 }
 
-func (s *Service) InitiateRegister(ctx context.Context, req RegisterInitRequest) (string, error) {
+func (s *Service) otpTTL() time.Duration {
+	if s.cfg.OTPTTL > 0 {
+		return s.cfg.OTPTTL
+	}
+	return 10 * time.Minute
+}
+
+func (s *Service) otpMinutes() int {
+	m := int(s.otpTTL().Round(time.Minute) / time.Minute)
+	if m < 1 {
+		return 1
+	}
+	return m
+}
+
+type OTPChallenge struct {
+	Code             string    `json:"-"`
+	ExpiresInSeconds int       `json:"expiresInSeconds"`
+	ExpiresAt        time.Time `json:"expiresAt"`
+}
+
+func (s *Service) newOTPChallenge() OTPChallenge {
+	ttl := s.otpTTL()
+	exp := time.Now().Add(ttl)
+	return OTPChallenge{
+		ExpiresInSeconds: int(ttl.Seconds()),
+		ExpiresAt:        exp,
+	}
+}
+
+func (s *Service) InitiateRegister(ctx context.Context, req RegisterInitRequest) (OTPChallenge, error) {
 	hash, err := password.Hash(req.Password)
 	if err != nil {
-		return "", err
+		return OTPChallenge{}, err
 	}
 	pending := map[string]interface{}{
 		"hash": hash, "req": req,
 	}
 	raw, _ := json.Marshal(pending)
-	code, err := s.notify.SendSMS(ctx, req.PhoneNumber, "register_otp", "Kayıt doğrulama", nil, nil)
+	mins := s.otpMinutes()
+	challenge := s.newOTPChallenge()
+	code, err := s.notify.SendSMS(
+		ctx,
+		req.PhoneNumber,
+		"register_otp",
+		fmt.Sprintf("Kayıt doğrulama. Kod %d dakika geçerlidir", mins),
+		nil,
+		nil,
+	)
 	if err != nil {
-		return "", err
+		return OTPChallenge{}, err
 	}
+	challenge.Code = code
 
-	// Send simultaneous Email verification code
-	emailBody := fmt.Sprintf("Kayıt doğrulama kodunuz: %s\n\nLütfen bu kodu kayıt ekranına girerek işleminizi tamamlayın.", code)
+	emailBody := fmt.Sprintf(
+		"Kayıt doğrulama kodunuz: %s\n\nBu kod %d dakika geçerlidir. Lütfen kayıt ekranına girerek işleminizi tamamlayın.",
+		code, mins,
+	)
 	_ = s.notify.SendEmail(ctx, req.Email, "Kayıt Doğrulama Kodu", "register_otp", emailBody, nil)
 
 	_, err = s.db.Pool.Exec(ctx, `
 		INSERT INTO verification_tokens (phone_number, email, token, purpose, expires_at)
 		VALUES ($1, $2, $3, 'register', $4)
-	`, req.PhoneNumber, req.Email, code, time.Now().Add(10*time.Minute))
+	`, req.PhoneNumber, req.Email, code, challenge.ExpiresAt)
 	if err != nil {
-		return "", err
+		return OTPChallenge{}, err
 	}
 	_ = raw
-	return code, nil
+	return challenge, nil
 }
 
 func (s *Service) CompleteRegister(ctx context.Context, phone, code string, req RegisterInitRequest) (*LoginResult, error) {
@@ -186,28 +228,41 @@ func (s *Service) Refresh(ctx context.Context, refreshToken string) (*LoginResul
 	}, nil
 }
 
-func (s *Service) InitiateForgotPassword(ctx context.Context, phone string) (string, error) {
+func (s *Service) InitiateForgotPassword(ctx context.Context, phone string) (OTPChallenge, error) {
 	var email string
 	_ = s.db.Pool.QueryRow(ctx, "SELECT email FROM users WHERE phone_number = $1 AND is_active = true", phone).Scan(&email)
 
-	code, err := s.notify.SendSMS(ctx, phone, "forgot_password", "Şifre sıfırlama", nil, nil)
+	mins := s.otpMinutes()
+	challenge := s.newOTPChallenge()
+	code, err := s.notify.SendSMS(
+		ctx,
+		phone,
+		"forgot_password",
+		fmt.Sprintf("Şifre sıfırlama. Kod %d dakika geçerlidir", mins),
+		nil,
+		nil,
+	)
 	if err != nil {
-		return "", err
+		return OTPChallenge{}, err
 	}
+	challenge.Code = code
 
 	if email != "" {
-		emailBody := fmt.Sprintf("Şifre sıfırlama kodunuz: %s\n\nLütfen bu kodu şifre sıfırlama ekranına girerek işleminizi tamamlayın.", code)
+		emailBody := fmt.Sprintf(
+			"Şifre sıfırlama kodunuz: %s\n\nBu kod %d dakika geçerlidir. Lütfen şifre sıfırlama ekranına girerek işleminizi tamamlayın.",
+			code, mins,
+		)
 		_ = s.notify.SendEmail(ctx, email, "Şifre Sıfırlama Kodu", "forgot_password", emailBody, nil)
 	}
 
 	_, err = s.db.Pool.Exec(ctx, `
 		INSERT INTO verification_tokens (phone_number, email, token, purpose, expires_at)
 		VALUES ($1, $2, $3, 'forgot_password', $4)
-	`, phone, email, code, time.Now().Add(10*time.Minute))
+	`, phone, email, code, challenge.ExpiresAt)
 	if err != nil {
-		return "", err
+		return OTPChallenge{}, err
 	}
-	return code, nil
+	return challenge, nil
 }
 
 func (s *Service) CompleteForgotPassword(ctx context.Context, phone, code, newPassword string) error {
@@ -219,7 +274,7 @@ func (s *Service) CompleteForgotPassword(ctx context.Context, phone, code, newPa
 		ORDER BY created_at DESC LIMIT 1
 	`, phone, code).Scan(&expires, &used)
 	if err != nil || used != nil || time.Now().After(expires) {
-		return errors.New("invalid or expired code")
+		return errors.New("Doğrulama kodu geçersiz veya süresi dolmuş. Yeni kod isteyin.")
 	}
 	hash, err := password.Hash(newPassword)
 	if err != nil {
