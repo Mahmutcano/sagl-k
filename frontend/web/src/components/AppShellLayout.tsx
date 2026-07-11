@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import { AppLogo } from "@/components/AppLogo";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +17,9 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { api, getToken } from "@/lib/api";
+import { useClientUser } from "@/hooks/useClientUser";
+import { userDisplayName } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { LogOut, ArrowRight, Menu } from "lucide-react";
 
@@ -32,6 +36,7 @@ type AppShellLayoutProps = {
   homeHref: string;
   navItems: NavItem[];
   roleBadge?: string;
+  profileHref?: string;
   onLogout: () => void | Promise<void>;
   title?: string;
   description?: string;
@@ -43,18 +48,59 @@ export function AppShellLayout({
   homeHref,
   navItems,
   roleBadge,
+  profileHref,
   onLogout,
   title,
   description,
   actions,
 }: AppShellLayoutProps) {
   const pathname = usePathname();
+  const user = useClientUser();
   const [menuOpen, setMenuOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [displayName, setDisplayName] = useState("");
+
+  useEffect(() => {
+    const token = getToken();
+    if (!token) return;
+    api<{ firstName?: string; lastName?: string }>("/api/v1/profile", {}, token)
+      .then((p) => {
+        const name = [p.firstName, p.lastName].filter(Boolean).join(" ").trim();
+        if (name) setDisplayName(name);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
+  const sidebarName = displayName || userDisplayName(user) || roleBadge || "Kullanıcı";
+  const initials = sidebarName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase() || "U";
 
   function isItemActive(item: NavItem) {
     return item.isActive ? item.isActive(pathname ?? "") : pathname === item.href;
   }
+
+  const profileBlock = (
+    <div className="flex min-w-0 items-center gap-2.5">
+      <Avatar className="h-8 w-8 shrink-0">
+        <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <span className="block truncate text-sm font-medium leading-tight">{sidebarName}</span>
+        {roleBadge ? (
+          <span className="block truncate text-xs text-muted-foreground">{roleBadge}</span>
+        ) : null}
+      </div>
+    </div>
+  );
 
   return (
     <div className="app-shell flex min-h-svh flex-col pb-[calc(4.25rem+env(safe-area-inset-bottom,0px))] md:pb-0">
@@ -85,12 +131,17 @@ export function AppShellLayout({
               })}
             </nav>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            {roleBadge ? (
-              <Badge variant="outline" className="hidden text-xs sm:inline-flex">
-                {roleBadge}
-              </Badge>
-            ) : null}
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+            {profileHref ? (
+              <Link
+                href={profileHref}
+                className="hidden min-w-0 max-w-[12rem] rounded-md px-1.5 py-1 transition-colors hover:bg-accent sm:block lg:max-w-[16rem]"
+              >
+                {profileBlock}
+              </Link>
+            ) : (
+              <div className="hidden min-w-0 max-w-[12rem] sm:block lg:max-w-[16rem]">{profileBlock}</div>
+            )}
             <Button
               variant="destructive"
               size="sm"
@@ -138,12 +189,26 @@ export function AppShellLayout({
               );
             })}
           </nav>
-          {roleBadge ? (
-            <div className="border-t px-4 py-3">
-              <Badge variant="outline">{roleBadge}</Badge>
-            </div>
-          ) : null}
-          <div className="border-t p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
+          <div className="shrink-0 border-t p-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
+            {profileHref ? (
+              <Link
+                href={profileHref}
+                onClick={() => setMenuOpen(false)}
+                className="mb-3 flex items-center gap-3 rounded-md px-2 py-2 transition-colors hover:bg-accent"
+              >
+                <Avatar className="h-9 w-9">
+                  <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{sidebarName}</span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {roleBadge || "Profil ayarları"}
+                  </span>
+                </div>
+              </Link>
+            ) : (
+              <div className="mb-3 px-2 py-2">{profileBlock}</div>
+            )}
             <Button variant="destructive" className="w-full gap-2" onClick={() => setLogoutOpen(true)}>
               <LogOut className="h-4 w-4" />
               Çıkış yap

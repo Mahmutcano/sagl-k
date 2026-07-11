@@ -73,6 +73,7 @@ export function DoctorAppShell({ children, title, description, actions }: AppShe
       homeHref={nurse ? ROUTES.doctor.nurse : ROUTES.doctor.dashboard}
       navItems={navItems}
       roleBadge={user?.role ? roleLabel(user.role) : undefined}
+      profileHref={ROUTES.doctor.profile}
       onLogout={() => router.push(logoutTo("doctor"))}
       title={title}
       description={description}

@@ -9,7 +9,6 @@ import { ROUTES } from "@/lib/routes";
 import { api, getToken } from "@/lib/api";
 import { AppLogo } from "@/components/AppLogo";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { Separator } from "@/components/ui/separator";
@@ -180,13 +179,22 @@ export function AdminAppShell({ children, title, description, actions }: AppShel
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            {user?.role ? (
-              <Badge variant="outline" className="hidden sm:inline-flex">
-                {roleLabel(user.role)}
-              </Badge>
-            ) : null}
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="text-xs font-semibold">A</AvatarFallback>
+            <Link
+              href={ROUTES.admin.profile}
+              className="hidden min-w-0 max-w-[14rem] items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-accent sm:flex"
+            >
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <span className="block truncate text-sm font-medium leading-tight">{sidebarName}</span>
+                {user?.role ? (
+                  <span className="block truncate text-xs text-muted-foreground">{roleLabel(user.role)}</span>
+                ) : null}
+              </div>
+            </Link>
+            <Avatar className="h-8 w-8 sm:hidden">
+              <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
             </Avatar>
           </div>
         </header>

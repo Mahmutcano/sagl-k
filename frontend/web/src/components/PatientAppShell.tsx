@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { ClipboardList, FileCheck, UserCircle } from "lucide-react";
 import { AppShellLayout } from "@/components/AppShellLayout";
-import { logoutTo } from "@/lib/auth";
+import { useClientUser } from "@/hooks/useClientUser";
+import { logoutTo, roleLabel } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
 
 type AppShellProps = {
@@ -15,6 +16,7 @@ type AppShellProps = {
 
 export function PatientAppShell({ children, title, description, actions }: AppShellProps) {
   const router = useRouter();
+  const user = useClientUser();
 
   return (
     <AppShellLayout
@@ -42,7 +44,8 @@ export function PatientAppShell({ children, title, description, actions }: AppSh
           isActive: (p) => p.startsWith("/patient/profile"),
         },
       ]}
-      roleBadge={undefined}
+      roleBadge={user?.role ? roleLabel(user.role) : "Hasta"}
+      profileHref={ROUTES.patient.profile}
       onLogout={() => router.push(logoutTo("patient"))}
       title={title}
       description={description}
