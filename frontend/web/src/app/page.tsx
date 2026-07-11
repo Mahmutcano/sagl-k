@@ -197,8 +197,8 @@ export default function HomePage() {
             <div className="absolute inset-0 bg-gradient-to-t from-background/50 via-transparent to-background/10" />
           </div>
 
-          <div className="relative mx-auto flex min-h-[min(88svh,720px)] max-w-6xl flex-col justify-end px-4 pb-12 pt-16 sm:px-8 sm:pb-16 lg:justify-center lg:pb-20">
-            <div className="max-w-xl space-y-6">
+          <div className="relative mx-auto flex min-h-[min(88svh,720px)] max-w-6xl flex-col justify-start px-4 pb-10 pt-8 sm:px-8 sm:pb-16 sm:pt-12 lg:justify-center lg:pb-20 lg:pt-16">
+            <div className="max-w-xl space-y-5 sm:space-y-6">
               <Badge variant="outline" className="border-primary/30 bg-background/80 text-xs backdrop-blur-sm">
                 Erciyes Üniversitesi Hastanesi · Tıbbi Danışmanlık
               </Badge>
