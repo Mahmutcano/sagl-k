@@ -20,8 +20,8 @@ RUN set -eux; \
       exit 1; \
     fi; \
     cd "$WEB_DIR"; \
-    if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
-    elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
+    if [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
+    elif [ -f yarn.lock ]; then yarn --frozen-lockfile; \
     elif [ -f package-lock.json ]; then npm ci; \
     else npm install; \
     fi; \
@@ -40,8 +40,8 @@ RUN set -eux; \
     WEB_DIR=$(cat /web_dir); \
     cp -a /opt/node_modules "$WEB_DIR/node_modules"; \
     cd "$WEB_DIR"; \
-    if [ -f yarn.lock ]; then yarn build; \
-    elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm build; \
+    if [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm build; \
+    elif [ -f yarn.lock ]; then yarn build; \
     else npm run build; \
     fi; \
     mkdir -p /out; \
