@@ -6,7 +6,7 @@ import { AdminAppShell } from "@/components/AdminAppShell";
 import { ApiError, api, getToken } from "@/lib/api";
 import { requireSession, roleLabel } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,

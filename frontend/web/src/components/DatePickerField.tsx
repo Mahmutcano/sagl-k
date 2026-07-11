@@ -51,7 +51,8 @@ export function DatePickerField({
   const [view, setView] = useState(() => selected ?? new Date());
 
   useEffect(() => {
-    if (selected) setView(new Date(selected.getFullYear(), selected.getMonth(), 1));
+    const dt = parseISO(value);
+    if (dt) setView(new Date(dt.getFullYear(), dt.getMonth(), 1));
   }, [value]);
 
   useEffect(() => {
@@ -68,7 +69,7 @@ export function DatePickerField({
     const m = view.getMonth();
     const first = new Date(y, m, 1);
     // Monday-first
-    let startPad = (first.getDay() + 6) % 7;
+    const startPad = (first.getDay() + 6) % 7;
     const daysInMonth = new Date(y, m + 1, 0).getDate();
     const cells: ({ day: number; iso: string } | null)[] = [];
     for (let i = 0; i < startPad; i++) cells.push(null);

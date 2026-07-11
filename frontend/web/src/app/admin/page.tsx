@@ -67,7 +67,6 @@ export default function AdminDashboardPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [page, setPage] = useState(0);
-  const [totalCount, setTotalCount] = useState(0);
   const PAGE_SIZE = 20;
 
   function load(token: string) {
@@ -83,7 +82,6 @@ export default function AdminDashboardPage() {
       const list = Array.isArray(a) ? a : (payload.items ?? []);
       setApps(list);
       setStatsApps(list);
-      setTotalCount(Array.isArray(a) ? list.length : (payload.totalCount ?? list.length));
       setPayments(p?.items ?? []);
     });
   }
