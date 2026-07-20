@@ -55,13 +55,15 @@ export function PatientApplicationRow({ item, onDelete, deleting }: Props) {
       <CardFooter className="flex flex-wrap justify-end gap-2 border-t pt-4">
         {canEdit ? (
           <>
+            <Button size="sm" asChild className="w-full sm:w-auto">
+              <Link href={ROUTES.patient.editApplication(item.applicationId)}>
+                Devam et
+              </Link>
+            </Button>
             <Button size="sm" variant="outline" asChild className="w-full sm:w-auto">
               <Link href={ROUTES.patient.editApplication(item.applicationId, "details")}>
                 Bölüm / doktor
               </Link>
-            </Button>
-            <Button size="sm" asChild className="w-full sm:w-auto">
-              <Link href={ROUTES.patient.editApplication(item.applicationId)}>Devam et</Link>
             </Button>
           </>
         ) : null}

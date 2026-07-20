@@ -1,14 +1,13 @@
 "use client";
 
-import { ROUTES } from "@/lib/routes";
-
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ROUTES } from "@/lib/routes";
 import { requireSession } from "@/lib/auth";
 import { PatientAppShell } from "@/components/PatientAppShell";
 import { PatientApplicationDetail } from "@/components/ApplicationDetail";
 
-export default function ApplicationDetailPage({ params }: { params: { id: string } }) {
+function ApplicationDetailBody({ id }: { id: string }) {
   const router = useRouter();
   const [token, setToken] = useState<string | null>(null);
 
@@ -25,7 +24,15 @@ export default function ApplicationDetailPage({ params }: { params: { id: string
 
   return (
     <PatientAppShell title="Başvuru detayı" description="Durum, ödeme ve notlar">
-      <PatientApplicationDetail id={params.id} token={token} />
+      <PatientApplicationDetail id={id} token={token} />
     </PatientAppShell>
+  );
+}
+
+export default function ApplicationDetailPage({ params }: { params: { id: string } }) {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Yükleniyor...</div>}>
+      <ApplicationDetailBody id={params.id} />
+    </Suspense>
   );
 }

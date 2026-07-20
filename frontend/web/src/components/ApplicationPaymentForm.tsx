@@ -52,11 +52,13 @@ export function ApplicationPaymentForm({ applicationId, token, onSuccess, onErro
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState("");
   const [paytr, setPaytr] = useState<TokenResponse | null>(null);
+  const [alreadyPaidReceipt, setAlreadyPaidReceipt] = useState<PaymentReceipt | null>(null);
   const started = useRef(false);
 
   const start = useCallback(async () => {
     setLoading(true);
     setError("");
+    setAlreadyPaidReceipt(null);
     try {
       const raw = await api<TokenResponse>(
         API.applications.paytrToken(applicationId),
@@ -64,8 +66,9 @@ export function ApplicationPaymentForm({ applicationId, token, onSuccess, onErro
         token
       );
       if (raw.status === "paid") {
-        const res = normalizePaymentResult(raw as Record<string, unknown>);
-        onSuccess?.(res.receipt);
+        // Ödeme ekranını atlamadan kullanıcıya durumu göster; onSuccess'i butonla tetikle.
+        setPaytr(raw);
+        setAlreadyPaidReceipt(normalizePaymentResult(raw as Record<string, unknown>).receipt ?? null);
         return;
       }
       setPaytr(raw);
@@ -76,7 +79,7 @@ export function ApplicationPaymentForm({ applicationId, token, onSuccess, onErro
     } finally {
       setLoading(false);
     }
-  }, [applicationId, token, onSuccess, onError]);
+  }, [applicationId, token, onError]);
 
   useEffect(() => {
     if (started.current) return;
@@ -137,7 +140,23 @@ export function ApplicationPaymentForm({ applicationId, token, onSuccess, onErro
         <p className="text-sm text-muted-foreground">Ödeme formu hazırlanıyor…</p>
       ) : null}
 
-      {!loading && paytr?.mock ? (
+      {!loading && paytr?.status === "paid" ? (
+        <div className="space-y-3 rounded-lg border border-primary/30 bg-primary/5 p-4">
+          <p className="text-sm font-medium">Bu başvuru için ödeme zaten alınmış.</p>
+          <p className="text-xs text-muted-foreground">
+            Yeni bir ödeme gerekmiyor. Başvurunuz uzman hekim değerlendirmesinde.
+          </p>
+          <Button
+            type="button"
+            className="w-full"
+            onClick={() => onSuccess?.(alreadyPaidReceipt ?? undefined)}
+          >
+            Başvuruya dön
+          </Button>
+        </div>
+      ) : null}
+
+      {!loading && paytr?.mock && paytr.status !== "paid" ? (
         <div className="space-y-3 rounded-lg border border-dashed p-4">
           <p className="text-sm text-muted-foreground">
             PAYTR mock modundasınız. Canlı iframe yerine test ödemesini simüle edebilirsiniz.
@@ -151,7 +170,7 @@ export function ApplicationPaymentForm({ applicationId, token, onSuccess, onErro
         </div>
       ) : null}
 
-      {!loading && paytr && !paytr.mock && paytr.token ? (
+      {!loading && paytr && !paytr.mock && paytr.token && paytr.status !== "paid" ? (
         <div className="space-y-3">
           {cards.length > 0 ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm">

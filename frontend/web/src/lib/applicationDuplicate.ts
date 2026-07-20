@@ -12,9 +12,12 @@ export function redirectIfDuplicateApplication(
   if (typeof existingId !== "string") return false;
 
   if (reason === "payment_pending") {
-    router.push(ROUTES.patient.editApplication(existingId, "details"));
+    // Önce form önizleme; ödeme ancak önizleme onayından sonra.
+    router.push(ROUTES.patient.editApplication(existingId, "preview"));
   } else {
-    router.push(ROUTES.patient.application(existingId));
+    router.push(
+      `${ROUTES.patient.application(existingId)}?notice=awaiting_doctor`
+    );
   }
   return true;
 }

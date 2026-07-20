@@ -67,8 +67,12 @@ func NewPayTRProvider(cfg appcfg.PayTRConfig) *PayTRProvider {
 func (p *PayTRProvider) Name() string { return "paytr" }
 
 func (p *PayTRProvider) IsMock() bool {
-	return strings.EqualFold(p.cfg.Mode, "mock") ||
-		(strings.TrimSpace(p.cfg.MerchantID) == "" && !strings.EqualFold(p.cfg.Mode, "live"))
+	mode := strings.ToLower(strings.TrimSpace(p.cfg.Mode))
+	if mode == "" {
+		mode = "mock"
+	}
+	// Yalnızca açık mock. test/live'ta merchant yoksa GetToken hata döner (sessiz mock yok).
+	return mode == "mock"
 }
 
 func (p *PayTRProvider) GetToken(ctx context.Context, req TokenRequest) (*TokenResult, error) {

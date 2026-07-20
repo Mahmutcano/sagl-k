@@ -33,7 +33,7 @@ import {
   parseSurveyData,
   type ApplicationSurveyAnswers,
 } from "@/lib/applicationSurvey";
-import { type ApplicationDetail, type PaymentReceipt, isPatientEditableStatus, resolveEditStep } from "@/lib/application";
+import { type ApplicationDetail, type PaymentReceipt, isPatientEditableStatus, resolveEditStep, markPreviewConfirmed, clearPreviewConfirmed, isPreviewConfirmed } from "@/lib/application";
 import { redirectIfDuplicateApplication } from "@/lib/applicationDuplicate";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -146,6 +146,19 @@ function NewApplicationContent() {
       .finally(() => setEditLoading(false));
   }, [editId, stepParam, router]);
 
+  // Ödeme adımı: önizleme onayı ve status 0 zorunlu — aksi halde geri çek.
+  useEffect(() => {
+    if (step !== "payment" || !createdId) return;
+    if (applicationStatus !== 0 || !isPreviewConfirmed(createdId)) {
+      setStep("preview");
+      setError(
+        applicationStatus !== 0
+          ? "Bu başvuru için ödeme beklenmiyor."
+          : "Ödemeye geçmeden önce form önizlemesini onaylamanız gerekir."
+      );
+    }
+  }, [step, createdId, applicationStatus]);
+
   useEffect(() => {
     if (!careProviderId || !catalog.providers.length) return;
     const provider = catalog.providers.find((p) => p.careProviderId === careProviderId);
@@ -186,10 +199,13 @@ function NewApplicationContent() {
   function continueToSurvey(e: FormEvent) {
     e.preventDefault();
     const fields: FieldErrors = {};
-    if (!professionCode) fields.professionCode = "Bölüm seçiniz.";
-    if (!careProviderId) fields.careProviderId = "Doktor seçimi zorunludur.";
+    if (!professionCode.trim()) fields.professionCode = "Bölüm seçiniz.";
+    if (!careProviderId.trim()) fields.careProviderId = "Doktor seçimi zorunludur.";
     setDetailFields(fields);
-    if (hasErrors(fields)) return;
+    if (hasErrors(fields)) {
+      setError("Bölüm ve doktor seçmeden şikayet adımına geçilemez.");
+      return;
+    }
 
     const profession = catalog.professions.find((p) => p.code === professionCode);
     setProfessionName(profession?.name ?? professionCode);
@@ -226,6 +242,7 @@ function NewApplicationContent() {
       .then(() => {
         setStep("survey");
         setError("");
+        if (createdId) clearPreviewConfirmed(createdId);
       })
       .catch((err) => {
         if (!redirectIfDuplicateApplication(err, router)) {
@@ -338,6 +355,7 @@ function NewApplicationContent() {
         }
       }
       setStep("preview");
+      if (applicationId) clearPreviewConfirmed(applicationId);
     } catch (err) {
       if (redirectIfDuplicateApplication(err, router)) return;
       if (err instanceof ApiError) {
@@ -727,7 +745,15 @@ function NewApplicationContent() {
                 Ödemeye geç
               </Button>
             )}
-            <Button type="button" variant="ghost" className={formStepButtonClass("gap-1.5")} onClick={() => setStep("survey")}>
+            <Button
+              type="button"
+              variant="ghost"
+              className={formStepButtonClass("gap-1.5")}
+              onClick={() => {
+                if (createdId) clearPreviewConfirmed(createdId);
+                setStep("survey");
+              }}
+            >
               <ArrowLeft className="h-4 w-4" />
               Geri
             </Button>
@@ -735,7 +761,7 @@ function NewApplicationContent() {
         </Card>
       ) : null}
 
-      {step === "payment" && createdId && applicationStatus === 0 ? (
+      {step === "payment" && createdId && applicationStatus === 0 && isPreviewConfirmed(createdId) ? (
         <Card className="max-w-4xl w-full application-form-card border-2 border-primary/40">
           <CardHeader>
             <CardTitle>Adım 4 — Ödeme</CardTitle>
@@ -877,7 +903,25 @@ function NewApplicationContent() {
         confirmText="Evet, ödemeye geç"
         cancelText="Vazgeç"
         onConfirm={() => {
+          if (!createdId) return;
+          if (!professionCode || !careProviderId) {
+            setPaymentConfirmOpen(false);
+            setError("Bölüm ve doktor seçimi zorunludur.");
+            setStep("details");
+            return;
+          }
+          const surveyErrs = validateApplicationSurvey(surveyAnswers);
+          if (hasErrors(surveyErrs)) {
+            setPaymentConfirmOpen(false);
+            setSurveyFields(surveyErrs);
+            setSurveyFormError(summarizeSurveyErrors(surveyErrs));
+            setError("Ödemeye geçmeden önce şikayet formunu eksiksiz doldurun.");
+            setStep("survey");
+            return;
+          }
+          markPreviewConfirmed(createdId);
           setPaymentConfirmOpen(false);
+          setError("");
           setStep("payment");
         }}
         onCancel={() => setPaymentConfirmOpen(false)}

@@ -89,6 +89,11 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
     const payment = searchParams.get("payment");
     if (payment === "success") setMsg("Ödeme başarıyla tamamlandı.");
     if (payment === "failed") setError("Ödeme tamamlanamadı. Lütfen tekrar deneyin.");
+    if (searchParams.get("notice") === "awaiting_doctor") {
+      setMsg(
+        "Bu doktora zaten ödenmiş ve sonuçlanmamış bir başvurunuz var. Yeni başvuru / ödeme yapılamaz; mevcut sürecin tamamlanması gerekir."
+      );
+    }
   }, [searchParams]);
 
   useEffect(() => {
@@ -200,6 +205,15 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
         </Alert>
       ) : null}
 
+      {app.statusCode === 0 && !surveyComplete ? (
+        <Alert>
+          <AlertTitle>Ödeme henüz yapılmadı</AlertTitle>
+          <AlertDescription>
+            Başvurunuzu tamamlamak için şikayet bilgilerini doldurup ardından ödeme adımına geçmeniz gerekir.
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
           <div className="min-w-0 space-y-1">
@@ -258,8 +272,8 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
           <CardHeader>
             <CardTitle className="text-base">Başvuru adımları</CardTitle>
             <CardDescription>
-              Önizleme (Adım 3) ve ödeme (Adım 4) ayrı ekranlardır. Ödeme yalnızca formu
-              onayladıktan sonra yapılır.
+              Sıra zorunludur: Bölüm &amp; doktor → Şikayet &amp; belgeler → Form önizleme → Ödeme.
+              Ödeme yalnızca form önizlemesini onayladıktan sonra yapılır.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
@@ -269,8 +283,8 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
                 <Alert>
                   <AlertTitle>Adım 3 — Form önizleme</AlertTitle>
                   <AlertDescription>
-                    Aşağıda başvuru formunuzun özeti var. Ödeme için &quot;Adım 4 — Ödemeye geç&quot;
-                    butonunu kullanın.
+                    Formu kontrol edin. Sonraki adımda ödemeye geçmek için sihirbazdaki
+                    &quot;Ödemeye geç&quot; onayını kullanın; ödeme adımı atlanamaz.
                   </AlertDescription>
                 </Alert>
                 <ApplicationPreviewPanel applicationId={id} token={token} />
@@ -287,15 +301,16 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
           </CardContent>
           <CardFooter className="flex flex-wrap gap-2 border-t">
             <Button asChild>
-              <Link href={ROUTES.patient.editApplication(id)}>Adımlara devam et</Link>
+              <Link
+                href={
+                  surveyComplete
+                    ? ROUTES.patient.editApplication(id, "preview")
+                    : ROUTES.patient.editApplication(id)
+                }
+              >
+                {surveyComplete ? "Önizleme ve ödemeye devam et" : "Adımlara devam et"}
+              </Link>
             </Button>
-            {surveyComplete ? (
-              <Button asChild variant="secondary">
-                <Link href={ROUTES.patient.editApplication(id, "payment")}>
-                  Adım 4 — Ödemeye geç
-                </Link>
-              </Button>
-            ) : null}
           </CardFooter>
         </Card>
       ) : null}

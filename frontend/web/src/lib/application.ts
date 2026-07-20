@@ -264,9 +264,9 @@ export function isSurveyComplete(surveyData: unknown): boolean {
   );
 }
 
-/** Düzenleme modunda kullanıcının kaldığı sihirbaz adımını belirler. */
+/** Düzenleme modunda kullanıcının kaldığı sihirbaz adımını belirler. Ödeme asla atlanmaz. */
 export function resumeWizardStep(app: ApplicationDetail): "details" | "survey" | "preview" | "payment" {
-  if (!app.professionCode?.trim()) return "details";
+  if (!app.professionCode?.trim() || !app.careProviderId?.trim()) return "details";
   if (!isSurveyComplete(app.surveyData)) return "survey";
   return "preview";
 }
@@ -274,7 +274,30 @@ export function resumeWizardStep(app: ApplicationDetail): "details" | "survey" |
 const WIZARD_STEPS = ["details", "survey", "preview", "payment"] as const;
 export type WizardStepId = (typeof WIZARD_STEPS)[number];
 
-/** URL ?step= veya otomatik devam adımı. Ödeme yalnızca önizleme tamamlandıysa ve status 0 ise. */
+const previewConfirmedKey = (applicationId: string) =>
+  `mcp:previewConfirmed:${applicationId}`;
+
+/** Form önizleme onaylandıktan sonra ödeme adımına geçilebilir. */
+export function markPreviewConfirmed(applicationId: string): void {
+  if (typeof window === "undefined" || !applicationId) return;
+  sessionStorage.setItem(previewConfirmedKey(applicationId), "1");
+}
+
+export function clearPreviewConfirmed(applicationId: string): void {
+  if (typeof window === "undefined" || !applicationId) return;
+  sessionStorage.removeItem(previewConfirmedKey(applicationId));
+}
+
+export function isPreviewConfirmed(applicationId: string): boolean {
+  if (typeof window === "undefined" || !applicationId) return false;
+  return sessionStorage.getItem(previewConfirmedKey(applicationId)) === "1";
+}
+
+/**
+ * URL ?step= veya otomatik devam adımı.
+ * Sıra zorunlu: details → survey → preview → (onay) → payment.
+ * Ödeme URL ile atlanamaz; önce önizleme onayı gerekir.
+ */
 export function resolveEditStep(
   app: ApplicationDetail,
   stepParam: string | null
@@ -284,14 +307,20 @@ export function resolveEditStep(
     return resumed;
   }
   const requested = stepParam as WizardStepId;
+
   if (requested === "payment") {
     if (app.statusCode !== 0) return "preview";
     if (resumed === "details" || resumed === "survey") return resumed;
+    // Önizleme onayı yoksa ödeme adımına düşürme
+    if (!isPreviewConfirmed(app.applicationId)) return "preview";
     return "payment";
   }
+
   if (app.statusCode === 0 && (requested === "details" || requested === "survey")) {
     return requested;
   }
+
+  // İlerideki adıma URL ile zıplamayı engelle
   const order = WIZARD_STEPS.indexOf(requested);
   const resumedOrder = WIZARD_STEPS.indexOf(resumed);
   if (order > resumedOrder) return resumed;
