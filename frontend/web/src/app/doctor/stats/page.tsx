@@ -143,7 +143,7 @@ export default function DoctorStatsPage() {
           <Card>
             <CardHeader className="pb-2">
               <CardDescription className="flex items-center gap-2">
-                <Clock className="h-4 w-4" /> Rapor bekleyen
+                <Clock className="h-4 w-4" /> Rapor Bekleyen
               </CardDescription>
               <CardTitle className="text-2xl">{stats.waitingReport}</CardTitle>
             </CardHeader>

@@ -50,7 +50,7 @@ type Agreement = {
 function RegisterSteps({ current }: { current: "form" | "otp" }) {
   const steps = [
     { id: "form", label: "Bilgiler" },
-    { id: "otp", label: "SMS doğrulama" },
+    { id: "otp", label: "SMS Doğrulama" },
   ] as const;
 
   return (

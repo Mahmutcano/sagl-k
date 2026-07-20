@@ -3,9 +3,9 @@
 import { cn } from "@/lib/utils";
 
 export const FLOW_STEPS = [
-  { key: "details", label: "Bölüm & doktor", short: "Bölüm" },
-  { key: "survey", label: "Şikayet & belgeler", short: "Şikayet" },
-  { key: "preview", label: "Form önizleme", short: "Önizleme" },
+  { key: "details", label: "Bölüm & Doktor", short: "Bölüm" },
+  { key: "survey", label: "Şikayet & Belgeler", short: "Şikayet" },
+  { key: "preview", label: "Form Önizleme", short: "Önizleme" },
   { key: "payment", label: "Ödeme", short: "Ödeme" },
 ] as const;
 
@@ -33,7 +33,7 @@ export function ApplicationFlowSteps({ current, paymentComplete, compact }: Prop
             <li
               key={step.key}
               className={cn(
-                "flex min-w-[4.5rem] flex-1 items-center justify-center gap-2 rounded-sm px-2 py-2 text-xs sm:text-sm",
+                "flex min-w-[4.5rem] flex-1 items-center justify-center gap-2 rounded-sm px-2 py-2.5 text-sm sm:text-[0.9375rem]",
                 active && "bg-primary text-primary-foreground",
                 done && !active && "bg-secondary text-secondary-foreground",
                 !done && !active && "text-muted-foreground"
@@ -41,7 +41,7 @@ export function ApplicationFlowSteps({ current, paymentComplete, compact }: Prop
             >
               <span
                 className={cn(
-                  "flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold",
+                  "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
                   active && "bg-primary-foreground/20",
                   done && !active && "bg-background",
                   !done && !active && "bg-muted"
@@ -73,7 +73,7 @@ export function ApplicationFlowHint({ current }: { current: FlowStepKey }) {
   const step = FLOW_STEPS[index];
   const next = FLOW_STEPS[index + 1];
   return (
-    <p className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground sm:text-sm">
+    <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
       <span className="font-medium text-foreground">Adım {index + 1}/4 — {step?.label}</span>
       {next ? (
         <>

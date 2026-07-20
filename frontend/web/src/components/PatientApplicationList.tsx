@@ -47,7 +47,7 @@ export function PatientApplicationRow({ item, onDelete, deleting }: Props) {
             {dateLabel ? ` · ${dateLabel}` : ""}
           </p>
           {isPatientAwaitingDoctor(item.statusCode) ? (
-            <p className="text-xs text-muted-foreground">Doktorunuz tarafından raporlanıyor</p>
+            <p className="text-sm text-muted-foreground">Doktorunuz tarafından raporlanıyor</p>
           ) : null}
         </div>
         <StatusBadge code={item.statusCode} />
@@ -62,7 +62,7 @@ export function PatientApplicationRow({ item, onDelete, deleting }: Props) {
             </Button>
             <Button size="sm" variant="outline" asChild className="w-full sm:w-auto">
               <Link href={ROUTES.patient.editApplication(item.applicationId, "details")}>
-                Bölüm / doktor
+                Bölüm / Doktor
               </Link>
             </Button>
           </>

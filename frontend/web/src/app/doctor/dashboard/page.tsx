@@ -57,7 +57,7 @@ const PAGE_SIZE = 15;
 
 const CATEGORY_OPTIONS: { id: DoctorQueueCategory; label: string }[] = [
   { id: "all", label: "Tümü" },
-  { id: "pending_report", label: "Rapor bekleyen" },
+  { id: "pending_report", label: "Rapor Bekleyen" },
   { id: "draft", label: "Taslak" },
   { id: "concluded", label: "Sonuçlanan" },
 ];

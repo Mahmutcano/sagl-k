@@ -272,7 +272,7 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
           <CardHeader>
             <CardTitle className="text-base">Başvuru adımları</CardTitle>
             <CardDescription>
-              Sıra zorunludur: Bölüm &amp; doktor → Şikayet &amp; belgeler → Form önizleme → Ödeme.
+              Sıra zorunludur: Bölüm &amp; Doktor → Şikayet &amp; Belgeler → Form Önizleme → Ödeme.
               Ödeme yalnızca form önizlemesini onayladıktan sonra yapılır.
             </CardDescription>
           </CardHeader>
@@ -281,7 +281,7 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
             {surveyComplete ? (
               <>
                 <Alert>
-                  <AlertTitle>Adım 3 — Form önizleme</AlertTitle>
+                  <AlertTitle>Adım 3 — Form Önizleme</AlertTitle>
                   <AlertDescription>
                     Formu kontrol edin. Sonraki adımda ödemeye geçmek için sihirbazdaki
                     &quot;Ödemeye geç&quot; onayını kullanın; ödeme adımı atlanamaz.
@@ -318,7 +318,7 @@ export function PatientApplicationDetail({ id, token, backHref = ROUTES.patient.
       {app.statusCode >= 1 && !isConcludedStatus(app.statusCode) && hasSurveyContent ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Form önizleme</CardTitle>
+            <CardTitle className="text-base">Form Önizleme</CardTitle>
             <CardDescription>PDF olarak kaydetmek için yazdır butonunu kullanın.</CardDescription>
           </CardHeader>
           <CardContent>

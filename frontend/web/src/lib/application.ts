@@ -133,7 +133,7 @@ export const PATIENT_APPLICATION_GROUPS: PatientApplicationGroup[] = [
     id: "pending",
     title: "Tamamlanmayı bekleyen",
     description: "Ödeme yapılmadı — kaldığınız adımdan devam edin veya silin.",
-    stepHint: "1 Bölüm → 2 Şikayet → 3 Form önizleme → 4 Ödeme (ayrı adımlar)",
+    stepHint: "1 Bölüm → 2 Şikayet → 3 Form Önizleme → 4 Ödeme (ayrı adımlar)",
     statusCodes: [0],
   },
   {

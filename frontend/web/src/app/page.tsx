@@ -38,31 +38,31 @@ const WORKFLOW: {
   },
   {
     step: "02",
-    title: "Bölüm ve uzman seçimi",
+    title: "Bölüm ve Uzman Seçimi",
     desc: "Danışmak istediğiniz bölümü ve uzman hekimi seçerek başvurunuzu başlatın.",
     Icon: Health,
   },
   {
     step: "03",
-    title: "Şikayet ve belgeler",
+    title: "Şikayet ve Belgeler",
     desc: "Tıbbi öykünüzü, şikayetlerinizi ve varsa raporlarınızı güvenle yükleyin.",
     Icon: DocumentText2,
   },
   {
     step: "04",
-    title: "Form önizleme",
+    title: "Form Önizleme",
     desc: "Başvuru özetinizi kontrol edin ve süreci onaylayarak devam edin.",
     Icon: ClipboardCheck,
   },
   {
     step: "05",
-    title: "Uzman değerlendirme",
+    title: "Uzman Değerlendirme",
     desc: "Seçtiğiniz uzman hekim başvurunuzu inceler; gerekirse mesajlaşma ile iletişim kurulur.",
     Icon: ChatRound,
   },
   {
     step: "06",
-    title: "Rapor ve takip",
+    title: "Rapor ve Takip",
     desc: "Sonuç raporunuza panelinizden ulaşın; süreci baştan sona takip edin.",
     Icon: ClipboardCheck,
   },
@@ -309,7 +309,7 @@ export default function HomePage() {
               </li>
               <li className="flex items-start gap-2">
                 <CheckMark />
-                Bölüm ve doktor seçin
+                Bölüm ve Doktor seçin
               </li>
               <li className="flex items-start gap-2">
                 <CheckMark />

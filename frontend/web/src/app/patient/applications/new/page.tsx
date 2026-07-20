@@ -203,7 +203,7 @@ function NewApplicationContent() {
     if (!careProviderId.trim()) fields.careProviderId = "Doktor seçimi zorunludur.";
     setDetailFields(fields);
     if (hasErrors(fields)) {
-      setError("Bölüm ve doktor seçmeden şikayet adımına geçilemez.");
+      setError("Bölüm ve Doktor seçmeden şikayet adımına geçilemez.");
       return;
     }
 
@@ -246,7 +246,7 @@ function NewApplicationContent() {
       })
       .catch((err) => {
         if (!redirectIfDuplicateApplication(err, router)) {
-          setError(err instanceof ApiError ? err.message : "Bölüm ve doktor kaydedilemedi.");
+          setError(err instanceof ApiError ? err.message : "Bölüm ve Doktor kaydedilemedi.");
         }
       })
       .finally(() => setSubmitting(false));
@@ -590,7 +590,7 @@ function NewApplicationContent() {
         <Card className="max-w-4xl w-full application-form-card ">
           <form onSubmit={continueToSurvey} noValidate>
             <CardHeader>
-              <CardTitle>Adım 1 — Bölüm ve doktor</CardTitle>
+              <CardTitle>Adım 1 — Bölüm ve Doktor</CardTitle>
               <CardDescription>
                 Danışmak istediğiniz bölümü seçin; isteğe bağlı olarak uzman hekim tercih edebilirsiniz.
                 {createdId ? " Ödeme yapılmadan önce bölüm ve doktor seçiminizi buradan değiştirebilirsiniz." : ""}
@@ -648,7 +648,7 @@ function NewApplicationContent() {
               <Button type="submit" disabled={submitting} className={formStepButtonClass()}>
                 <span className="sm:hidden">{submitting ? "Kaydediliyor..." : "Devam et"}</span>
                 <span className="hidden sm:inline">
-                  {submitting ? "Kaydediliyor..." : "Devam et — şikayet bilgileri"}
+                  {submitting ? "Kaydediliyor..." : "Devam et — Şikayet Bilgileri"}
                 </span>
               </Button>
               {!createdId ? (
@@ -674,7 +674,7 @@ function NewApplicationContent() {
         <Card className="max-w-4xl w-full application-form-card ">
           <form onSubmit={saveAndGoToPreview} noValidate>
             <CardHeader>
-              <CardTitle>Adım 2 — Şikayet ve belgeler</CardTitle>
+              <CardTitle>Adım 2 — Şikayet ve Belgeler</CardTitle>
               <CardDescription>
                 Tıbbi geçmişinizi, şikayetinizi ve sorularınızı yazın; tetkik/rapor dosyalarını ekleyin.
               </CardDescription>
@@ -706,7 +706,7 @@ function NewApplicationContent() {
               <Button type="submit" disabled={submitting} className={formStepButtonClass()}>
                 <span className="sm:hidden">{submitting ? "Kaydediliyor..." : "Önizlemeye geç"}</span>
                 <span className="hidden sm:inline">
-                  {submitting ? "Kaydediliyor..." : "Devam et — form önizleme (Adım 3)"}
+                  {submitting ? "Kaydediliyor..." : "Devam et — Form Önizleme (Adım 3)"}
                 </span>
               </Button>
               <Button type="button" variant="ghost" onClick={() => setStep("details")} className={formStepButtonClass("gap-1.5")}>
@@ -721,7 +721,7 @@ function NewApplicationContent() {
       {step === "preview" && createdId ? (
         <Card className="max-w-5xl w-full application-form-card border-primary/20">
           <CardHeader>
-            <CardTitle>Adım 3 — Form önizleme</CardTitle>
+            <CardTitle>Adım 3 — Form Önizleme</CardTitle>
             <CardDescription>
               Başvuru formunuzu kontrol edin. Mobilde formu indirip veya tam ekranda açarak inceleyin; masaüstünde
               doğrudan önizleyebilirsiniz. Onay sonrası ödeme adımına geçilir.
@@ -906,7 +906,7 @@ function NewApplicationContent() {
           if (!createdId) return;
           if (!professionCode || !careProviderId) {
             setPaymentConfirmOpen(false);
-            setError("Bölüm ve doktor seçimi zorunludur.");
+            setError("Bölüm ve Doktor seçimi zorunludur.");
             setStep("details");
             return;
           }

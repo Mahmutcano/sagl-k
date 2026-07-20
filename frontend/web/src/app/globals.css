@@ -58,13 +58,14 @@
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground antialiased min-h-[100vh] flex flex-col;
+  html {
+    -webkit-text-size-adjust: 100%;
+    font-size: 106.25%; /* ~17px — bir tık daha okunaklı */
   }
-}
 
-html {
-  -webkit-text-size-adjust: 100%;
+  body {
+    @apply bg-background text-foreground antialiased min-h-[100vh] flex flex-col text-base;
+  }
 }
 
 /* Mobile safe areas */
