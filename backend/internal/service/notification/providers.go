@@ -22,8 +22,7 @@ func newSMSProvider(cfg appcfg.SMSConfig) SMSProvider {
 	case "verimor":
 		p, err := NewVerimorSMS(cfg)
 		if err != nil {
-			log.Printf("[notification] verimor init failed, falling back to mock: %v", err)
-			return MockSMS{}
+			log.Fatalf("[notification] verimor init failed: %v", err)
 		}
 		log.Println("[notification] SMS provider: verimor")
 		return p
@@ -50,8 +49,7 @@ func newEmailProvider(cfg appcfg.EmailConfig) EmailProvider {
 	case "mailersend":
 		p, err := NewMailerSendEmail(cfg)
 		if err != nil {
-			log.Printf("[notification] mailersend init failed, falling back to mock: %v", err)
-			return MockEmail{}
+			log.Fatalf("[notification] mailersend init failed: %v", err)
 		}
 		log.Println("[notification] Email provider: mailersend")
 		return p

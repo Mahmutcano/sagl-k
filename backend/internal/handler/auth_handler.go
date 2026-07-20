@@ -90,7 +90,8 @@ func validateRegister(req *authsvc.RegisterInitRequest) validate.Errors {
 	}
 
 	validate.PhoneNational(&errs, "phoneNumber", req.PhoneCountryCode, req.PhoneNumber)
-	validate.Email(&errs, "email", req.Email)
+	req.Email = strings.TrimSpace(req.Email)
+	validate.EmailOptional(&errs, "email", req.Email)
 	validate.Password(&errs, "password", req.Password)
 	validate.DateOfBirth(&errs, "dateOfBirth", req.DateOfBirth)
 	validate.Gender(&errs, "gender", req.Gender)

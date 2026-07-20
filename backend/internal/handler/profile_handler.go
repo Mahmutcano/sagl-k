@@ -138,11 +138,9 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	if req.LastName == "" {
 		errs.Add("lastName", "required", "Soyad alanı zorunludur.")
 	}
-	validate.Email(&errs, "email", req.Email)
+	validate.EmailOptional(&errs, "email", req.Email)
 	validate.NationalID(&errs, "nationalIdentifier", req.NationalIdentifier)
-	if req.PhoneNumber != "" {
-		validate.PhoneNational(&errs, "phoneNumber", req.PhoneCountryCode, req.PhoneNumber)
-	}
+	validate.PhoneNational(&errs, "phoneNumber", req.PhoneCountryCode, req.PhoneNumber)
 
 	if req.Gender != nil && *req.Gender != 1 && *req.Gender != 2 {
 		errs.Add("gender", "invalid", "Geçersiz cinsiyet seçimi.")
@@ -190,9 +188,9 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Unique check for email and TC
-	if req.Email != currentEmail {
+	if req.Email != "" && req.Email != currentEmail {
 		var exists bool
-		_ = h.db.Pool.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1 AND id <> $2)`, req.Email, claims.UserID).Scan(&exists)
+		_ = h.db.Pool.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM users WHERE LOWER(email) = LOWER($1) AND id <> $2)`, req.Email, claims.UserID).Scan(&exists)
 		if exists {
 			errs.Add("email", "unique", "Bu e-posta adresi başka bir kullanıcı tarafından kullanılıyor.")
 			validate.Fail(w, errs)
@@ -222,12 +220,16 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Execute general profile update (except phone number)
+	var emailArg interface{}
+	if req.Email != "" {
+		emailArg = req.Email
+	}
 	_, err = h.db.Pool.Exec(r.Context(), `
 		UPDATE users
 		SET first_name = $1, last_name = $2, email = $3, national_identifier = $4,
 			date_of_birth = $5, gender = $6, password_hash = $7, updated_at = now()
 		WHERE id = $8
-	`, req.FirstName, req.LastName, req.Email, req.NationalIdentifier, dob, req.Gender, updatedHash, claims.UserID)
+	`, req.FirstName, req.LastName, emailArg, req.NationalIdentifier, dob, req.Gender, updatedHash, claims.UserID)
 
 	if err != nil {
 		response.Fail(w, http.StatusInternalServerError, "PROF004", "Profil güncellenemedi.")

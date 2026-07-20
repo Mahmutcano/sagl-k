@@ -566,22 +566,28 @@ function NewApplicationContent() {
                 fieldClassName="sm:col-span-2"
               />
             </CardContent>
-            <FormStepFooter>
-              <Button type="submit" className={formStepButtonClass()}>Devam et</Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => {
-                  setStep("who");
-                  setRelativeFields({});
-                  setError("");
-                }}
-                className={formStepButtonClass("gap-1.5")}
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Geri
-              </Button>
-            </FormStepFooter>
+            <FormStepFooter
+              back={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setStep("who");
+                    setRelativeFields({});
+                    setError("");
+                  }}
+                  className={formStepButtonClass("gap-1.5")}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Geri
+                </Button>
+              }
+              primary={
+                <Button type="submit" className={formStepButtonClass()}>
+                  Devam et
+                </Button>
+              }
+            />
           </form>
         </Card>
       )}
@@ -644,28 +650,29 @@ function NewApplicationContent() {
                 disabled={!professionCode || catalog.loadingProviders}
               />
             </CardContent>
-            <FormStepFooter>
-              <Button type="submit" disabled={submitting} className={formStepButtonClass()}>
-                <span className="sm:hidden">{submitting ? "Kaydediliyor..." : "Devam et"}</span>
-                <span className="hidden sm:inline">
-                  {submitting ? "Kaydediliyor..." : "Devam et — Şikayet Bilgileri"}
-                </span>
-              </Button>
-              {!createdId ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setStep(forRelative ? "relative" : "who");
-                    setApplicationStatus(null);
-                  }}
-                  className={formStepButtonClass("gap-1.5")}
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Geri
+            <FormStepFooter
+              back={
+                !createdId ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setStep(forRelative ? "relative" : "who");
+                      setApplicationStatus(null);
+                    }}
+                    className={formStepButtonClass("gap-1.5")}
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    Geri
+                  </Button>
+                ) : undefined
+              }
+              primary={
+                <Button type="submit" disabled={submitting} className={formStepButtonClass()}>
+                  {submitting ? "Kaydediliyor..." : "Devam et"}
                 </Button>
-              ) : null}
-            </FormStepFooter>
+              }
+            />
           </form>
         </Card>
       )}
@@ -702,18 +709,24 @@ function NewApplicationContent() {
                 disabled={submitting}
               />
             </CardContent>
-            <FormStepFooter>
-              <Button type="submit" disabled={submitting} className={formStepButtonClass()}>
-                <span className="sm:hidden">{submitting ? "Kaydediliyor..." : "Önizlemeye geç"}</span>
-                <span className="hidden sm:inline">
-                  {submitting ? "Kaydediliyor..." : "Devam et — Form Önizleme (Adım 3)"}
-                </span>
-              </Button>
-              <Button type="button" variant="ghost" onClick={() => setStep("details")} className={formStepButtonClass("gap-1.5")}>
-                <ArrowLeft className="h-4 w-4" />
-                Geri — bölüm seçimi
-              </Button>
-            </FormStepFooter>
+            <FormStepFooter
+              back={
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setStep("details")}
+                  className={formStepButtonClass("gap-1.5")}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Geri
+                </Button>
+              }
+              primary={
+                <Button type="submit" disabled={submitting} className={formStepButtonClass()}>
+                  {submitting ? "Kaydediliyor..." : "Devam et"}
+                </Button>
+              }
+            />
           </form>
         </Card>
       )}
@@ -731,33 +744,41 @@ function NewApplicationContent() {
           <CardContent>
             <ApplicationPreviewPanel applicationId={createdId} token={getToken() ?? ""} />
           </CardContent>
-          <FormStepFooter>
-            {applicationStatus === 1 ? (
+          <FormStepFooter
+            back={
               <Button
                 type="button"
-                className={formStepButtonClass()}
-                onClick={() => router.push(ROUTES.patient.application(createdId))}
+                variant="ghost"
+                className={formStepButtonClass("gap-1.5")}
+                onClick={() => {
+                  if (createdId) clearPreviewConfirmed(createdId);
+                  setStep("survey");
+                }}
               >
-                Başvuruya dön
+                <ArrowLeft className="h-4 w-4" />
+                Geri
               </Button>
-            ) : (
-              <Button type="button" className={formStepButtonClass()} onClick={() => setPaymentConfirmOpen(true)}>
-                Ödemeye geç
-              </Button>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              className={formStepButtonClass("gap-1.5")}
-              onClick={() => {
-                if (createdId) clearPreviewConfirmed(createdId);
-                setStep("survey");
-              }}
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Geri
-            </Button>
-          </FormStepFooter>
+            }
+            primary={
+              applicationStatus === 1 ? (
+                <Button
+                  type="button"
+                  className={formStepButtonClass()}
+                  onClick={() => router.push(ROUTES.patient.application(createdId))}
+                >
+                  Başvuruya dön
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  className={formStepButtonClass()}
+                  onClick={() => setPaymentConfirmOpen(true)}
+                >
+                  Ödemeye geç
+                </Button>
+              )
+            }
+          />
         </Card>
       ) : null}
 
@@ -799,12 +820,19 @@ function NewApplicationContent() {
               }}
             />
           </CardContent>
-          <FormStepFooter>
-            <Button type="button" variant="ghost" className={formStepButtonClass("gap-1.5")} onClick={() => setStep("preview")}>
-              <ArrowLeft className="h-4 w-4" />
-              Geri
-            </Button>
-          </FormStepFooter>
+          <FormStepFooter
+            back={
+              <Button
+                type="button"
+                variant="ghost"
+                className={formStepButtonClass("gap-1.5")}
+                onClick={() => setStep("preview")}
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Geri
+              </Button>
+            }
+          />
         </Card>
       ) : null}
 
@@ -859,40 +887,44 @@ function NewApplicationContent() {
               </div>
             ) : null}
           </CardContent>
-          <FormStepFooter>
-            <Button asChild className={formStepButtonClass()}>
-              <Link href={ROUTES.patient.applications}>Başvurularıma git</Link>
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className={formStepButtonClass()}
-              onClick={() => {
-                setStep("who");
-                setForRelative(false);
-                setRelative(emptyRelative);
-                setApplicationStatus(null);
-                setProfessionCode("");
-                setProfessionName("");
-                setCareProviderId("");
-                setCareProviderLabel("");
-                setSurveyAnswers(EMPTY_SURVEY);
-                setSurveyFields({});
-                setPendingFiles([]);
-                setFileError("");
-                setSurveyFormError("");
-                setCreatedId("");
-                setApplicationStatus(null);
-                setApplicationNumber("");
-                setPaymentCompleted(false);
-                setPaymentReceipt(null);
-                setError("");
-                if (editId) router.replace(ROUTES.patient.newApplication);
-              }}
-            >
-              Yeni başvuru daha
-            </Button>
-          </FormStepFooter>
+          <FormStepFooter
+            back={
+              <Button
+                type="button"
+                variant="outline"
+                className={formStepButtonClass()}
+                onClick={() => {
+                  setStep("who");
+                  setForRelative(false);
+                  setRelative(emptyRelative);
+                  setApplicationStatus(null);
+                  setProfessionCode("");
+                  setProfessionName("");
+                  setCareProviderId("");
+                  setCareProviderLabel("");
+                  setSurveyAnswers(EMPTY_SURVEY);
+                  setSurveyFields({});
+                  setPendingFiles([]);
+                  setFileError("");
+                  setSurveyFormError("");
+                  setCreatedId("");
+                  setApplicationStatus(null);
+                  setApplicationNumber("");
+                  setPaymentCompleted(false);
+                  setPaymentReceipt(null);
+                  setError("");
+                  if (editId) router.replace(ROUTES.patient.newApplication);
+                }}
+              >
+                Yeni başvuru
+              </Button>
+            }
+            primary={
+              <Button asChild className={formStepButtonClass()}>
+                <Link href={ROUTES.patient.applications}>Başvurularıma git</Link>
+              </Button>
+            }
+          />
         </Card>
       )}
 

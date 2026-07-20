@@ -86,6 +86,19 @@ func (h *ApplicationHandler) StartPayTRPayment(w http.ResponseWriter, r *http.Re
 	}
 
 	customerName := strings.TrimSpace(firstName + " " + lastName)
+	// E-posta opsiyonel; PayTR token için yoksa telefon tabanlı placeholder kullanılır.
+	if strings.TrimSpace(email) == "" {
+		digits := ""
+		for _, r := range phone {
+			if r >= '0' && r <= '9' {
+				digits += string(r)
+			}
+		}
+		if digits == "" {
+			digits = strings.ReplaceAll(claims.UserID.String(), "-", "")[:12]
+		}
+		email = "hasta" + digits + "@noreply.local"
+	}
 	var custErrs validate.Errors
 	validate.PayTRCustomerEmail(&custErrs, "email", email)
 	validate.PayTRCustomerPhone(&custErrs, "phoneNumber", phone)

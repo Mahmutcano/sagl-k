@@ -25,7 +25,9 @@ import (
 )
 
 func main() {
-	_ = godotenv.Load()
+	// .env dosyası shell'deki mock değerlerin üzerine yazılsın (godotenv.Load override etmez).
+	_ = godotenv.Overload()
+	_ = godotenv.Overload("../.env")
 	cfg := appcfg.Load()
 
 	if err := notifysvc.ValidateProviderConfig(cfg); err != nil {

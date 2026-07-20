@@ -25,8 +25,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { DEFAULT_PHONE_COUNTRY, normalizeNationalNumber } from "@/lib/phone";
-import { type FieldErrors } from "@/lib/validation";
+import { DEFAULT_PHONE_COUNTRY, normalizeNationalNumber, validateNationalPhone } from "@/lib/phone";
+import {
+  formatPersonName,
+  hasErrors,
+  validateEmailOptional,
+  validateNationalId,
+  validatePersonName,
+  type FieldErrors,
+} from "@/lib/validation";
 
 type ProfileData = {
   id: string;
@@ -122,6 +129,23 @@ export function ProfileSettings() {
     setSuccess("");
     setFields({});
 
+    const local: FieldErrors = {};
+    const fn = validatePersonName(formatPersonName(form.firstName), "Ad");
+    if (fn) local.firstName = fn;
+    const ln = validatePersonName(formatPersonName(form.lastName), "Soyad");
+    if (ln) local.lastName = ln;
+    const emailErr = validateEmailOptional(form.email);
+    if (emailErr) local.email = emailErr;
+    const nid = validateNationalId(form.nationalIdentifier);
+    if (nid) local.nationalIdentifier = nid;
+    const phoneErr = validateNationalPhone(form.phoneCountryCode, form.phoneNumber);
+    if (phoneErr) local.phoneNumber = phoneErr;
+    if (hasErrors(local)) {
+      setFields(local);
+      setSaving(false);
+      return;
+    }
+
     try {
       const res = await api<{
         requiresPhoneVerify: boolean;
@@ -133,10 +157,10 @@ export function ProfileSettings() {
         {
           method: "PUT",
           body: JSON.stringify({
-            firstName: form.firstName,
-            lastName: form.lastName,
-            email: form.email,
-            nationalIdentifier: form.nationalIdentifier,
+            firstName: formatPersonName(form.firstName),
+            lastName: formatPersonName(form.lastName),
+            email: form.email.trim(),
+            nationalIdentifier: form.nationalIdentifier.trim(),
             phoneCountryCode: form.phoneCountryCode,
             phoneNumber: normalizeNationalNumber(form.phoneNumber, form.phoneCountryCode),
             dateOfBirth: form.dateOfBirth ? form.dateOfBirth : null,
@@ -294,11 +318,12 @@ export function ProfileSettings() {
               />
               <TextInput
                 id="email"
-                label="E-posta Adresi"
+                label="E-posta (opsiyonel)"
                 type="email"
                 value={form.email}
                 onChange={(e) => updateField("email", e.target.value)}
                 error={fields.email}
+                hint="Bildirimler için isteğe bağlı"
               />
               <TextInput
                 id="nationalIdentifier"
@@ -313,7 +338,8 @@ export function ProfileSettings() {
                 onCountryChange={(dial) => updateField("phoneCountryCode", dial)}
                 onNationalChange={(n) => updateField("phoneNumber", n)}
                 error={fields.phoneNumber}
-                hint="Değiştirildiğinde SMS doğrulaması gerekecektir."
+                label="Cep telefonu (zorunlu)"
+                hint="Değiştirildiğinde SMS doğrulaması gerekir"
               />
               <FormSelect
                 id="gender"

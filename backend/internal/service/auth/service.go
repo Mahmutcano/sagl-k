@@ -163,12 +163,14 @@ func (s *Service) CheckRegisterUniqueness(ctx context.Context, req RegisterInitR
 		errs.Add("phoneNumber", "unique", "Bu telefon numarası zaten kullanılıyor. Giriş yapmayı deneyin.")
 	}
 
-	var emailExists bool
-	_ = s.db.Pool.QueryRow(ctx, `
-		SELECT EXISTS(SELECT 1 FROM users WHERE LOWER(email) = LOWER($1))
-	`, req.Email).Scan(&emailExists)
-	if emailExists {
-		errs.Add("email", "unique", "Bu e-posta adresi zaten kullanılıyor. Giriş yapmayı deneyin.")
+	if email := strings.TrimSpace(req.Email); email != "" {
+		var emailExists bool
+		_ = s.db.Pool.QueryRow(ctx, `
+			SELECT EXISTS(SELECT 1 FROM users WHERE LOWER(email) = LOWER($1))
+		`, email).Scan(&emailExists)
+		if emailExists {
+			errs.Add("email", "unique", "Bu e-posta adresi zaten kullanılıyor. Giriş yapmayı deneyin.")
+		}
 	}
 
 	return errs
@@ -244,16 +246,22 @@ func (s *Service) InitiateRegister(ctx context.Context, req RegisterInitRequest)
 	challenge.Code = code
 	s.logSMSOTP(ctx, "register", smsTo, req.PhoneCountryCode, req.PhoneNumber, code, req.FirstName, req.LastName, req.Email, status, "", nil)
 
-	emailBody := fmt.Sprintf(
-		"Kayıt doğrulama kodunuz: %s\n\nBu kod %d dakika geçerlidir. Lütfen kayıt ekranına girerek işleminizi tamamlayın.",
-		code, mins,
-	)
-	_ = s.notify.SendEmail(ctx, req.Email, "Kayıt Doğrulama Kodu", "register_otp", emailBody, nil)
+	if strings.TrimSpace(req.Email) != "" {
+		emailBody := fmt.Sprintf(
+			"Kayıt doğrulama kodunuz: %s\n\nBu kod %d dakika geçerlidir. Lütfen kayıt ekranına girerek işleminizi tamamlayın.",
+			code, mins,
+		)
+		_ = s.notify.SendEmail(ctx, req.Email, "Kayıt Doğrulama Kodu", "register_otp", emailBody, nil)
+	}
 
+	emailArg := interface{}(nil)
+	if e := strings.TrimSpace(req.Email); e != "" {
+		emailArg = e
+	}
 	_, err = s.db.Pool.Exec(ctx, `
 		INSERT INTO verification_tokens (phone_number, email, token, purpose, expires_at)
 		VALUES ($1, $2, $3, 'register', $4)
-	`, req.PhoneNumber, req.Email, code, challenge.ExpiresAt)
+	`, req.PhoneNumber, emailArg, code, challenge.ExpiresAt)
 	if err != nil {
 		return OTPChallenge{}, err
 	}
@@ -298,6 +306,11 @@ func (s *Service) CompleteRegister(ctx context.Context, phone, code string, req 
 		return nil, err
 	}
 
+	var emailArg interface{}
+	if e := strings.TrimSpace(req.Email); e != "" {
+		emailArg = e
+	}
+
 	var userID uuid.UUID
 	err = s.db.Pool.QueryRow(ctx, `
 		INSERT INTO users (
@@ -307,12 +320,14 @@ func (s *Service) CompleteRegister(ctx context.Context, phone, code string, req 
 		)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,true,'patient')
 		RETURNING id
-	`, req.Email, phone, country, hash, req.FirstName, req.LastName, nationalID, passport, dob, req.Gender, req.Nationality, patientNo).Scan(&userID)
+	`, emailArg, phone, country, hash, req.FirstName, req.LastName, nationalID, passport, dob, req.Gender, req.Nationality, patientNo).Scan(&userID)
 	if err != nil {
 		return nil, registerInsertErr(err)
 	}
 	_, _ = s.db.Pool.Exec(ctx, `UPDATE verification_tokens SET used_at = now() WHERE phone_number = $1 AND token = $2`, phone, code)
-	s.notify.SendWelcomeEmail(ctx, userID, req.Email, req.FirstName)
+	if strings.TrimSpace(req.Email) != "" {
+		s.notify.SendWelcomeEmail(ctx, userID, req.Email, req.FirstName)
+	}
 	access, _ := s.jwt.IssueAccess(userID, "patient")
 	refresh, _ := s.jwt.IssueRefresh(userID, "patient")
 	return &LoginResult{

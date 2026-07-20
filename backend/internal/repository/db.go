@@ -34,7 +34,8 @@ func (db *DB) Close() {
 func (db *DB) LogNotification(ctx context.Context, channel, recipient, templateKey, status string, userID, appID *uuid.UUID, preview string) error {
 	_, err := db.Pool.Exec(ctx, `
 		INSERT INTO notification_logs (channel, recipient, template_key, status, user_id, application_id, body_preview, sent_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $4 = 'sent' THEN now() ELSE NULL END)
+		VALUES ($1, $2, $3, $4::notification_status, $5, $6, $7,
+		        CASE WHEN $4::text = 'sent' THEN now() ELSE NULL END)
 	`, channel, recipient, templateKey, status, userID, appID, preview)
 	return err
 }

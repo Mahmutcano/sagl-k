@@ -552,17 +552,18 @@ export default function RegisterPage() {
                 onCountryChange={(dial) => update("phoneCountryCode", dial)}
                 onNationalChange={(n) => update("phoneNumber", n)}
                 error={fields.phoneNumber}
-                hint="Ülke kodu ve cep telefonu numarası"
+                hint="Zorunlu — ülke kodu ve cep telefonu"
               />
               <TextInput
                 id="email"
-                label="E-posta"
+                label="E-posta (opsiyonel)"
                 type="email"
                 autoComplete="email"
                 placeholder="ornek@mail.com"
                 value={form.email}
                 onChange={(e) => update("email", e.target.value)}
                 error={fields.email}
+                hint="İsterseniz bildirimler için e-posta ekleyebilirsiniz"
                 fieldClassName="min-w-0"
               />
 

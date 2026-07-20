@@ -82,6 +82,12 @@ export function validateEmail(value: string): string | null {
   return null;
 }
 
+/** Boş bırakılabilir; doluysa format kontrolü. */
+export function validateEmailOptional(value: string): string | null {
+  if (!value.trim()) return null;
+  return validateEmail(value);
+}
+
 /** Canonical TR national number for DB (no +90, no leading 0). */
 export function normalizePhoneTR(value: string): string {
   return normalizeNationalNumber(value, "+90");
@@ -303,7 +309,7 @@ export function validateRegister(input: RegisterInput): FieldErrors {
   const phone = validateNationalPhone(input.phoneCountryCode || "+90", input.phoneNumber);
   if (phone) errors.phoneNumber = phone;
 
-  const email = validateEmail(input.email);
+  const email = validateEmailOptional(input.email);
   if (email) errors.email = email;
   const pw = validatePassword(input.password);
   if (pw) errors.password = pw;

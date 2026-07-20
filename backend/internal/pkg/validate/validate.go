@@ -186,6 +186,15 @@ func Email(errs *Errors, field, value string) {
 	}
 }
 
+// EmailOptional: boş bırakılabilir; doluysa format kontrolü yapılır.
+func EmailOptional(errs *Errors, field, value string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return
+	}
+	Email(errs, field, value)
+}
+
 func PhoneTR(errs *Errors, field, value string) {
 	PhoneNational(errs, field, "+90", value)
 }
