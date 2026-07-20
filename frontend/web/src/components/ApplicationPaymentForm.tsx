@@ -1,22 +1,43 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import Script from "next/script";
 import { ApiError, api } from "@/lib/api";
 import { API } from "@/lib/endpoints";
-import { type PaymentRequest, type PaymentReceipt, normalizePaymentResult, isPaymentSuccessful } from "@/lib/application";
-import { FormAlert, FormField } from "@/components/FormField";
-import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { type PaymentReceipt, normalizePaymentResult, isPaymentSuccessful } from "@/lib/application";
+import { FormAlert } from "@/components/FormField";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 
 export const PAYMENT_AMOUNT = 1500;
 
-const PARAM_TEST_CARD = {
-  cardHolder: "TEST KULLANICI",
-  cardNumber: "4546711234567894",
-  expiryMonth: "12",
-  expiryYear: "26",
-  cvv: "000",
+/** Official PAYTR Direct API test cards (also usable when iframe asks for card). */
+export const PAYTR_TEST_CARDS = [
+  { label: "Visa", holder: "PAYTR TEST", number: "4355 0843 5508 4358", expiry: "12/30", cvv: "000" },
+  { label: "Mastercard", holder: "PAYTR TEST", number: "5406 6754 0667 5403", expiry: "12/30", cvv: "000" },
+  { label: "Troy", holder: "PAYTR TEST", number: "9792 0303 9444 0796", expiry: "12/30", cvv: "000" },
+] as const;
+
+type TestCard = {
+  label: string;
+  holder: string;
+  number: string;
+  expiry: string;
+  cvv: string;
+  note?: string;
+};
+
+type TokenResponse = {
+  status?: string;
+  token?: string;
+  iframeUrl?: string;
+  merchantOid?: string;
+  amount?: number;
+  currency?: string;
+  mock?: boolean;
+  mode?: string;
+  paymentId?: string;
+  testCards?: TestCard[];
+  receipt?: PaymentReceipt;
 };
 
 type Props = {
@@ -27,98 +48,63 @@ type Props = {
 };
 
 export function ApplicationPaymentForm({ applicationId, token, onSuccess, onError }: Props) {
+  const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [error, setError] = useState("");
-  const [card, setCard] = useState({
-    cardHolder: "",
-    cardNumber: "",
-    expiryMonth: "",
-    expiryYear: "",
-    cvv: "",
-  });
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [paytr, setPaytr] = useState<TokenResponse | null>(null);
+  const started = useRef(false);
 
-  function fillTestCard() {
-    setCard({ ...PARAM_TEST_CARD });
-    setFieldErrors({});
+  const start = useCallback(async () => {
+    setLoading(true);
     setError("");
-  }
+    try {
+      const raw = await api<TokenResponse>(
+        API.applications.paytrToken(applicationId),
+        { method: "POST", body: JSON.stringify({}) },
+        token
+      );
+      if (raw.status === "paid") {
+        const res = normalizePaymentResult(raw as Record<string, unknown>);
+        onSuccess?.(res.receipt);
+        return;
+      }
+      setPaytr(raw);
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Ödeme başlatılamadı.";
+      setError(msg);
+      onError?.(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [applicationId, token, onSuccess, onError]);
 
-  function validatePaymentForm(): boolean {
-    const f: Record<string, string> = {};
-    if (!card.cardHolder.trim() || card.cardHolder.trim().length < 3) {
-      f.cardHolder = "Kart üzerindeki isim en az 3 karakter olmalıdır.";
-    }
-    const digits = card.cardNumber.replace(/\D/g, "");
-    if (digits.length < 13 || digits.length > 19) {
-      f.cardNumber = "Geçerli bir kart numarası giriniz.";
-    }
-    const month = parseInt(card.expiryMonth, 10);
-    if (!month || month < 1 || month > 12) {
-      f.expiryMonth = "Ay 1–12 arasında olmalıdır.";
-    }
-    const year = parseInt(card.expiryYear, 10);
-    if (!year || year < new Date().getFullYear() % 100) {
-      f.expiryYear = "Geçerli bir yıl giriniz.";
-    }
-    const cvvDigits = card.cvv.replace(/\D/g, "");
-    if (cvvDigits.length < 3 || cvvDigits.length > 4) {
-      f.cvv = "CVV 3 veya 4 haneli olmalıdır.";
-    }
-    setFieldErrors(f);
-    return Object.keys(f).length === 0;
-  }
+  useEffect(() => {
+    if (started.current) return;
+    started.current = true;
+    void start();
+  }, [start]);
 
-  async function pay() {
+  async function completeMock() {
+    if (!paytr?.merchantOid) return;
     setPaying(true);
     setError("");
-    setFieldErrors({});
-
-    if (!validatePaymentForm()) {
-      setPaying(false);
-      return;
-    }
-
-    const body: PaymentRequest = {
-      provider: "param",
-      cardHolder: card.cardHolder.trim(),
-      cardNumber: card.cardNumber.replace(/\s/g, ""),
-      expiryMonth: parseInt(card.expiryMonth, 10),
-      expiryYear: parseInt(card.expiryYear, 10),
-      cvv: card.cvv.replace(/\D/g, ""),
-    };
-
     try {
       const raw = await api<Record<string, unknown>>(
-        API.applications.payment(applicationId),
-        { method: "POST", body: JSON.stringify(body) },
+        API.applications.paytrSimulate(applicationId),
+        {
+          method: "POST",
+          body: JSON.stringify({ merchantOid: paytr.merchantOid }),
+        },
         token
       );
       const res = normalizePaymentResult(raw);
-      if (res.redirectUrl) {
-        window.location.href = res.redirectUrl;
-        return;
-      }
       if (isPaymentSuccessful(res.status)) {
         onSuccess?.(res.receipt);
-      } else if (res.status) {
-        setError(`Ödeme durumu: ${res.status}`);
-        onError?.(`Ödeme durumu: ${res.status}`);
       } else {
-        onSuccess?.(res.receipt);
+        setError("Test ödemesi tamamlanamadı.");
       }
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.code === "APP110") {
-          onSuccess?.();
-          return;
-        }
-        if (err.fields) {
-          setFieldErrors(err.fields);
-        }
-      }
-      const msg = err instanceof ApiError ? err.message : "Ödeme başarısız.";
+      const msg = err instanceof ApiError ? err.message : "Test ödemesi başarısız.";
       setError(msg);
       onError?.(msg);
     } finally {
@@ -126,107 +112,81 @@ export function ApplicationPaymentForm({ applicationId, token, onSuccess, onErro
     }
   }
 
+  const amount = paytr?.amount ?? PAYMENT_AMOUNT;
+  const isTestMode = paytr?.mode === "test" || (!!paytr?.testCards && paytr.testCards.length > 0);
+  const cards: TestCard[] =
+    paytr?.testCards?.length
+      ? paytr.testCards
+      : isTestMode
+        ? PAYTR_TEST_CARDS.map((c) => ({ ...c }))
+        : [];
+
   return (
-    <div className="grid gap-4">
+    <div className="space-y-4">
       {error ? <FormAlert title="Ödeme hatası" message={error} /> : null}
-      <div className="rounded-lg border bg-muted/40 p-4 text-sm">
-        <p className="font-medium text-foreground">Param ile güvenli ödeme</p>
-        <p className="text-muted-foreground mt-1">
-          Tutar:{" "}
-          <span className="font-medium text-foreground">
-            {PAYMENT_AMOUNT.toLocaleString("tr-TR")} TRY
-          </span>
-          {" · "}
-          Ödeme sonrası fatura Bizim Hesap üzerinden otomatik oluşturulur.
+
+      <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
+        <p className="font-medium">Ödenecek tutar</p>
+        <p className="text-2xl font-semibold tracking-tight">
+          {amount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} {paytr?.currency ?? "TRY"}
         </p>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-muted-foreground text-xs">Param test kartı:</span>
-          <code className="rounded bg-background px-2 py-0.5 text-xs">
-            {PARAM_TEST_CARD.cardNumber}
-          </code>
-          <span className="text-muted-foreground text-xs">12/26 · CVV 000</span>
-          <Button type="button" variant="outline" size="sm" onClick={fillTestCard}>
-            Test kartını doldur
+        <p className="mt-1 text-xs text-muted-foreground">Güvenli ödeme altyapısı: PAYTR</p>
+      </div>
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Ödeme formu hazırlanıyor…</p>
+      ) : null}
+
+      {!loading && paytr?.mock ? (
+        <div className="space-y-3 rounded-lg border border-dashed p-4">
+          <p className="text-sm text-muted-foreground">
+            PAYTR mock modundasınız. Canlı iframe yerine test ödemesini simüle edebilirsiniz.
+          </p>
+          <Button type="button" className="w-full" disabled={paying} onClick={() => void completeMock()}>
+            {paying ? "Tamamlanıyor…" : "Test ödemesini tamamla"}
+          </Button>
+          <Button type="button" variant="outline" className="w-full" onClick={() => void start()} disabled={paying}>
+            Yeniden başlat
           </Button>
         </div>
-      </div>
-      <FormField id="cardHolder" label="Kart üzerindeki isim" error={fieldErrors.cardHolder}>
-        <Input
-          id="cardHolder"
-          autoComplete="cc-name"
-          value={card.cardHolder}
-          onChange={(e) => setCard((c) => ({ ...c, cardHolder: e.target.value }))}
-        />
-      </FormField>
-      <FormField id="cardNumber" label="Kart numarası" error={fieldErrors.cardNumber}>
-        <Input
-          id="cardNumber"
-          inputMode="numeric"
-          autoComplete="cc-number"
-          placeholder="0000 0000 0000 0000"
-          value={card.cardNumber}
-          onChange={(e) => setCard((c) => ({ ...c, cardNumber: e.target.value }))}
-        />
-      </FormField>
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <FormField id="expiryMonth" label="Ay (MM)" error={fieldErrors.expiryMonth}>
-          <Input
-            id="expiryMonth"
-            inputMode="numeric"
-            autoComplete="cc-exp-month"
-            placeholder="MM"
-            maxLength={2}
-            value={card.expiryMonth}
-            onChange={(e) => setCard((c) => ({ ...c, expiryMonth: e.target.value }))}
-          />
-        </FormField>
-        <FormField id="expiryYear" label="Yıl (YY)" error={fieldErrors.expiryYear}>
-          <Input
-            id="expiryYear"
-            inputMode="numeric"
-            autoComplete="cc-exp-year"
-            placeholder="YY"
-            maxLength={2}
-            value={card.expiryYear}
-            onChange={(e) => setCard((c) => ({ ...c, expiryYear: e.target.value }))}
-          />
-        </FormField>
-        <FormField id="cvv" label="CVV" error={fieldErrors.cvv}>
-          <Input
-            id="cvv"
-            inputMode="numeric"
-            autoComplete="cc-csc"
-            placeholder="***"
-            maxLength={4}
-            value={card.cvv}
-            onChange={(e) => setCard((c) => ({ ...c, cvv: e.target.value }))}
-          />
-        </FormField>
-      </div>
-      <Button
-        type="button"
-        disabled={paying}
-        onClick={() => {
-          if (!validatePaymentForm()) return;
-          setConfirmOpen(true);
-        }}
-        className="w-full min-h-11 touch-manipulation sm:w-auto"
-      >
-        {paying ? "İşleniyor..." : "Param ile ödemeyi tamamla"}
-      </Button>
+      ) : null}
 
-      <ConfirmModal
-        isOpen={confirmOpen}
-        title="Ödemeyi onayla"
-        message={`${PAYMENT_AMOUNT.toLocaleString("tr-TR")} TRY tutarında ödemeyi tamamlamak istediğinize emin misiniz?`}
-        confirmText="Evet, öde"
-        cancelText="Vazgeç"
-        onConfirm={() => {
-          setConfirmOpen(false);
-          void pay();
-        }}
-        onCancel={() => setConfirmOpen(false)}
-      />
+      {!loading && paytr && !paytr.mock && paytr.token ? (
+        <div className="space-y-3">
+          {cards.length > 0 ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm">
+              <p className="font-semibold text-amber-950">PAYTR test kartları (stage / test_mode)</p>
+              <p className="mt-1 text-xs text-amber-900/80">
+                iFrame bazen kartı otomatik doldurur. İstenirse aşağıdaki kartlardan birini kullanın. CVV her zaman{" "}
+                <span className="font-mono font-bold">000</span>. SKT gelecekte bir tarih olabilir (ör. 12/30).
+              </p>
+              <ul className="mt-3 space-y-2">
+                {cards.map((c) => (
+                  <li key={c.number} className="rounded-md border border-amber-200/80 bg-white/70 px-3 py-2 font-mono text-xs text-amber-950">
+                    <span className="font-sans font-semibold">{c.label}</span>
+                    <br />
+                    {c.number} · SKT {c.expiry} · CVV {c.cvv}
+                    {c.note ? <span className="mt-1 block font-sans text-[11px] text-muted-foreground">{c.note}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          <Script src="https://www.paytr.com/js/iframeResizer.min.js" strategy="afterInteractive" />
+          <iframe
+            src={paytr.iframeUrl || `https://www.paytr.com/odeme/guvenli/${paytr.token}`}
+            id="paytriframe"
+            title="PAYTR ödeme"
+            frameBorder={0}
+            scrolling="no"
+            style={{ width: "100%", minHeight: 420 }}
+          />
+          <p className="text-xs text-muted-foreground">
+            Ödeme tamamlandıktan sonra bu sayfaya yönlendirileceksiniz. Onay, bankadan gelen bildirimle
+            otomatik işlenir.
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }

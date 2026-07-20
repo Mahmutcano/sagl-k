@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/mail"
 	"regexp"
@@ -508,11 +509,19 @@ func HospitalName(errs *Errors, field, value string) {
 }
 
 func RefundAmount(errs *Errors, field string, amount float64) {
+	if math.IsNaN(amount) || math.IsInf(amount, 0) {
+		errs.Add(field, "format", "İade tutarı sayısal olmalıdır.")
+		return
+	}
 	if amount <= 0 {
 		errs.Add(field, "range", "İade tutarı 0'dan büyük olmalıdır.")
 	}
-	if amount > 1_000_000 {
+	if amount > MaxPaymentAmount {
 		errs.Add(field, "range", "İade tutarı üst sınırı aşıyor.")
+	}
+	scaled := amount * 100
+	if math.Abs(scaled-math.Round(scaled)) > 1e-6 {
+		errs.Add(field, "format", "İade tutarı en fazla 2 ondalık basamak (kuruş) içerebilir.")
 	}
 }
 

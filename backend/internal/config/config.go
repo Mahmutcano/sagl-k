@@ -8,26 +8,26 @@ import (
 )
 
 type Config struct {
-	DatabaseURL   string
-	APIPort       string
-	JWTSecret     string
-	JWTAccessTTL  time.Duration
-	JWTRefreshTTL time.Duration
-	OTPTTL        time.Duration
-	PortalURL     string
-	DoctorURL     string
-	AdminURL      string
-	CORSOrigins   []string
-	SMS           SMSConfig
-	Email         EmailConfig
-	Param         ParamConfig
-	BizimHesap    BizimHesapConfig
-	PACSBaseURL          string
-	Erciyes              ErciyesConfig
-	PaymentAmount        float64
+	DatabaseURL            string
+	APIPort                string
+	JWTSecret              string
+	JWTAccessTTL           time.Duration
+	JWTRefreshTTL          time.Duration
+	OTPTTL                 time.Duration
+	PortalURL              string
+	DoctorURL              string
+	AdminURL               string
+	CORSOrigins            []string
+	SMS                    SMSConfig
+	Email                  EmailConfig
+	PayTR                  PayTRConfig
+	Parasut                ParasutConfig
+	PACSBaseURL            string
+	Erciyes                ErciyesConfig
+	PaymentAmount          float64
 	DefaultPaymentProvider string
-	UploadDir            string
-	ContactInboxEmail    string
+	UploadDir              string
+	ContactInboxEmail      string
 }
 
 // ErciyesConfig connects to Erciyes University Hospital HIS web services.
@@ -46,38 +46,53 @@ type ErciyesConfig struct {
 }
 
 type SMSConfig struct {
-	Provider string
-	Username string
-	Password string
-	Header   string
+	Provider   string // mock | verimor | netgsm (legacy)
+	Username   string
+	Password   string
+	Header     string // NetGSM header / Verimor source_addr fallback
+	VerimorURL string
 }
 
 type EmailConfig struct {
-	Provider string
-	Host     string
-	Port     string
-	User     string
-	Password string
-	From     string
+	Provider          string // mock | mailersend | smtp (legacy)
+	Host              string
+	Port              string
+	User              string
+	Password          string
+	From              string
+	MailerSendAPIKey  string
+	MailerSendFrom    string
+	MailerSendFromName string
 }
 
-type ParamConfig struct {
-	ClientCode     string
-	ClientUsername string
-	ClientPassword string
-	GUID           string
-	Mode           string
-	APIURL         string
+type PayTRConfig struct {
+	MerchantID   string
+	MerchantKey  string
+	MerchantSalt string
+	Mode         string // mock | test | live
+	APIURL       string
+	CallbackURL  string
+	OKURL        string // optional template override
+	FailURL      string
 }
 
-type BizimHesapConfig struct {
-	APIKey  string
-	FirmID  string
-	Mode    string
-	APIURL  string
+type ParasutConfig struct {
+	ClientID     string
+	ClientSecret string
+	CompanyID    string
+	Username     string
+	Password     string
+	Mode         string // mock | test | live
+	APIURL       string
 }
 
 func Load() Config {
+	smsUser := firstNonEmpty(os.Getenv("VERIMOR_USERNAME"), os.Getenv("SMS_USERNAME"))
+	smsPass := firstNonEmpty(os.Getenv("VERIMOR_PASSWORD"), os.Getenv("SMS_PASSWORD"))
+	smsHeader := firstNonEmpty(os.Getenv("VERIMOR_SOURCE_ADDR"), os.Getenv("SMS_HEADER"))
+
+	mailFrom := firstNonEmpty(os.Getenv("MAILERSEND_FROM_EMAIL"), os.Getenv("SMTP_FROM"), "noreply@example.com")
+
 	return Config{
 		DatabaseURL:   getEnv("DATABASE_URL", "postgres://mcp:mcp_secret@localhost:5432/medical_consultation?sslmode=disable"),
 		APIPort:       getEnv("PORT", getEnv("API_PORT", "8080")),
@@ -90,38 +105,47 @@ func Load() Config {
 		AdminURL:      getEnv("ADMIN_URL", "http://localhost:3000"),
 		CORSOrigins:   parseCSV(getEnv("CORS_ALLOWED_ORIGINS", "")),
 		SMS: SMSConfig{
-			Provider: getEnv("SMS_PROVIDER", "mock"),
-			Username: os.Getenv("SMS_USERNAME"),
-			Password: os.Getenv("SMS_PASSWORD"),
-			Header:   os.Getenv("SMS_HEADER"),
+			Provider:   getEnv("SMS_PROVIDER", "mock"),
+			Username:   smsUser,
+			Password:   smsPass,
+			Header:     smsHeader,
+			VerimorURL: getEnv("VERIMOR_API_URL", "https://sms.verimor.com.tr/v2/send.json"),
 		},
 		Email: EmailConfig{
-			Provider: getEnv("EMAIL_PROVIDER", "mock"),
-			Host:     os.Getenv("SMTP_HOST"),
-			Port:     getEnv("SMTP_PORT", "587"),
-			User:     os.Getenv("SMTP_USER"),
-			Password: os.Getenv("SMTP_PASSWORD"),
-			From:     getEnv("SMTP_FROM", "noreply@example.com"),
+			Provider:           getEnv("EMAIL_PROVIDER", "mock"),
+			Host:               os.Getenv("SMTP_HOST"),
+			Port:               getEnv("SMTP_PORT", "587"),
+			User:               os.Getenv("SMTP_USER"),
+			Password:           os.Getenv("SMTP_PASSWORD"),
+			From:               mailFrom,
+			MailerSendAPIKey:   os.Getenv("MAILERSEND_API_KEY"),
+			MailerSendFrom:     mailFrom,
+			MailerSendFromName: getEnv("MAILERSEND_FROM_NAME", "Erciyes Tibbi Danismanlik"),
 		},
-		Param: ParamConfig{
-			ClientCode:     os.Getenv("PARAM_CLIENT_CODE"),
-			ClientUsername: os.Getenv("PARAM_CLIENT_USERNAME"),
-			ClientPassword: os.Getenv("PARAM_CLIENT_PASSWORD"),
-			GUID:           os.Getenv("PARAM_GUID"),
-			Mode:           getEnv("PARAM_MODE", "test"),
-			APIURL:         getEnv("PARAM_API_URL", "https://posws.param.com.tr/turkpos.ws/service_turkpos_prod.asmx"),
+		PayTR: PayTRConfig{
+			MerchantID:   os.Getenv("PAYTR_MERCHANT_ID"),
+			MerchantKey:  os.Getenv("PAYTR_MERCHANT_KEY"),
+			MerchantSalt: os.Getenv("PAYTR_MERCHANT_SALT"),
+			Mode:         getEnv("PAYTR_MODE", "mock"),
+			APIURL:       getEnv("PAYTR_API_URL", "https://www.paytr.com/odeme/api/get-token"),
+			CallbackURL:  os.Getenv("PAYTR_CALLBACK_URL"),
+			OKURL:        os.Getenv("PAYTR_OK_URL"),
+			FailURL:      os.Getenv("PAYTR_FAIL_URL"),
 		},
-		BizimHesap: BizimHesapConfig{
-			APIKey: os.Getenv("BIZIMHESAP_API_KEY"),
-			FirmID: os.Getenv("BIZIMHESAP_FIRM_ID"),
-			Mode:   getEnv("BIZIMHESAP_MODE", "test"),
-			APIURL: getEnv("BIZIMHESAP_API_URL", "https://api.bizimhesap.com"),
+		Parasut: ParasutConfig{
+			ClientID:     os.Getenv("PARASUT_CLIENT_ID"),
+			ClientSecret: os.Getenv("PARASUT_CLIENT_SECRET"),
+			CompanyID:    os.Getenv("PARASUT_COMPANY_ID"),
+			Username:     os.Getenv("PARASUT_USERNAME"),
+			Password:     os.Getenv("PARASUT_PASSWORD"),
+			Mode:         getEnv("PARASUT_MODE", "mock"),
+			APIURL:       getEnv("PARASUT_API_URL", "https://api.parasut.com"),
 		},
 		PACSBaseURL:            getEnv("PACS_BASE_URL", "https://pacs.example.com"),
 		PaymentAmount:          getEnvFloat("PAYMENT_AMOUNT", 1500),
-		DefaultPaymentProvider: getEnv("DEFAULT_PAYMENT_PROVIDER", "param"),
+		DefaultPaymentProvider: getEnv("DEFAULT_PAYMENT_PROVIDER", "paytr"),
 		UploadDir:              getEnv("UPLOAD_DIR", "./uploads"),
-		ContactInboxEmail:      getEnv("CONTACT_INBOX_EMAIL", getEnv("SMTP_FROM", "")),
+		ContactInboxEmail:      getEnv("CONTACT_INBOX_EMAIL", mailFrom),
 		Erciyes: ErciyesConfig{
 			Mode:              getEnv("ERCIYES_MODE", "mock"),
 			BaseURL:           os.Getenv("ERCIYES_BASE_URL"),
@@ -136,6 +160,15 @@ func Load() Config {
 			TargetInstitution: getEnvInt("ERCIYES_TARGET_INSTITUTION", 1),
 		},
 	}
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 func getEnvFloat(key string, fallback float64) float64 {

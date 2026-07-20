@@ -41,6 +41,20 @@ Yerelde `NEXT_PUBLIC_API_URL` boş bırakılır; Next.js `/api` isteklerini back
 
 Detay: [DEPLOYMENT.md](./DEPLOYMENT.md)
 
-## Param test kartı
+## PAYTR ödeme (stage / test)
 
-`PARAM_MODE=test` iken: `4546711234567894` · `12/26` · CVV `000` — [Param test kartları](https://dev.param.com.tr/tr/test-kartlari)
+- `PAYTR_MODE=mock` — iframe yok; UI’da “Test ödemesini tamamla”
+- `PAYTR_MODE=test` — iframe + `test_mode=1`; aşağıdaki test kartları
+- `PAYTR_MODE=live` — gerçek tahsilat (`PAYTR_CALLBACK_URL` public HTTPS)
+
+### Test kartları ([PAYTR dokümantasyonu](https://dev.paytr.com/en/direkt-api/test-kart-bilgileri))
+
+| Kart | Numara | SKT | CVV |
+|------|--------|-----|-----|
+| Visa | `4355 0843 5508 4358` | `12/30` (gelecek tarih) | `000` |
+| Mastercard | `5406 6754 0667 5403` | `12/30` | `000` |
+| Troy | `9792 0303 9444 0796` | `12/30` | `000` |
+
+Kart sahibi: `PAYTR TEST` (serbest). iFrame API’de test kartları çoğu zaman otomatik gelir; Direct API için yukarıdakiler zorunludur.
+
+**Admin:** Ödemeler & Faturalar listesinde `merchant_oid`, sipariş/fatura durumu, callback ve CSV export görünür. Başvuru detayında ödeme paneli + e-makbuz.

@@ -13,7 +13,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	appcfg "medical-consultation-platform/backend/internal/config"
-	"medical-consultation-platform/backend/internal/domain"
 	authmw "medical-consultation-platform/backend/internal/middleware"
 	"medical-consultation-platform/backend/internal/pkg/response"
 	"medical-consultation-platform/backend/internal/pkg/validate"
@@ -309,6 +308,27 @@ func paymentResultPayload(result *paysvc.CheckoutResult, receipt map[string]inte
 	if result.RedirectHTML != nil {
 		out["redirectHtml"] = *result.RedirectHTML
 	}
+	if result.Token != "" {
+		out["token"] = result.Token
+	}
+	if result.IframeURL != "" {
+		out["iframeUrl"] = result.IframeURL
+	}
+	if result.MerchantOID != "" {
+		out["merchantOid"] = result.MerchantOID
+	}
+	if result.Mock {
+		out["mock"] = true
+	}
+	if result.PaymentID != "" {
+		out["paymentId"] = result.PaymentID
+	}
+	if result.OrderID != "" {
+		out["orderId"] = result.OrderID
+	}
+	if result.TransactionID != "" {
+		out["transactionId"] = result.TransactionID
+	}
 	if receipt != nil {
 		out["receipt"] = sanitizePatientReceipt(receipt)
 	}
@@ -324,6 +344,12 @@ func isInternalPatientReference(value string) bool {
 		return true
 	}
 	if strings.HasPrefix(strings.ToLower(value), "bh-inv-test-") {
+		return true
+	}
+	if strings.HasPrefix(strings.ToLower(value), "ps-inv-") {
+		return true
+	}
+	if strings.HasPrefix(strings.ToLower(value), "mock-") {
 		return true
 	}
 	if _, err := uuid.Parse(value); err == nil {
@@ -436,8 +462,8 @@ func (h *ApplicationHandler) buildPaymentReceipt(
 		"paymentId":       paymentID.String(),
 		"applicationId":   appID.String(),
 		"description":     "Tıbbi danışmanlık başvuru ücreti",
-		"providerLabel":   "Param",
-		"invoiceProviderLabel": "Bizim Hesap",
+		"providerLabel":        "PAYTR",
+		"invoiceProviderLabel": "Paraşüt",
 	}
 	if paidAt != nil {
 		receipt["paidAt"] = paidAt.Format(time.RFC3339)
@@ -478,6 +504,31 @@ func (h *ApplicationHandler) buildPaymentReceipt(
 	}
 	if v, ok := meta["invoice_error"].(string); ok && v != "" {
 		receipt["invoiceError"] = v
+	}
+
+	// Prefer invoices table over legacy metadata (Paraşüt writes here).
+	var invExtID, invNumber, invProvider, invStatus, invErrMsg *string
+	_ = h.db.Pool.QueryRow(ctx, `
+		SELECT NULLIF(external_id,''), NULLIF(invoice_number,''), provider, status::text, NULLIF(error_message,'')
+		FROM invoices
+		WHERE payment_id = $1
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, paymentID).Scan(&invExtID, &invNumber, &invProvider, &invStatus, &invErrMsg)
+	if invExtID != nil && *invExtID != "" {
+		receipt["invoiceId"] = *invExtID
+	}
+	if invNumber != nil && *invNumber != "" {
+		receipt["invoiceNumber"] = *invNumber
+	}
+	if invProvider != nil && *invProvider != "" {
+		receipt["invoiceProvider"] = *invProvider
+	}
+	if invStatus != nil && *invStatus != "" {
+		receipt["invoiceStatus"] = *invStatus
+	}
+	if invErrMsg != nil && *invErrMsg != "" {
+		receipt["invoiceError"] = *invErrMsg
 	}
 	return receipt
 }
@@ -1254,213 +1305,8 @@ func (h *ApplicationHandler) GetFinalReportHTML(w http.ResponseWriter, r *http.R
 }
 
 func (h *ApplicationHandler) UpdatePayment(w http.ResponseWriter, r *http.Request) {
-	claims := authmw.ClaimsFromContext(r.Context())
-	appID, ok := parseAppID(w, r)
-	if !ok {
-		return
-	}
-	if !authmw.RequireApplicationAccess(w, r, h.db, appID) {
-		return
-	}
-
-	if existing, err := h.payment.Store().FindPaidByApplication(r.Context(), appID); err == nil && existing != nil {
-		receipt := h.buildPaymentReceipt(r.Context(), existing.ID, appID)
-		response.OK(w, paymentResultPayload(&paysvc.CheckoutResult{
-			TransactionID: existing.ProviderTransactionID,
-			OrderID:       appID.String(),
-			Status:        "paid",
-			PaymentID:     existing.ID.String(),
-		}, receipt))
-		return
-	}
-
-	var req struct {
-		Provider    string `json:"provider"`
-		CardHolder  string `json:"cardHolder"`
-		CardNumber  string `json:"cardNumber"`
-		ExpiryMonth int    `json:"expiryMonth"`
-		ExpiryYear  int    `json:"expiryYear"`
-		CVV         string `json:"cvv"`
-	}
-	if !validate.DecodeJSON(w, r, &req) {
-		return
-	}
-	provider := "param"
-	if req.Provider != "" && strings.ToLower(strings.TrimSpace(req.Provider)) != "param" {
-		var errs validate.Errors
-		errs.Add("provider", "invalid", "Ödeme yalnızca Param ile yapılır.")
-		validate.Fail(w, errs)
-		return
-	}
-
-	var amount float64
-	err := h.db.Pool.QueryRow(r.Context(), `
-		SELECT COALESCE(cp.consultation_fee, 1000.00)
-		FROM applications a
-		LEFT JOIN care_providers cp ON cp.id = a.care_provider_id
-		WHERE a.id = $1
-	`, appID).Scan(&amount)
-	if err != nil || amount <= 0 {
-		amount = h.cfg.PaymentAmount
-	}
-
-	var errs validate.Errors
-	validate.PaymentAmount(&errs, "amount", amount)
-	requireCard := isLivePaymentProvider(h.cfg, provider) || isTestPaymentProvider(h.cfg) || h.payment.RequireCard()
-	if requireCard {
-		validate.CardHolder(&errs, "cardHolder", req.CardHolder)
-		validate.CardNumber(&errs, "cardNumber", req.CardNumber)
-		validate.CardCVV(&errs, "cvv", req.CVV)
-		validate.CardExpiry(&errs, "expiryMonth", req.ExpiryMonth, "expiryYear", req.ExpiryYear)
-	}
-	if errs.Has() {
-		validate.Fail(w, errs)
-		return
-	}
-
-	var statusCode int
-	var appNumber *string
-	err = h.db.Pool.QueryRow(r.Context(), `
-		SELECT status_code, application_number FROM applications WHERE id = $1
-	`, appID).Scan(&statusCode, &appNumber)
-	if err != nil {
-		response.Fail(w, http.StatusNotFound, "APP001", "Başvuru bulunamadı.")
-		return
-	}
-	if statusCode != domain.StatusPaymentPending {
-		if statusCode == domain.StatusPaymentCompleted {
-			if existing, err := h.payment.Store().FindPaidByApplication(r.Context(), appID); err == nil && existing != nil {
-				receipt := h.buildPaymentReceipt(r.Context(), existing.ID, appID)
-				response.OK(w, paymentResultPayload(&paysvc.CheckoutResult{
-					TransactionID: existing.ProviderTransactionID,
-					OrderID:       appID.String(),
-					Status:        "paid",
-					PaymentID:     existing.ID.String(),
-				}, receipt))
-				return
-			}
-			response.OK(w, map[string]interface{}{
-				"orderId": appID.String(),
-				"status":  "paid",
-			})
-			return
-		}
-		response.Fail(w, http.StatusConflict, "APP110", "Bu başvuru için ödeme beklenmiyor. Başvuru zaten ödenmiş veya farklı bir aşamada olabilir.")
-		return
-	}
-
-	var firstName, lastName, email, phone string
-	err = h.db.Pool.QueryRow(r.Context(), `
-		SELECT first_name, last_name, COALESCE(email,''), COALESCE(phone_number,'')
-		FROM users WHERE id = $1
-	`, claims.UserID).Scan(&firstName, &lastName, &email, &phone)
-	if err != nil {
-		response.Fail(w, http.StatusBadRequest, "APP112", "Kullanıcı bilgileri alınamadı.")
-		return
-	}
-
-	cardBrand := "Unknown"
-	maskedCard := ""
-	cleanCard := strings.ReplaceAll(req.CardNumber, " ", "")
-	if len(cleanCard) >= 6 {
-		if strings.HasPrefix(cleanCard, "4") {
-			cardBrand = "Visa"
-		} else if strings.HasPrefix(cleanCard, "5") {
-			cardBrand = "Mastercard"
-		} else if strings.HasPrefix(cleanCard, "9") || strings.HasPrefix(cleanCard, "6") {
-			cardBrand = "Troy"
-		}
-		if len(cleanCard) >= 16 {
-			maskedCard = cleanCard[0:6] + "******" + cleanCard[len(cleanCard)-4:]
-		} else {
-			maskedCard = cleanCard[0:6] + "******"
-		}
-	}
-
-	meta := map[string]interface{}{
-		"provider":    provider,
-		"card_brand":  cardBrand,
-		"masked_card": maskedCard,
-		"card_holder": req.CardHolder,
-	}
-
-	dbProvider := paysvc.ProviderDBValue(paysvc.NormalizeProvider(provider))
-	paymentID, err := h.payment.Store().CreatePending(r.Context(), paysvc.PaymentRecord{
-		ApplicationID:  appID,
-		UserID:         claims.UserID,
-		Provider:       dbProvider,
-		Amount:         amount,
-		Currency:       "TRY",
-		IdempotencyKey: appID.String(),
-	}, meta)
-	if err != nil {
-		response.Fail(w, http.StatusInternalServerError, "APP113", "Ödeme kaydı oluşturulamadı.")
-		return
-	}
-
-	successURL := strings.TrimRight(h.cfg.PortalURL, "/") + "/patient/applications/" + appID.String() + "?payment=success"
-	failURL := strings.TrimRight(h.cfg.PortalURL, "/") + "/patient/applications/" + appID.String() + "?payment=failed"
-
-	result, err := h.payment.Checkout(r.Context(), provider, paysvc.CheckoutRequest{
-		ApplicationID:  appID.String(),
-		Amount:         amount,
-		Currency:       "TRY",
-		CustomerName:   strings.TrimSpace(firstName + " " + lastName),
-		CustomerEmail:  email,
-		CustomerPhone:  phone,
-		CardHolder:     req.CardHolder,
-		CardNumber:     req.CardNumber,
-		ExpiryMonth:    req.ExpiryMonth,
-		ExpiryYear:     req.ExpiryYear,
-		CVV:            req.CVV,
-		IdempotencyKey: appID.String(),
-		SuccessURL:     successURL,
-		FailURL:        failURL,
-	})
-	if err != nil {
-		_ = h.payment.Store().MarkFailed(r.Context(), paymentID, err.Error())
-		response.Fail(w, http.StatusBadRequest, "APP111", response.SafeMessage(err, "Ödeme başlatılamadı."))
-		return
-	}
-
-	if result.Status == "paid" || result.Status == "success" || result.Status == "completed" {
-		paidMeta := map[string]interface{}{
-			"orderId": result.OrderID,
-		}
-		displayNo := appID.String()
-		if appNumber != nil && *appNumber != "" {
-			displayNo = *appNumber
-		}
-		if h.invoice != nil {
-			inv, invErr := h.invoice.Create(r.Context(), invoicesvc.CreateRequest{
-				PaymentID:         paymentID.String(),
-				ApplicationID:     appID.String(),
-				ApplicationNumber: displayNo,
-				Amount:            amount,
-				Currency:          "TRY",
-				CustomerName:      strings.TrimSpace(firstName + " " + lastName),
-				CustomerEmail:     email,
-				CustomerPhone:     phone,
-				TransactionID:     result.TransactionID,
-				Description:       "Tıbbi danışmanlık başvuru ücreti",
-			})
-			if invErr == nil && inv != nil {
-				paidMeta["invoice_id"] = inv.InvoiceID
-				paidMeta["invoice_number"] = inv.InvoiceNumber
-				paidMeta["invoice_provider"] = "bizim_hesap"
-				paidMeta["invoice_status"] = inv.Status
-			} else if invErr != nil {
-				paidMeta["invoice_error"] = invErr.Error()
-			}
-		}
-		_ = h.payment.Store().MarkPaid(r.Context(), paymentID, result.TransactionID, paidMeta)
-		_ = h.app.UpdatePaymentCompleted(r.Context(), appID, claims.UserID)
-		h.notify.SendPaymentConfirmation(r.Context(), claims.UserID, email, displayNo, amount)
-	}
-
-	result.PaymentID = paymentID.String()
-	receipt := h.buildPaymentReceipt(r.Context(), paymentID, appID)
-	response.OK(w, paymentResultPayload(result, receipt))
+	// Legacy card charge endpoint — now starts PAYTR iframe token flow.
+	h.StartPayTRPayment(w, r)
 }
 
 func (h *ApplicationHandler) AddNote(w http.ResponseWriter, r *http.Request) {

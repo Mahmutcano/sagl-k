@@ -176,8 +176,22 @@ export function validateHospitalName(value: string): string | null {
 }
 
 export function validateRefundAmount(value: number): string | null {
+  if (!Number.isFinite(value)) return "İade tutarı sayısal olmalıdır.";
   if (!(value > 0)) return "İade tutarı 0'dan büyük olmalıdır.";
   if (value > 1_000_000) return "İade tutarı üst sınırı aşıyor.";
+  if (Math.abs(value * 100 - Math.round(value * 100)) > 1e-6) {
+    return "İade tutarı en fazla 2 ondalık basamak (kuruş) içerebilir.";
+  }
+  return null;
+}
+
+export function validateRefundAmountAgainstPayment(
+  amount: number,
+  paymentAmount: number
+): string | null {
+  const base = validateRefundAmount(amount);
+  if (base) return base;
+  if (amount > paymentAmount + 1e-9) return "İade tutarı ödeme tutarını aşamaz.";
   return null;
 }
 
@@ -186,6 +200,48 @@ export function validateRefundReason(value: string): string | null {
   if (!v) return "İade nedeni zorunludur.";
   if (charCount(v) < 5) return "İade nedeni en az 5 karakter olmalıdır.";
   if (charCount(v) > 500) return "İade nedeni en fazla 500 karakter olabilir.";
+  return null;
+}
+
+export function validateMerchantOid(value: string): string | null {
+  const v = value.trim();
+  if (!v) return "Merchant OID zorunludur.";
+  if (charCount(v) < 6 || charCount(v) > 64) {
+    return "Merchant OID 6–64 karakter olmalıdır.";
+  }
+  if (!/^[A-Za-z0-9_-]+$/.test(v)) {
+    return "Merchant OID yalnızca harf, rakam, tire veya alt çizgi içerebilir.";
+  }
+  return null;
+}
+
+export function validatePaymentAmount(value: number): string | null {
+  if (!Number.isFinite(value)) return "Tutar sayısal olmalıdır.";
+  if (value < 1) return "Tutar en az 1.00 TRY olmalıdır.";
+  if (value > 1_000_000) return "Tutar üst sınırı aşıyor.";
+  if (Math.abs(value * 100 - Math.round(value * 100)) > 1e-6) {
+    return "Tutar en fazla 2 ondalık basamak (kuruş) içerebilir.";
+  }
+  return null;
+}
+
+export function validateDateYYYYMMDD(value: string, label = "Tarih"): string | null {
+  const v = value.trim();
+  if (!v) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    return `${label} YYYY-MM-DD formatında olmalıdır.`;
+  }
+  const t = new Date(v + "T00:00:00");
+  if (Number.isNaN(t.getTime())) return `${label} geçersiz.`;
+  return null;
+}
+
+export function validatePaymentStatusFilter(value: string): string | null {
+  const v = value.trim().toLowerCase();
+  if (!v) return null;
+  if (!["pending", "paid", "failed", "refunded"].includes(v)) {
+    return "Durum pending, paid, failed veya refunded olabilir.";
+  }
   return null;
 }
 

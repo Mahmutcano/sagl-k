@@ -138,8 +138,14 @@ docker run -p 3000:3000 -e PORT=3000 mcp-web
 1. PostgreSQL + migration
 2. **Backend** deploy → `https://api.../health` → `{"status":"ok"}`
 3. Backend env: `PORTAL_URL` = frontend URL
-4. **Frontend** deploy → `NEXT_PUBLIC_API_URL` = backend URL
-5. Tarayıcıdan giriş / başvuru / ödeme smoke test
+4. Ödeme / bildirim env (Railway Variables):
+   - `DEFAULT_PAYMENT_PROVIDER=paytr`
+   - `PAYTR_MODE=mock|test|live` + `PAYTR_MERCHANT_*` (test/live)
+   - `PAYTR_CALLBACK_URL=https://<api-host>/api/v1/payments/paytr/callback` (public HTTPS; auth yok, hash doğrulamalı)
+   - `SMS_PROVIDER=mock|verimor`, `EMAIL_PROVIDER=mock|mailersend`, `PARASUT_MODE=mock|test|live`
+5. Migration: `014_paytr_orders_invoices.sql` (orders + invoices + payments PAYTR kolonları)
+6. **Frontend** deploy → `NEXT_PUBLIC_API_URL` = backend URL
+7. Smoke: başvuru → PAYTR token/iframe (veya mock simulate) → callback → fatura satırı
 
 ---
 
@@ -169,6 +175,8 @@ cd frontend/web && npm run dev
 | CORS hatası | Backend `PORTAL_URL` = frontend origin; gerekirse `CORS_ALLOWED_ORIGINS` |
 | API 404 / network | `NEXT_PUBLIC_API_URL` yanlış veya trailing `/` |
 | Ödeme / upload | Backend `UPLOAD_DIR` kalıcı volume değil |
+| PAYTR callback 404 / unpaid | `PAYTR_CALLBACK_URL` yanlış host; migration 014 eksik; merchant hash |
+| Fatura oluşmuyor | `PARASUT_MODE` / credentials; callback sonrası async — `invoices.status` kontrol et |
 | JWT / oturum | Aynı `JWT_SECRET`; HTTPS önerilir |
 
 ---

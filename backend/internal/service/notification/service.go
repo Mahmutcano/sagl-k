@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"medical-consultation-platform/backend/internal/config"
+	"medical-consultation-platform/backend/internal/pkg/validate"
 	"medical-consultation-platform/backend/internal/repository"
 )
 
@@ -68,14 +69,111 @@ func (s *Service) SendWelcomeEmail(ctx context.Context, userID uuid.UUID, email,
 }
 
 func (s *Service) SendPaymentConfirmation(ctx context.Context, userID uuid.UUID, email, appNumber string, amount float64) {
-	if strings.TrimSpace(email) == "" {
-		return
-	}
+	s.SendPaymentConfirmationFull(ctx, userID, email, "", "", appNumber, amount, nil)
+}
+
+// SendPaymentConfirmationFull notifies the patient by email and optionally SMS.
+func (s *Service) SendPaymentConfirmationFull(
+	ctx context.Context,
+	userID uuid.UUID,
+	email, phoneCountry, phoneNational, appNumber string,
+	amount float64,
+	appID *uuid.UUID,
+) {
 	body := fmt.Sprintf(
-		"Ödemeniz alındı.\n\nBaşvuru no: %s\nTutar: %.2f TRY\n\nBaşvurunuz işleme alınacaktır.\n\nSaygılarımızla",
+		"Ödemeniz alındı.\n\nBaşvuru no: %s\nTutar: %.2f TRY\n\nBaşvurunuz ilgili hekime iletildi.\n\nSaygılarımızla",
 		appNumber, amount,
 	)
-	_ = s.SendEmail(ctx, email, "Ödeme onayı", "payment_confirmed", body, &userID)
+	if strings.TrimSpace(email) != "" {
+		_ = s.SendEmailWithApp(ctx, email, "Ödeme onayı", "payment_confirmed", body, &userID, appID)
+	}
+	phone := strings.TrimSpace(phoneNational)
+	if phone != "" {
+		smsTo := strings.TrimPrefix(validate.ToE164(phoneCountry, phone), "+")
+		msg := fmt.Sprintf(
+			"Odemeniz alindi. Basvuru no: %s. Tutar: %.2f TL. Basvurunuz hekime iletildi.",
+			appNumber, amount,
+		)
+		_ = s.SendSMSDirect(ctx, smsTo, "payment_confirmed", msg, &userID, appID)
+	}
+}
+
+// NotifyDoctorNewPaidApplication sends SMS/email to the assigned doctor (care_provider flags).
+func (s *Service) NotifyDoctorNewPaidApplication(ctx context.Context, appID uuid.UUID, appNumber string, amount float64) {
+	var (
+		doctorUserID                                              *uuid.UUID
+		email, phone, phoneCC, doctorName, patientName, profession string
+		smsEnabled, emailEnabled                                  bool
+	)
+	err := s.db.Pool.QueryRow(ctx, `
+		SELECT
+			COALESCE(a.doctor_user_id, cp.user_id),
+			COALESCE(du.email, ''),
+			COALESCE(du.phone_number, ''),
+			COALESCE(du.phone_country_code, '+90'),
+			COALESCE(NULLIF(TRIM(cp.full_name), ''), NULLIF(TRIM(du.first_name || ' ' || du.last_name), ''), 'Hekim'),
+			COALESCE(cp.sms_enabled, true),
+			COALESCE(cp.email_enabled, true),
+			COALESCE(NULLIF(TRIM(pu.first_name || ' ' || pu.last_name), ''), 'Hasta'),
+			COALESCE(a.profession_name, a.profession_code, '')
+		FROM applications a
+		LEFT JOIN care_providers cp ON cp.id = a.care_provider_id
+		LEFT JOIN users du ON du.id = COALESCE(a.doctor_user_id, cp.user_id)
+		LEFT JOIN users pu ON pu.id = a.owner_user_id
+		WHERE a.id = $1
+	`, appID).Scan(
+		&doctorUserID, &email, &phone, &phoneCC, &doctorName, &smsEnabled, &emailEnabled, &patientName, &profession,
+	)
+	if err != nil {
+		log.Printf("[notify] doctor lookup failed app=%s: %v", appID, err)
+		return
+	}
+	if doctorUserID == nil {
+		log.Printf("[notify] no doctor assigned for app=%s — doctor SMS/email skipped", appID)
+		return
+	}
+
+	doctorURL := strings.TrimRight(s.cfg.DoctorURL, "/")
+	if doctorURL == "" {
+		doctorURL = strings.TrimRight(s.cfg.PortalURL, "/")
+	}
+	appLink := doctorURL + "/doctor/applications/" + appID.String()
+
+	smsBody := fmt.Sprintf(
+		"Yeni odemeli basvuru. No: %s. Hasta: %s. Tutar: %.2f TL. Panel: %s",
+		appNumber, patientName, amount, appLink,
+	)
+	emailSubject := "Yeni ödenmiş başvuru — " + appNumber
+	emailBody := fmt.Sprintf(
+		"Sayın %s,\n\nYeni bir başvuru ödemesi tamamlandı ve size atandı.\n\nBaşvuru no: %s\nHasta: %s\nBranş: %s\nTutar: %.2f TRY\n\nBaşvuruyu incelemek için:\n%s\n\nSaygılarımızla",
+		doctorName, appNumber, patientName, profession, amount, appLink,
+	)
+
+	if smsEnabled && strings.TrimSpace(phone) != "" {
+		smsTo := strings.TrimPrefix(validate.ToE164(phoneCC, phone), "+")
+		if err := s.SendSMSDirect(ctx, smsTo, "doctor_new_paid_application", smsBody, doctorUserID, &appID); err != nil {
+			log.Printf("[notify] doctor SMS failed app=%s: %v", appID, err)
+		}
+	}
+	if emailEnabled && strings.TrimSpace(email) != "" {
+		if err := s.SendEmailWithApp(ctx, email, emailSubject, "doctor_new_paid_application", emailBody, doctorUserID, &appID); err != nil {
+			log.Printf("[notify] doctor email failed app=%s: %v", appID, err)
+		}
+	}
+}
+
+func (s *Service) SendEmail(ctx context.Context, to, subject, templateKey, body string, userID *uuid.UUID) error {
+	return s.SendEmailWithApp(ctx, to, subject, templateKey, body, userID, nil)
+}
+
+func (s *Service) SendEmailWithApp(ctx context.Context, to, subject, templateKey, body string, userID, appID *uuid.UUID) error {
+	status := "sent"
+	if err := s.em.Send(ctx, to, subject, body); err != nil {
+		status = "failed"
+		_ = s.db.LogNotification(ctx, "email", to, templateKey, status, userID, appID, body)
+		return err
+	}
+	return s.db.LogNotification(ctx, "email", to, templateKey, status, userID, appID, body)
 }
 
 func (s *Service) SendReportReadyEmail(ctx context.Context, userID uuid.UUID, email, appNumber string, appID uuid.UUID) {
@@ -86,7 +184,7 @@ func (s *Service) SendReportReadyEmail(ctx context.Context, userID uuid.UUID, em
 		"Başvurunuz sonuçlandırıldı.\n\nBaşvuru no: %s\n\nRaporunuzu hasta panelinden görüntüleyebilirsiniz.\n\nSaygılarımızla",
 		appNumber,
 	)
-	_ = s.SendEmail(ctx, email, "Raporunuz hazır", "report_ready", body, &userID)
+	_ = s.SendEmailWithApp(ctx, email, "Raporunuz hazır", "report_ready", body, &userID, &appID)
 }
 
 func (s *Service) SendReportUpdatedEmail(ctx context.Context, userID uuid.UUID, email, appNumber string) {
@@ -98,16 +196,6 @@ func (s *Service) SendReportUpdatedEmail(ctx context.Context, userID uuid.UUID, 
 		appNumber,
 	)
 	_ = s.SendEmail(ctx, email, "Raporunuz güncellendi", "report_updated", body, &userID)
-}
-
-func (s *Service) SendEmail(ctx context.Context, to, subject, templateKey, body string, userID *uuid.UUID) error {
-	status := "sent"
-	if err := s.em.Send(ctx, to, subject, body); err != nil {
-		status = "failed"
-		_ = s.db.LogNotification(ctx, "email", to, templateKey, status, userID, nil, body)
-		return err
-	}
-	return s.db.LogNotification(ctx, "email", to, templateKey, status, userID, nil, body)
 }
 
 // Mock providers for development

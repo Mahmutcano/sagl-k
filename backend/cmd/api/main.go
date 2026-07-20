@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -50,10 +49,9 @@ func main() {
 	app := appsvc.NewService(db)
 	chat := chatsvc.NewService(db)
 	payStore := paysvc.NewStore(db)
-	param := paysvc.NewParamProvider(cfg.Param)
-	requireCard := strings.EqualFold(cfg.Param.Mode, "live") || strings.EqualFold(cfg.Param.Mode, "test")
-	payment := paysvc.NewService(param, payStore, requireCard)
-	invoiceSvc := invoicesvc.NewService(cfg.BizimHesap)
+	paytr := paysvc.NewPayTRProvider(cfg.PayTR)
+	payment := paysvc.NewService(paytr, payStore, cfg.PayTR)
+	invoiceSvc := invoicesvc.NewService(cfg.Parasut)
 
 	auditLog := audit.NewLogger(db.Pool)
 
@@ -80,7 +78,7 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("api listening on :%s", cfg.APIPort)
+		log.Printf("api listening on :%s (paytr mode=%s)", cfg.APIPort, cfg.PayTR.Mode)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("server: %v", err)
 		}

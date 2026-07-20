@@ -30,16 +30,31 @@ import {
 } from "@/components/ui/table";
 import { Download, FileText, Printer, X, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { validateDateYYYYMMDD, validatePaymentStatusFilter } from "@/lib/validation";
 
 type Payment = {
   id: string;
   applicationId: string;
+  applicationNumber?: string;
   provider: string;
   amount: number;
   currency: string;
   status: string;
   patientName?: string;
   createdAt?: string;
+  paidAt?: string;
+  merchantOid?: string;
+  orderId?: string;
+  orderStatus?: string;
+  invoiceNumber?: string;
+  invoiceStatus?: string;
+  invoiceError?: string;
+  doctorName?: string;
+  doctorId?: string;
+  revenueSharePercent?: number;
+  doctorShareAmount?: number;
+  callbackStatus?: string;
+  transactionId?: string;
 };
 
 type Invoice = {
@@ -65,7 +80,41 @@ type Invoice = {
   invoiceProvider?: string;
   invoiceStatus?: string;
   invoiceError?: string;
+  invoicePdfUrl?: string;
+  orderId?: string;
+  merchantOid?: string;
+  orderStatus?: string;
+  callbackStatus?: string;
 };
+
+function paymentStatusLabel(status: string) {
+  switch (status) {
+    case "paid":
+      return "Ödendi";
+    case "pending":
+      return "Bekliyor";
+    case "failed":
+      return "Başarısız";
+    case "refunded":
+      return "İade";
+    default:
+      return status;
+  }
+}
+
+function invoiceStatusLabel(status?: string) {
+  if (!status) return "—";
+  switch (status.toLowerCase()) {
+    case "issued":
+      return "Kesildi";
+    case "pending":
+      return "Bekliyor";
+    case "failed":
+      return "Hata";
+    default:
+      return status;
+  }
+}
 
 export default function AdminPaymentsPage() {
   const router = useRouter();
@@ -82,6 +131,7 @@ export default function AdminPaymentsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
 
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [loadingInvoice, setLoadingInvoice] = useState(false);
@@ -103,7 +153,8 @@ export default function AdminPaymentsPage() {
       search: searchQuery.trim(),
       startDate,
       endDate,
-    }).toString();
+    });
+    if (statusFilter) query.set("status", statusFilter);
 
     api<{ items: Payment[]; totalCount: number }>(`${API.admin.payments}?${query}`, {}, token)
       .then((res) => {
@@ -112,7 +163,7 @@ export default function AdminPaymentsPage() {
       })
       .catch((err) => setError(err instanceof ApiError ? err.message : "Ödemeler yüklenemedi."))
       .finally(() => setLoading(false));
-  }, [router, page, pageSize, searchQuery, startDate, endDate]);
+  }, [router, page, pageSize, searchQuery, startDate, endDate, statusFilter]);
 
   useEffect(() => {
     fetchPayments();
@@ -120,6 +171,15 @@ export default function AdminPaymentsPage() {
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const dateErr =
+      validateDateYYYYMMDD(startDate, "Başlangıç tarihi") ||
+      validateDateYYYYMMDD(endDate, "Bitiş tarihi");
+    const statusErr = validatePaymentStatusFilter(statusFilter);
+    if (dateErr || statusErr) {
+      setError(dateErr || statusErr || "Doğrulama hatası");
+      return;
+    }
+    setError("");
     setPage(0);
     setSearchQuery(searchText);
   };
@@ -129,6 +189,7 @@ export default function AdminPaymentsPage() {
     setSearchQuery("");
     setStartDate("");
     setEndDate("");
+    setStatusFilter("");
     setPage(0);
   };
 
@@ -212,11 +273,26 @@ export default function AdminPaymentsPage() {
               <Input
                 id="search"
                 className="h-10 rounded-xl bg-white pl-10 focus-visible:border-primary focus-visible:ring-primary/20"
-                placeholder="Hasta adı, başvuru no..."
+                placeholder="Hasta, başvuru no, merchant OID, fatura no…"
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
               />
             </div>
+          </div>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <label htmlFor="statusFilter" className="text-xs font-bold tracking-wide text-foreground">Ödeme durumu</label>
+            <select
+              id="statusFilter"
+              className="h-10 rounded-xl border bg-white px-3 text-sm"
+              value={statusFilter}
+              onChange={(e) => { setPage(0); setStatusFilter(e.target.value); }}
+            >
+              <option value="">Tümü</option>
+              <option value="paid">Ödendi</option>
+              <option value="pending">Bekliyor</option>
+              <option value="failed">Başarısız</option>
+              <option value="refunded">İade</option>
+            </select>
           </div>
           <CustomDatePicker
             id="startDate"
@@ -269,46 +345,77 @@ export default function AdminPaymentsPage() {
               <Table>
                 <TableHeader className="bg-muted/40">
                   <TableRow>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Hasta Adı</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Başvuru</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Sağlayıcı</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Tutar</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Durum</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Tarih</TableHead>
-                    <TableHead className="px-6 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider text-right">İşlem</TableHead>
+                    <TableHead className="px-4 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Hasta</TableHead>
+                    <TableHead className="px-4 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Başvuru</TableHead>
+                    <TableHead className="px-4 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Merchant OID</TableHead>
+                    <TableHead className="px-4 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Tutar</TableHead>
+                    <TableHead className="px-4 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Ödeme</TableHead>
+                    <TableHead className="px-4 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Fatura</TableHead>
+                    <TableHead className="px-4 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Callback</TableHead>
+                    <TableHead className="px-4 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Doktor</TableHead>
+                    <TableHead className="px-4 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Tarih</TableHead>
+                    <TableHead className="px-4 py-4 text-[11px] font-bold text-muted-foreground uppercase tracking-wider text-right">İşlem</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {payments.map((p) => (
                     <TableRow key={p.id} className="hover:bg-muted/40 transition-colors">
-                      <TableCell className="px-6 py-4 font-semibold text-foreground">
+                      <TableCell className="px-4 py-3 font-semibold text-foreground">
                         {p.patientName || "—"}
+                        <span className="mt-0.5 block text-[10px] font-medium uppercase text-muted-foreground">
+                          {(p.provider || "paytr").toUpperCase()}
+                        </span>
                       </TableCell>
-                      <TableCell className="px-6 py-4">
+                      <TableCell className="px-4 py-3">
                         <Link
                           href={ROUTES.admin.application(p.applicationId)}
                           className="underline-offset-4 hover:underline font-mono text-xs text-primary font-medium"
                         >
-                          {p.applicationId.slice(0, 8)}…
+                          {p.applicationNumber || `${p.applicationId.slice(0, 8)}…`}
                         </Link>
                       </TableCell>
-                      <TableCell className="px-6 py-4 capitalize text-muted-foreground font-medium">{p.provider}</TableCell>
-                      <TableCell className="px-6 py-4 font-bold text-foreground">
+                      <TableCell className="px-4 py-3 font-mono text-[11px] text-muted-foreground">
+                        {p.merchantOid || "—"}
+                        {p.orderStatus ? (
+                          <span className="mt-0.5 block font-sans text-[10px]">{p.orderStatus}</span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 font-bold text-foreground whitespace-nowrap">
                         {p.amount.toLocaleString("tr-TR", {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}{" "}
                         {p.currency}
                       </TableCell>
-                      <TableCell className="px-6 py-4">
-                        <Badge variant={p.status === "paid" ? "default" : "secondary"}>
-                          {p.status === "paid" ? "Ödendi" : p.status}
+                      <TableCell className="px-4 py-3">
+                        <Badge variant={p.status === "paid" ? "default" : p.status === "failed" ? "destructive" : "secondary"}>
+                          {paymentStatusLabel(p.status)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="px-6 py-4 text-muted-foreground text-xs font-mono">
+                      <TableCell className="px-4 py-3 text-xs">
+                        <span className={p.invoiceStatus === "failed" ? "text-amber-700 font-semibold" : "text-muted-foreground"}>
+                          {invoiceStatusLabel(p.invoiceStatus)}
+                        </span>
+                        {p.invoiceNumber ? (
+                          <span className="mt-0.5 block font-mono text-[10px]">{p.invoiceNumber}</span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 font-mono text-[11px] text-muted-foreground">
+                        {p.callbackStatus || "—"}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-xs">
+                        {p.doctorName || "—"}
+                        {p.doctorShareAmount != null ? (
+                          <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
+                            pay {p.doctorShareAmount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}
+                            {p.revenueSharePercent != null ? ` (%${p.revenueSharePercent})` : ""}
+                          </span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="px-4 py-3 text-muted-foreground text-xs font-mono whitespace-nowrap">
                         {p.createdAt ? new Date(p.createdAt).toLocaleString("tr-TR") : "—"}
                       </TableCell>
-                      <TableCell className="px-6 py-4 text-right">
+                      <TableCell className="px-4 py-3 text-right">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -503,7 +610,16 @@ export default function AdminPaymentsPage() {
               {/* Transaction Footers */}
               <div className="bg-muted/40 rounded-xl p-4 text-xs text-muted-foreground space-y-1.5 border ">
                 <p><span className="font-bold text-muted-foreground">Ödeme Durumu:</span> {selectedInvoice.status.toUpperCase()}</p>
-                <p><span className="font-bold text-muted-foreground">Ödeme Kanalı:</span> Param</p>
+                <p><span className="font-bold text-muted-foreground">Ödeme Kanalı:</span> {selectedInvoice.provider?.toUpperCase() === "PAYTR" || !selectedInvoice.provider ? "PAYTR" : selectedInvoice.provider}</p>
+                {selectedInvoice.merchantOid ? (
+                  <p className="font-mono"><span className="font-bold font-sans text-muted-foreground">Merchant OID:</span> {selectedInvoice.merchantOid}</p>
+                ) : null}
+                {selectedInvoice.orderStatus ? (
+                  <p><span className="font-bold text-muted-foreground">Sipariş:</span> {selectedInvoice.orderStatus}</p>
+                ) : null}
+                {selectedInvoice.callbackStatus ? (
+                  <p><span className="font-bold text-muted-foreground">Callback:</span> {selectedInvoice.callbackStatus}</p>
+                ) : null}
                 {selectedInvoice.providerTransactionId && (
                   <p className="font-mono"><span className="font-bold font-sans text-muted-foreground">İşlem (TX) ID:</span> {selectedInvoice.providerTransactionId}</p>
                 )}
@@ -512,17 +628,26 @@ export default function AdminPaymentsPage() {
                 )}
                 {selectedInvoice.invoiceNumber ? (
                   <>
-                    <p className="pt-2 border-t "><span className="font-bold text-muted-foreground">Fatura (Bizim Hesap):</span> {selectedInvoice.invoiceNumber}</p>
+                    <p className="pt-2 border-t "><span className="font-bold text-muted-foreground">Fatura (Paraşüt):</span> {selectedInvoice.invoiceNumber}</p>
                     {selectedInvoice.invoiceId && (
                       <p className="font-mono"><span className="font-bold font-sans text-muted-foreground">Fatura ID:</span> {selectedInvoice.invoiceId}</p>
                     )}
                     {selectedInvoice.invoiceStatus && (
                       <p><span className="font-bold text-muted-foreground">Fatura Durumu:</span> {selectedInvoice.invoiceStatus.toUpperCase()}</p>
                     )}
+                    {selectedInvoice.invoicePdfUrl ? (
+                      <p>
+                        <a className="text-primary underline" href={selectedInvoice.invoicePdfUrl} target="_blank" rel="noreferrer">
+                          Fatura PDF
+                        </a>
+                      </p>
+                    ) : null}
                   </>
                 ) : selectedInvoice.invoiceError ? (
                   <p className="pt-2 border-t text-amber-700"><span className="font-bold">Fatura hatası:</span> {selectedInvoice.invoiceError}</p>
-                ) : null}
+                ) : (
+                  <p className="pt-2 border-t">Fatura kaydı henüz yok veya kesim bekleniyor.</p>
+                )}
               </div>
 
               <div className="text-center mt-12 text-[10px] font-medium text-muted-foreground border-t pt-4">

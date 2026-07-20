@@ -34,6 +34,7 @@ import {
   MessageSquare,
   Smartphone,
   Calculator,
+  BarChart3,
 } from "lucide-react";
 
 type AppShellProps = {
@@ -73,10 +74,11 @@ export function AdminAppShell({ children, title, description, actions }: AppShel
     { href: ROUTES.admin.titles, label: "Unvan Tanımları", icon: Tag },
     { href: ROUTES.admin.payments, label: "Ödemeler & Faturalar", icon: CreditCard },
     { href: ROUTES.admin.refunds, label: "İade Talepleri", icon: RefreshCw },
+    { href: ROUTES.admin.reports, label: "Rapor Merkezi", icon: BarChart3 },
     { href: ROUTES.admin.accounting, label: "Hesaplar", icon: Calculator },
     { href: ROUTES.admin.users, label: "Kullanıcılar", icon: UserSquare2 },
     { href: ROUTES.admin.contact, label: "İletişim / Öneri", icon: MessageSquare },
-    { href: ROUTES.admin.notifications, label: "Bildirim Takibi", icon: Bell },
+    { href: ROUTES.admin.notifications, label: "SMS / E-posta Raporu", icon: Bell },
     { href: ROUTES.admin.smsLogs, label: "SMS Kod Logları", icon: Smartphone },
     { href: ROUTES.admin.logs, label: "Sistem Logları", icon: Activity },
   ];

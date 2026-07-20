@@ -186,8 +186,8 @@ export function normalizePaymentReceipt(raw: Record<string, unknown>): PaymentRe
   return {
     amount: Number(raw.amount ?? 0),
     currency: String(raw.currency ?? "TRY"),
-    provider: String(raw.provider ?? "param"),
-    providerLabel: String(raw.providerLabel ?? "Param"),
+    provider: String(raw.provider ?? "paytr"),
+    providerLabel: String(raw.providerLabel ?? "PAYTR"),
     transactionId: String(raw.transactionId ?? ""),
     paymentId: String(raw.paymentId ?? ""),
     applicationId: String(raw.applicationId ?? ""),
@@ -203,7 +203,7 @@ export function normalizePaymentReceipt(raw: Record<string, unknown>): PaymentRe
     invoiceId: raw.invoiceId ? String(raw.invoiceId) : undefined,
     invoiceNumber: raw.invoiceNumber ? String(raw.invoiceNumber) : undefined,
     invoiceProvider: raw.invoiceProvider ? String(raw.invoiceProvider) : undefined,
-    invoiceProviderLabel: raw.invoiceProviderLabel ? String(raw.invoiceProviderLabel) : "Bizim Hesap",
+    invoiceProviderLabel: raw.invoiceProviderLabel ? String(raw.invoiceProviderLabel) : "Paraşüt",
     invoiceStatus: raw.invoiceStatus ? String(raw.invoiceStatus) : undefined,
     invoiceStatusLabel: raw.invoiceStatusLabel ? String(raw.invoiceStatusLabel) : undefined,
     invoiceError: raw.invoiceError ? String(raw.invoiceError) : undefined,
@@ -299,12 +299,12 @@ export function resolveEditStep(
 }
 
 export type PaymentRequest = {
-  provider: "param";
-  cardHolder: string;
-  cardNumber: string;
-  expiryMonth: number;
-  expiryYear: number;
-  cvv: string;
+  provider?: "paytr";
+  cardHolder?: string;
+  cardNumber?: string;
+  expiryMonth?: number;
+  expiryYear?: number;
+  cvv?: string;
 };
 
 export type StatusHistoryItem = {

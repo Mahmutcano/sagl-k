@@ -8,9 +8,9 @@ import (
 
 func isLivePaymentProvider(cfg appcfg.Config, provider string) bool {
 	_ = provider
-	return strings.EqualFold(cfg.Param.Mode, "live")
+	return strings.EqualFold(cfg.PayTR.Mode, "live")
 }
 
 func isTestPaymentProvider(cfg appcfg.Config) bool {
-	return strings.EqualFold(cfg.Param.Mode, "test")
+	return strings.EqualFold(cfg.PayTR.Mode, "test")
 }

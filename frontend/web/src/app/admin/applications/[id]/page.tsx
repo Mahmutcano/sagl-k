@@ -75,6 +75,24 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
   const [draftReport, setDraftReport] = useState<string | null>(null);
   const [finalReport, setFinalReport] = useState<{ reportJson: unknown; createdAt: string } | null>(null);
   const [attachments, setAttachments] = useState<{ id: string; fileName: string; mimeType: string; fileSize: number }[]>([]);
+  const [payments, setPayments] = useState<{
+    id: string;
+    applicationId?: string;
+    amount: number;
+    currency: string;
+    status: string;
+    provider?: string;
+    merchantOid?: string;
+    orderStatus?: string;
+    invoiceNumber?: string;
+    invoiceStatus?: string;
+    invoiceError?: string;
+    callbackStatus?: string;
+    createdAt?: string;
+    paidAt?: string;
+  }[]>([]);
+  const [invoiceLoadingId, setInvoiceLoadingId] = useState("");
+  const [selectedInvoice, setSelectedInvoice] = useState<Record<string, unknown> | null>(null);
 
   const catalog = useApplicationCatalog(1, professionCode, true);
 
@@ -142,6 +160,17 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
       )
         .then((files) => setAttachments(files ?? []))
         .catch(() => setAttachments([]));
+
+      // Payment / order / invoice report for this application
+      api<{ items: typeof payments }>(
+        `${API.admin.payments}?page=0&pageSize=50&search=${encodeURIComponent(params.id)}`,
+        {},
+        token
+      )
+        .then((res) =>
+          setPayments((res?.items ?? []).filter((p) => p.applicationId === params.id))
+        )
+        .catch(() => setPayments([]));
 
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Veriler yüklenemedi.");
@@ -474,6 +503,79 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
 
           {/* Right Column: Status Change History (takes 1 col) */}
           <div className="flex flex-col gap-6">
+            <Card className=" ">
+              <CardHeader className="bg-muted/40">
+                <CardTitle className="text-base text-foreground flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                  Ödeme & Fatura
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  PAYTR sipariş, callback ve Paraşüt fatura durumu
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-4 grid gap-3">
+                {payments.length === 0 ? (
+                  <p className="text-xs text-muted-foreground italic text-center py-2">Ödeme kaydı yok.</p>
+                ) : (
+                  payments.map((p) => (
+                    <div key={p.id} className="rounded-lg border bg-muted/30 p-3 text-xs space-y-1.5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <Badge variant={p.status === "paid" ? "default" : p.status === "failed" ? "destructive" : "secondary"}>
+                          {p.status === "paid" ? "Ödendi" : p.status}
+                        </Badge>
+                        <span className="font-bold">
+                          {p.amount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })} {p.currency}
+                        </span>
+                      </div>
+                      <p className="font-mono text-[10px] text-muted-foreground">
+                        {(p.provider || "paytr").toUpperCase()}
+                        {p.merchantOid ? ` · ${p.merchantOid}` : ""}
+                      </p>
+                      {p.orderStatus ? <p>Sipariş: <span className="font-medium">{p.orderStatus}</span></p> : null}
+                      {p.callbackStatus ? <p>Callback: <span className="font-medium">{p.callbackStatus}</span></p> : null}
+                      <p>
+                        Fatura:{" "}
+                        <span className={p.invoiceStatus === "failed" ? "text-amber-700 font-semibold" : "font-medium"}>
+                          {p.invoiceStatus || "—"}
+                          {p.invoiceNumber ? ` · ${p.invoiceNumber}` : ""}
+                        </span>
+                      </p>
+                      {p.invoiceError ? <p className="text-amber-700">{p.invoiceError}</p> : null}
+                      <p className="font-mono text-[10px] text-muted-foreground">
+                        {p.createdAt ? new Date(p.createdAt).toLocaleString("tr-TR") : ""}
+                        {p.paidAt ? ` · ödeme ${new Date(p.paidAt).toLocaleString("tr-TR")}` : ""}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 mt-1"
+                        disabled={invoiceLoadingId === p.id}
+                        onClick={async () => {
+                          const token = getToken();
+                          if (!token) return;
+                          setInvoiceLoadingId(p.id);
+                          try {
+                            const inv = await api<Record<string, unknown>>(API.admin.paymentInvoice(p.id), {}, token);
+                            setSelectedInvoice(inv);
+                          } catch (err) {
+                            setError(err instanceof ApiError ? err.message : "E-makbuz yüklenemedi.");
+                          } finally {
+                            setInvoiceLoadingId("");
+                          }
+                        }}
+                      >
+                        E-Makbuz
+                      </Button>
+                    </div>
+                  ))
+                )}
+                <Link href={ROUTES.admin.payments} className="text-[11px] text-primary underline-offset-2 hover:underline">
+                  Tüm ödemeler listesine git
+                </Link>
+              </CardContent>
+            </Card>
+
             {/* Attachments Card */}
             <Card className=" ">
               <CardHeader className="bg-muted/40">
@@ -556,6 +658,40 @@ export default function AdminApplicationDetailPage({ params }: { params: { id: s
           </div>
         </div>
       )}
+      {selectedInvoice ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-sm font-bold">E-Makbuz özeti</h3>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedInvoice(null)}>
+                Kapat
+              </Button>
+            </div>
+            <dl className="space-y-2 text-xs">
+              <div><dt className="text-muted-foreground">Hasta</dt><dd className="font-semibold">{String(selectedInvoice.patientName ?? "—")}</dd></div>
+              <div><dt className="text-muted-foreground">Tutar</dt><dd className="font-semibold">{String(selectedInvoice.amount)} {String(selectedInvoice.currency ?? "TRY")}</dd></div>
+              <div><dt className="text-muted-foreground">Merchant OID</dt><dd className="font-mono">{String(selectedInvoice.merchantOid || "—")}</dd></div>
+              <div><dt className="text-muted-foreground">Sipariş / Callback</dt><dd>{String(selectedInvoice.orderStatus || "—")} / {String(selectedInvoice.callbackStatus || "—")}</dd></div>
+              <div><dt className="text-muted-foreground">Fatura</dt><dd>{String(selectedInvoice.invoiceNumber || selectedInvoice.invoiceStatus || "—")}</dd></div>
+              {selectedInvoice.invoiceError ? (
+                <div className="text-amber-700"><dt>Fatura hatası</dt><dd>{String(selectedInvoice.invoiceError)}</dd></div>
+              ) : null}
+              {typeof selectedInvoice.invoicePdfUrl === "string" && selectedInvoice.invoicePdfUrl ? (
+                <div>
+                  <a className="text-primary underline" href={selectedInvoice.invoicePdfUrl} target="_blank" rel="noreferrer">
+                    PDF aç
+                  </a>
+                </div>
+              ) : null}
+            </dl>
+            <p className="mt-4">
+              <Link href={ROUTES.admin.payments} className="text-xs text-primary underline">
+                Ödemeler listesinde detay
+              </Link>
+            </p>
+          </div>
+        </div>
+      ) : null}
     </AdminAppShell>
   );
 }

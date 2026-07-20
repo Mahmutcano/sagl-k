@@ -32,6 +32,8 @@ function isInternalReference(value?: string): boolean {
   if (UUID_RE.test(v)) return true;
   if (/^param-test-/i.test(v)) return true;
   if (/^bh-inv-test-/i.test(v)) return true;
+  if (/^ps-inv-/i.test(v)) return true;
+  if (/^mock-/i.test(v)) return true;
   return false;
 }
 
@@ -106,7 +108,10 @@ function buildDekontRows(receipt: PaymentReceipt, appNo: string): DekontRow[] {
   if (receipt.doctorName) rows.push({ label: "Uzman", value: receipt.doctorName });
 
   rows.push({ label: "Tutar", value: formatMoney(receipt.amount, receipt.currency) });
-  rows.push({ label: "Ödeme kanalı", value: "Param · Kredi kartı" });
+  rows.push({
+    label: "Ödeme kanalı",
+    value: receipt.providerLabel?.trim() || "PAYTR",
+  });
 
   if (receipt.invoiceNumber && !isInternalReference(receipt.invoiceNumber)) {
     rows.push({ label: "Fatura no", value: receipt.invoiceNumber });

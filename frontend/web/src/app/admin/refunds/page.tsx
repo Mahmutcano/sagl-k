@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { ApiError, api, clearAuth, getToken, getUser, isAdminRole } from "@/lib/api";
 import { API } from "@/lib/endpoints";
-import { hasErrors, validateRefundAmount, validateRefundReason, type FieldErrors } from "@/lib/validation";
+import { hasErrors, validateRefundAmount, validateRefundAmountAgainstPayment, validateRefundReason, type FieldErrors } from "@/lib/validation";
 import { AdminAppShell } from "@/components/AdminAppShell";
 import { FormAlert, TextInput } from "@/components/FormField";
 import { CustomDatePicker } from "@/components/CustomDatePicker";
@@ -59,6 +59,26 @@ export default function AdminRefundsPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
 
+  const [refunds, setRefunds] = useState<{
+    id: string;
+    paymentId: string;
+    applicationId: string;
+    amount: number;
+    reason: string;
+    status: string;
+    merchantOid?: string;
+    patientName?: string;
+    createdAt?: string;
+  }[]>([]);
+
+  const loadRefunds = useCallback(() => {
+    const token = getToken();
+    if (!token) return;
+    api<{ items: typeof refunds }>(`${API.admin.refunds}?page=0&pageSize=30`, {}, token)
+      .then((res) => setRefunds(res?.items ?? []))
+      .catch(() => setRefunds([]));
+  }, []);
+
   const loadPayments = useCallback(() => {
     const token = getToken();
     if (!token) return;
@@ -90,7 +110,8 @@ export default function AdminRefundsPage() {
       return;
     }
     loadPayments();
-  }, [router, loadPayments]);
+    loadRefunds();
+  }, [router, loadPayments, loadRefunds]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,9 +130,12 @@ export default function AdminRefundsPage() {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const f: FieldErrors = {};
-    if (!form.paymentId.trim()) f.paymentId = "Ödeme kimliği zorunludur.";
     const amount = Number(form.amount);
-    const amountErr = validateRefundAmount(amount);
+    const selected = payments.find((p) => p.id === form.paymentId.trim());
+    const amountErr = selected
+      ? validateRefundAmountAgainstPayment(amount, selected.amount)
+      : validateRefundAmount(amount);
+    if (!form.paymentId.trim()) f.paymentId = "Ödeme kimliği zorunludur.";
     if (amountErr) f.amount = amountErr;
     const reasonErr = validateRefundReason(form.reason);
     if (reasonErr) f.reason = reasonErr;
@@ -132,13 +156,15 @@ export default function AdminRefundsPage() {
             paymentId: form.paymentId,
             amount,
             reason: form.reason,
+            manual: true,
           }),
         },
         token
       );
-      setMsg(`İade talebi başarıyla oluşturuldu. Başvuru: ${res.applicationId}`);
+      setMsg(`İade kaydı oluşturuldu (panel iadesi). Başvuru: ${res.applicationId}`);
       setForm({ paymentId: "", amount: "", reason: "" });
       loadPayments();
+      loadRefunds();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "İade oluşturulamadı.");
     } finally {
@@ -156,8 +182,49 @@ export default function AdminRefundsPage() {
 
   return (
     <AdminAppShell title="İadeler" description="Hasta ödemeleri için iade talepleri oluşturun ve yönetin">
+      <FormAlert
+        title="PAYTR iade"
+        message="Kart iadesi PayTR mağaza panelinden yapılır. Bu ekran sistem kaydı içindir; otomatik iade API’si yoktur. Merchant OID / işlem bilgisini Ödemeler ekranından alın."
+      />
       {error ? <FormAlert title="Hata" message={error} /> : null}
       {msg ? <FormAlert title="Başarılı" message={msg} variant="default" /> : null}
+
+      {refunds.length > 0 ? (
+        <Card className="mb-4 rounded-2xl overflow-hidden">
+          <CardHeader>
+            <CardTitle className="text-base">İade kayıtları</CardTitle>
+            <CardDescription>Sistemde kayıtlı iadeler (PAYTR panel sonrası manuel kayıt dahil)</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Hasta</TableHead>
+                  <TableHead>Merchant OID</TableHead>
+                  <TableHead>Tutar</TableHead>
+                  <TableHead>Durum</TableHead>
+                  <TableHead>Neden</TableHead>
+                  <TableHead>Tarih</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {refunds.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell className="font-semibold text-sm">{r.patientName || "—"}</TableCell>
+                    <TableCell className="font-mono text-[11px]">{r.merchantOid || r.paymentId.slice(0, 8)}</TableCell>
+                    <TableCell>{r.amount.toLocaleString("tr-TR", { minimumFractionDigits: 2 })}</TableCell>
+                    <TableCell>{r.status}</TableCell>
+                    <TableCell className="max-w-[200px] truncate text-xs">{r.reason}</TableCell>
+                    <TableCell className="font-mono text-[11px]">
+                      {r.createdAt ? new Date(r.createdAt).toLocaleString("tr-TR") : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-12 lg:items-start lg:gap-6">
         {/* Left Card: Refund Request Form */}

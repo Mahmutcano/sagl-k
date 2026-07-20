@@ -89,6 +89,7 @@ type Profession struct {
 
 type Payment struct {
 	ID                    uuid.UUID
+	OrderID               *uuid.UUID
 	ApplicationID         uuid.UUID
 	UserID                uuid.UUID
 	Provider              string
@@ -97,7 +98,58 @@ type Payment struct {
 	Currency              string
 	Status                string
 	IdempotencyKey        *string
+	PaytrToken            *string
+	PaytrIframeURL        *string
 }
+
+type Order struct {
+	ID             uuid.UUID
+	ApplicationID  uuid.UUID
+	UserID         uuid.UUID
+	MerchantOID    string
+	Amount         float64
+	Currency       string
+	Status         string
+	IdempotencyKey *string
+	PaidAt         *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+type Invoice struct {
+	ID             uuid.UUID
+	OrderID        uuid.UUID
+	PaymentID      *uuid.UUID
+	ApplicationID  uuid.UUID
+	UserID         uuid.UUID
+	Provider       string
+	ExternalID     *string
+	InvoiceNumber  *string
+	Status         string
+	PDFURL         *string
+	Amount         float64
+	Currency       string
+	ErrorMessage   *string
+	IssuedAt       *time.Time
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+// Order status values
+const (
+	OrderPending         = "pending"
+	OrderAwaitingPayment = "awaiting_payment"
+	OrderPaid            = "paid"
+	OrderFailed          = "failed"
+	OrderCancelled       = "cancelled"
+)
+
+// Invoice status values
+const (
+	InvoicePending = "pending"
+	InvoiceIssued  = "issued"
+	InvoiceFailed  = "failed"
+)
 
 type NotificationLog struct {
 	ID          uuid.UUID

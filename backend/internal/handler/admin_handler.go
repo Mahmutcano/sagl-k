@@ -170,29 +170,54 @@ func (h *AdminHandler) ApplicationHistory(w http.ResponseWriter, r *http.Request
 	}
 
 	payRows, err := h.db.Pool.Query(r.Context(), `
-		SELECT id::text, amount::float8, status::text, created_at, paid_at
-		FROM payments WHERE application_id = $1 ORDER BY created_at
+		SELECT p.id::text, p.amount::float8, p.status::text, p.provider::text, p.created_at, p.paid_at,
+		       COALESCE(o.merchant_oid, ''), COALESCE(o.status::text, ''),
+		       COALESCE(i.invoice_number, ''), COALESCE(i.status::text, ''), COALESCE(i.external_id, '')
+		FROM payments p
+		LEFT JOIN orders o ON o.id = p.order_id
+		LEFT JOIN LATERAL (
+			SELECT invoice_number, status, external_id
+			FROM invoices
+			WHERE payment_id = p.id
+			ORDER BY created_at DESC
+			LIMIT 1
+		) i ON true
+		WHERE p.application_id = $1
+		ORDER BY p.created_at
 	`, appID)
 	if err == nil {
 		defer payRows.Close()
 		for payRows.Next() {
-			var pid, status string
+			var pid, status, provider, merchantOID, orderStatus, invNo, invStatus, invExt string
 			var amount float64
 			var created time.Time
 			var paidAt *time.Time
-			if err := payRows.Scan(&pid, &amount, &status, &created, &paidAt); err != nil {
+			if err := payRows.Scan(&pid, &amount, &status, &provider, &created, &paidAt, &merchantOID, &orderStatus, &invNo, &invStatus, &invExt); err != nil {
 				continue
+			}
+			detail := fmt.Sprintf("%.2f TRY · %s · %s", amount, provider, status)
+			if merchantOID != "" {
+				detail += " · oid " + merchantOID
+			}
+			meta := map[string]interface{}{
+				"paymentId": pid, "amount": amount, "status": status, "provider": provider,
+				"merchantOid": merchantOID, "orderStatus": orderStatus,
+				"invoiceNumber": invNo, "invoiceStatus": invStatus, "invoiceId": invExt,
 			}
 			events = append(events, event{
 				At: created, Type: "payment_created", Title: "Ödeme kaydı oluşturuldu",
-				Detail: fmt.Sprintf("%.2f TRY · %s", amount, status),
-				Meta: map[string]interface{}{"paymentId": pid, "amount": amount, "status": status},
+				Detail: detail, Meta: meta,
 			})
 			if paidAt != nil {
+				paidDetail := fmt.Sprintf("%.2f TRY", amount)
+				if invNo != "" {
+					paidDetail += " · fatura " + invNo
+				} else if invStatus != "" {
+					paidDetail += " · fatura " + invStatus
+				}
 				events = append(events, event{
 					At: *paidAt, Type: "payment_paid", Title: "Ödeme alındı",
-					Detail: fmt.Sprintf("%.2f TRY", amount),
-					Meta: map[string]interface{}{"paymentId": pid, "amount": amount},
+					Detail: paidDetail, Meta: meta,
 				})
 			}
 		}
@@ -1158,6 +1183,44 @@ func (h *AdminHandler) GetPaymentInvoice(w http.ResponseWriter, r *http.Request)
 	invoiceStatus, _ := meta["invoice_status"].(string)
 	invoiceError, _ := meta["invoice_error"].(string)
 
+	// Prefer invoices table (Paraşüt path) over legacy payment.metadata keys.
+	var invExtID, invNumber, invProvider, invStatus, invErrMsg, invPDF *string
+	_ = h.db.Pool.QueryRow(r.Context(), `
+		SELECT NULLIF(external_id,''), NULLIF(invoice_number,''), provider, status::text, NULLIF(error_message,''), NULLIF(pdf_url,'')
+		FROM invoices
+		WHERE payment_id = $1
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, paymentID).Scan(&invExtID, &invNumber, &invProvider, &invStatus, &invErrMsg, &invPDF)
+	if invExtID != nil && *invExtID != "" {
+		invoiceID = *invExtID
+	}
+	if invNumber != nil && *invNumber != "" {
+		invoiceNumber = *invNumber
+	}
+	if invProvider != nil && *invProvider != "" {
+		invoiceProvider = *invProvider
+	}
+	if invStatus != nil && *invStatus != "" {
+		invoiceStatus = *invStatus
+	}
+	if invErrMsg != nil && *invErrMsg != "" {
+		invoiceError = *invErrMsg
+	}
+	pdfURL := ""
+	if invPDF != nil {
+		pdfURL = *invPDF
+	}
+
+	var orderID, merchantOID, orderStatus, cbStatus string
+	_ = h.db.Pool.QueryRow(r.Context(), `
+		SELECT COALESCE(o.id::text, ''), COALESCE(o.merchant_oid, ''), COALESCE(o.status::text, ''),
+		       COALESCE(p.callback_payload->>'status', '')
+		FROM payments p
+		LEFT JOIN orders o ON o.id = p.order_id
+		WHERE p.id = $1
+	`, paymentID).Scan(&orderID, &merchantOID, &orderStatus, &cbStatus)
+
 	response.OK(w, map[string]interface{}{
 		"id":                    p.ID.String(),
 		"amount":                p.Amount,
@@ -1181,6 +1244,11 @@ func (h *AdminHandler) GetPaymentInvoice(w http.ResponseWriter, r *http.Request)
 		"invoiceProvider":       invoiceProvider,
 		"invoiceStatus":         invoiceStatus,
 		"invoiceError":          invoiceError,
+		"invoicePdfUrl":         pdfURL,
+		"orderId":               orderID,
+		"merchantOid":           merchantOID,
+		"orderStatus":           orderStatus,
+		"callbackStatus":        cbStatus,
 	})
 }
 
@@ -1260,13 +1328,37 @@ func (h *AdminHandler) ListPayments(w http.ResponseWriter, r *http.Request) {
 	startDateStr := strings.TrimSpace(r.URL.Query().Get("startDate"))
 	endDateStr := strings.TrimSpace(r.URL.Query().Get("endDate"))
 
+	var filterErrs validate.Errors
+	startDateStr = validate.DateYYYYMMDD(&filterErrs, "startDate", startDateStr)
+	endDateStr = validate.DateYYYYMMDD(&filterErrs, "endDate", endDateStr)
+	statusFilter := validate.PaymentListStatus(&filterErrs, "status", r.URL.Query().Get("status"))
+	if utf8Len := len([]rune(search)); utf8Len > 100 {
+		filterErrs.Add("search", "max_length", "Arama metni en fazla 100 karakter olabilir.")
+	}
+	if filterErrs.Has() {
+		validate.Fail(w, filterErrs)
+		return
+	}
+
 	whereClauses := []string{}
 	args := []interface{}{}
 	argIdx := 1
 
 	if search != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf("(u.first_name || ' ' || u.last_name ILIKE $%d OR p.application_id::text ILIKE $%d OR p.id::text ILIKE $%d)", argIdx, argIdx, argIdx))
+		whereClauses = append(whereClauses, fmt.Sprintf(`(
+			u.first_name || ' ' || u.last_name ILIKE $%d
+			OR p.application_id::text ILIKE $%d
+			OR p.id::text ILIKE $%d
+			OR COALESCE(o.merchant_oid, '') ILIKE $%d
+			OR COALESCE(a.application_number, '') ILIKE $%d
+			OR COALESCE(i.invoice_number, '') ILIKE $%d
+		)`, argIdx, argIdx, argIdx, argIdx, argIdx, argIdx))
 		args = append(args, "%"+search+"%")
+		argIdx++
+	}
+	if statusFilter != "" {
+		whereClauses = append(whereClauses, fmt.Sprintf("p.status::text = $%d", argIdx))
+		args = append(args, statusFilter)
 		argIdx++
 	}
 	if startDateStr != "" {
@@ -1292,19 +1384,40 @@ func (h *AdminHandler) ListPayments(w http.ResponseWriter, r *http.Request) {
 		whereSQL = " WHERE " + strings.Join(whereClauses, " AND ")
 	}
 
+	fromSQL := `
+		FROM payments p
+		LEFT JOIN users u ON u.id = p.user_id
+		LEFT JOIN orders o ON o.id = p.order_id
+		LEFT JOIN applications a ON a.id = p.application_id
+		LEFT JOIN care_providers cp ON cp.id = a.care_provider_id
+		LEFT JOIN LATERAL (
+			SELECT invoice_number, status, external_id, provider, error_message, pdf_url
+			FROM invoices
+			WHERE payment_id = p.id
+			ORDER BY created_at DESC
+			LIMIT 1
+		) i ON true`
+
 	var totalCount int
-	countQuery := "SELECT COUNT(*) FROM payments p LEFT JOIN users u ON u.id = p.user_id" + whereSQL
+	countQuery := "SELECT COUNT(*) " + fromSQL + whereSQL
 	_ = h.db.Pool.QueryRow(r.Context(), countQuery, args...).Scan(&totalCount)
 
 	query := fmt.Sprintf(`
 		SELECT p.id::text, p.application_id::text, p.provider::text, p.amount, p.currency,
-		       p.status::text, p.metadata, p.created_at,
-		       COALESCE(u.first_name || ' ' || u.last_name, '') AS patient_name
-		FROM payments p
-		LEFT JOIN users u ON u.id = p.user_id
+		       p.status::text, p.metadata, p.created_at, p.paid_at,
+		       COALESCE(u.first_name || ' ' || u.last_name, '') AS patient_name,
+		       COALESCE(o.id::text, ''), COALESCE(o.merchant_oid, ''), COALESCE(o.status::text, ''),
+		       COALESCE(a.application_number, ''),
+		       COALESCE(i.invoice_number, ''), COALESCE(i.status::text, ''), COALESCE(i.external_id, ''),
+		       COALESCE(i.provider, ''), COALESCE(i.error_message, ''),
+		       COALESCE(p.callback_payload->>'status', ''),
+		       COALESCE(p.provider_transaction_id, ''),
+		       COALESCE(cp.full_name, ''), COALESCE(cp.revenue_share_percent, 70),
+		       COALESCE(cp.id::text, '')
+		%s
 		%s
 		ORDER BY p.created_at DESC LIMIT $%d OFFSET $%d
-	`, whereSQL, argIdx, argIdx+1)
+	`, fromSQL, whereSQL, argIdx, argIdx+1)
 
 	limitArgs := append(args, pageSize, page*pageSize)
 	rows, err := h.db.Pool.Query(r.Context(), query, limitArgs...)
@@ -1316,16 +1429,37 @@ func (h *AdminHandler) ListPayments(w http.ResponseWriter, r *http.Request) {
 	items := []map[string]interface{}{}
 	for rows.Next() {
 		var id, appID, provider, currency, status, patientName string
+		var orderID, merchantOID, orderStatus, appNumber string
+		var invNo, invStatus, invExt, invProvider, invErr, cbStatus, txID string
+		var doctorName, doctorID string
+		var doctorSharePct float64
 		var amount float64
 		var metadata json.RawMessage
 		var createdAt interface{}
-		if err := rows.Scan(&id, &appID, &provider, &amount, &currency, &status, &metadata, &createdAt, &patientName); err != nil {
+		var paidAt *time.Time
+		if err := rows.Scan(
+			&id, &appID, &provider, &amount, &currency, &status, &metadata, &createdAt, &paidAt,
+			&patientName, &orderID, &merchantOID, &orderStatus, &appNumber,
+			&invNo, &invStatus, &invExt, &invProvider, &invErr, &cbStatus, &txID,
+			&doctorName, &doctorSharePct, &doctorID,
+		); err != nil {
 			continue
 		}
+		doctorShareAmt := amount * doctorSharePct / 100
 		item := map[string]interface{}{
 			"id": id, "applicationId": appID, "provider": provider,
 			"amount": amount, "currency": currency, "status": status, "createdAt": createdAt,
 			"patientName": patientName,
+			"orderId": orderID, "merchantOid": merchantOID, "orderStatus": orderStatus,
+			"applicationNumber": appNumber,
+			"invoiceNumber": invNo, "invoiceStatus": invStatus, "invoiceId": invExt,
+			"invoiceProvider": invProvider, "invoiceError": invErr,
+			"callbackStatus": cbStatus, "transactionId": txID,
+			"doctorName": doctorName, "doctorId": doctorID,
+			"revenueSharePercent": doctorSharePct, "doctorShareAmount": round2(doctorShareAmt),
+		}
+		if paidAt != nil {
+			item["paidAt"] = paidAt.Format(time.RFC3339)
 		}
 		var meta map[string]interface{}
 		if json.Unmarshal(metadata, &meta) == nil {
@@ -1348,11 +1482,21 @@ func (h *AdminHandler) ListPayments(w http.ResponseWriter, r *http.Request) {
 
 func (h *AdminHandler) ExportPaymentsCSV(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.db.Pool.Query(r.Context(), `
-		SELECT p.id::text, p.application_id::text, p.provider::text, p.amount, p.currency,
-		       p.status::text, p.created_at,
-		       COALESCE(u.first_name || ' ' || u.last_name, '') AS patient_name
+		SELECT p.id::text, p.application_id::text, COALESCE(a.application_number, ''),
+		       p.provider::text, p.amount, p.currency, p.status::text, p.created_at,
+		       COALESCE(u.first_name || ' ' || u.last_name, ''),
+		       COALESCE(o.merchant_oid, ''), COALESCE(o.status::text, ''),
+		       COALESCE(i.invoice_number, ''), COALESCE(i.status::text, ''),
+		       COALESCE(p.provider_transaction_id, ''),
+		       COALESCE(p.callback_payload->>'status', '')
 		FROM payments p
 		LEFT JOIN users u ON u.id = p.user_id
+		LEFT JOIN orders o ON o.id = p.order_id
+		LEFT JOIN applications a ON a.id = p.application_id
+		LEFT JOIN LATERAL (
+			SELECT invoice_number, status FROM invoices
+			WHERE payment_id = p.id ORDER BY created_at DESC LIMIT 1
+		) i ON true
 		ORDER BY p.created_at DESC
 	`)
 	if err != nil {
@@ -1364,15 +1508,26 @@ func (h *AdminHandler) ExportPaymentsCSV(w http.ResponseWriter, r *http.Request)
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=odemeler.csv")
 	cw := csv.NewWriter(w)
-	_ = cw.Write([]string{"ID", "Başvuru ID", "Sağlayıcı", "Tutar", "Döviz", "Durum", "Tarih", "Hasta"})
+	_ = cw.Write([]string{
+		"ID", "Başvuru ID", "Başvuru No", "Sağlayıcı", "Tutar", "Döviz", "Ödeme Durumu", "Tarih", "Hasta",
+		"Merchant OID", "Sipariş Durumu", "Fatura No", "Fatura Durumu", "İşlem ID", "Callback",
+	})
 	for rows.Next() {
-		var id, appID, provider, currency, status, patientName string
+		var id, appID, appNo, provider, currency, status, patientName string
+		var merchantOID, orderStatus, invNo, invStatus, txID, cbStatus string
 		var amount float64
 		var createdAt time.Time
-		if err := rows.Scan(&id, &appID, &provider, &amount, &currency, &status, &createdAt, &patientName); err != nil {
+		if err := rows.Scan(
+			&id, &appID, &appNo, &provider, &amount, &currency, &status, &createdAt, &patientName,
+			&merchantOID, &orderStatus, &invNo, &invStatus, &txID, &cbStatus,
+		); err != nil {
 			continue
 		}
-		_ = cw.Write([]string{id, appID, provider, fmt.Sprintf("%.2f", amount), currency, status, createdAt.Format("2006-01-02 15:04"), patientName})
+		_ = cw.Write([]string{
+			id, appID, appNo, provider, fmt.Sprintf("%.2f", amount), currency, status,
+			createdAt.Format("2006-01-02 15:04"), patientName,
+			merchantOID, orderStatus, invNo, invStatus, txID, cbStatus,
+		})
 	}
 	cw.Flush()
 }
@@ -1455,10 +1610,12 @@ func (h *AdminHandler) AssignDoctor(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AdminHandler) CreateRefund(w http.ResponseWriter, r *http.Request) {
+	claims := authmw.ClaimsFromContext(r.Context())
 	var req struct {
 		PaymentID string  `json:"paymentId"`
 		Amount    float64 `json:"amount"`
 		Reason    string  `json:"reason"`
+		Manual    bool    `json:"manual"` // PAYTR panel iadesini sisteme kaydet
 	}
 	if !validate.DecodeJSON(w, r, &req) {
 		return
@@ -1496,64 +1653,66 @@ func (h *AdminHandler) CreateRefund(w http.ResponseWriter, r *http.Request) {
 		response.Fail(w, http.StatusConflict, "ADM054", "Ödeme sağlayıcı işlem kimliği bulunamadı.")
 		return
 	}
-	if req.Amount > paymentRec.PaymentAmount {
-		var errs validate.Errors
-		errs.Add("amount", "range", "İade tutarı ödeme tutarını aşamaz.")
-		validate.Fail(w, errs)
+	if req.Amount > paymentRec.PaymentAmount+1e-9 {
+		var amtErrs validate.Errors
+		amtErrs.Add("amount", "range", "İade tutarı ödeme tutarını aşamaz.")
+		validate.Fail(w, amtErrs)
+		return
+	}
+
+	provider := strings.ToLower(paymentRec.Provider)
+	if provider == "paytr" && !req.Manual {
+		response.Fail(w, http.StatusBadRequest, "ADM057",
+			"PAYTR iadeleri mağaza panelinden yapılır. Kayıt için manual=true gönderin (panel iadesi tamamlandıktan sonra).")
 		return
 	}
 
 	var refundID uuid.UUID
 	err = h.db.Pool.QueryRow(r.Context(), `
-		INSERT INTO refunds (payment_id, application_id, amount, reason, status)
-		VALUES ($1, $2, $3, $4, 'pending')
+		INSERT INTO refunds (payment_id, application_id, amount, reason, status, processed_by)
+		VALUES ($1, $2, $3, $4, 'pending', $5)
 		RETURNING id
-	`, paymentID, paymentRec.ApplicationID, req.Amount, req.Reason).Scan(&refundID)
+	`, paymentID, paymentRec.ApplicationID, req.Amount, req.Reason, claims.UserID).Scan(&refundID)
 	if err != nil {
-		response.Fail(w, http.StatusBadRequest, "ADM052", response.SafeMessage(err, "İade oluşturulamadı."))
-		return
+		// processed_by may not exist on older schemas — fallback
+		err = h.db.Pool.QueryRow(r.Context(), `
+			INSERT INTO refunds (payment_id, application_id, amount, reason, status)
+			VALUES ($1, $2, $3, $4, 'pending')
+			RETURNING id
+		`, paymentID, paymentRec.ApplicationID, req.Amount, req.Reason).Scan(&refundID)
+		if err != nil {
+			response.Fail(w, http.StatusBadRequest, "ADM052", response.SafeMessage(err, "İade oluşturulamadı."))
+			return
+		}
 	}
 
-	providerRefundID, err := h.payment.Refund(r.Context(), paymentRec.Provider, paymentRec.ProviderTransactionID, req.Amount, req.Reason)
-	if err != nil {
-		_ = h.payment.Store().MarkRefundFailed(r.Context(), refundID, err.Error())
-		response.Fail(w, http.StatusBadGateway, "ADM055", response.SafeMessage(err, "Ödeme sağlayıcısı iade işlemini reddetti."))
-		return
+	var providerRefundID string
+	if req.Manual || provider == "paytr" {
+		providerRefundID = "manual-panel:" + refundID.String()
+	} else {
+		var err error
+		providerRefundID, err = h.payment.Refund(r.Context(), paymentRec.Provider, paymentRec.ProviderTransactionID, req.Amount, req.Reason)
+		if err != nil {
+			_ = h.payment.Store().MarkRefundFailed(r.Context(), refundID, err.Error())
+			response.Fail(w, http.StatusBadGateway, "ADM055", response.SafeMessage(err, "Ödeme sağlayıcısı iade işlemini reddetti."))
+			return
+		}
 	}
 	if err := h.payment.Store().CompleteRefund(r.Context(), refundID, providerRefundID, paymentID); err != nil {
 		response.Fail(w, http.StatusInternalServerError, "ADM056", "İade kaydı güncellenemedi.")
 		return
 	}
-	response.OK(w, map[string]string{
+	response.OK(w, map[string]interface{}{
 		"applicationId": paymentRec.ApplicationID.String(),
 		"refundId":      refundID.String(),
 		"status":        "refunded",
+		"manual":        req.Manual || provider == "paytr",
 	})
 }
 
 func (h *AdminHandler) ListNotifications(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.db.Pool.Query(r.Context(), `
-		SELECT id::text, channel::text, recipient, template_key, status::text, created_at
-		FROM notification_logs ORDER BY created_at DESC LIMIT 100
-	`)
-	if err != nil {
-		response.Fail(w, http.StatusInternalServerError, "ADM060", "Bildirimler listelenemedi.")
-		return
-	}
-	defer rows.Close()
-	items := []map[string]interface{}{}
-	for rows.Next() {
-		var id, channel, recipient, template, status string
-		var createdAt interface{}
-		if err := rows.Scan(&id, &channel, &recipient, &template, &status, &createdAt); err != nil {
-			continue
-		}
-		items = append(items, map[string]interface{}{
-			"id": id, "channel": channel, "recipient": recipient,
-			"templateKey": template, "status": status, "createdAt": createdAt,
-		})
-	}
-	response.OK(w, items)
+	// Backward compatible: if no pagination params, still return paginated envelope.
+	h.ListNotificationsReport(w, r)
 }
 
 func (h *AdminHandler) ListAuditLogs(w http.ResponseWriter, r *http.Request) {

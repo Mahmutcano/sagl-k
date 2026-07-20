@@ -15,7 +15,9 @@ import (
 )
 
 func main() {
-	loadEnvFiles("../.env.stage", "../.env", ".env")
+	// Prefer local .env; only fall back to stage when DATABASE_URL is unset.
+	// Explicit DATABASE_URL in the environment always wins (godotenv does not override).
+	loadEnvFiles(".env", "../.env", "../.env.stage")
 	dsn := strings.TrimSpace(os.Getenv("DATABASE_URL"))
 	if dsn == "" {
 		log.Fatal("DATABASE_URL is required")

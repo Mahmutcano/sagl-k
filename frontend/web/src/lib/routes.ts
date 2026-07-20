@@ -35,6 +35,7 @@ export const ROUTES = {
     payments: "/admin/payments",
     refunds: "/admin/refunds",
     accounting: "/admin/accounting",
+    reports: "/admin/reports",
     notifications: "/admin/notifications",
     application: (id: string) => `/admin/applications/${id}`,
     users: "/admin/users",

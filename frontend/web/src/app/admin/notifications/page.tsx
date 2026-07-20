@@ -1,31 +1,20 @@
 "use client";
 
 import { ROUTES } from "@/lib/routes";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ApiError, api, clearAuth, getToken, getUser, isAdminRole } from "@/lib/api";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ApiError, api, clearAuth, getToken, getUser, isAdminRole, fetchTextWithAuth } from "@/lib/api";
 import { API } from "@/lib/endpoints";
 import { AdminAppShell } from "@/components/AdminAppShell";
 import { FormAlert } from "@/components/FormField";
+import { CustomDatePicker } from "@/components/CustomDatePicker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Eye, X } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Download, Eye, Search, X } from "lucide-react";
 
 type NotificationLog = {
   id: string;
@@ -33,6 +22,9 @@ type NotificationLog = {
   recipient: string;
   templateKey: string;
   status: string;
+  subject?: string;
+  bodyPreview?: string;
+  applicationId?: string;
   createdAt?: string;
 };
 
@@ -42,23 +34,35 @@ type NotificationDetail = {
   recipient: string;
   subject?: string;
   body?: string;
-  templateKey: string;
+  templateKey?: string;
   status: string;
-  providerResponse?: unknown;
-  createdAt: string;
+  createdAt?: string;
   sentAt?: string;
 };
 
 export default function AdminNotificationsPage() {
   const router = useRouter();
-  const [items, setItems] = useState<NotificationLog[]>([]);
+  const searchParams = useSearchParams();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-
-  const [selectedNotif, setSelectedNotif] = useState<NotificationDetail | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [items, setItems] = useState<NotificationLog[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const pageSize = 20;
+  const [channel, setChannel] = useState(searchParams.get("channel") || "");
+  const [status, setStatus] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [detail, setDetail] = useState<NotificationDetail | null>(null);
 
   useEffect(() => {
+    const ch = searchParams.get("channel") || "";
+    setChannel(ch);
+  }, [searchParams]);
+
+  const load = useCallback(() => {
     const token = getToken();
     const user = getUser();
     if (!token || !isAdminRole(user?.role)) {
@@ -66,45 +70,105 @@ export default function AdminNotificationsPage() {
       router.replace(ROUTES.admin.login);
       return;
     }
-    api<NotificationLog[]>(API.admin.notifications, {}, token)
-      .then((rows) => setItems(rows ?? []))
-      .catch((err) => setError(err instanceof ApiError ? err.message : "Kayıtlar yüklenemedi."))
+    setLoading(true);
+    setError("");
+    const q = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+      search: searchQuery,
+      startDate,
+      endDate,
+    });
+    if (channel) q.set("channel", channel);
+    if (status) q.set("status", status);
+    api<{ items: NotificationLog[]; totalCount: number }>(`${API.admin.notifications}?${q}`, {}, token)
+      .then((res) => {
+        setItems(res?.items ?? []);
+        setTotal(res?.totalCount ?? 0);
+      })
+      .catch((err) => setError(err instanceof ApiError ? err.message : "Bildirimler yüklenemedi."))
       .finally(() => setLoading(false));
-  }, [router]);
+  }, [router, page, searchQuery, startDate, endDate, channel, status]);
 
-  async function handleViewDetail(id: string) {
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function openDetail(id: string) {
     const token = getToken();
     if (!token) return;
-    setLoadingDetail(true);
-    setError("");
     try {
-      const details = await api<NotificationDetail>(API.admin.notificationDetail(id), {}, token);
-      setSelectedNotif(details);
+      const d = await api<NotificationDetail>(API.admin.notificationDetail(id), {}, token);
+      setDetail(d);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Bildirim detayları alınamadı.");
-    } finally {
-      setLoadingDetail(false);
+      setError(err instanceof ApiError ? err.message : "Detay yüklenemedi.");
     }
   }
 
+  async function exportCSV() {
+    const token = getToken();
+    if (!token) return;
+    const q = new URLSearchParams();
+    if (channel) q.set("channel", channel);
+    const res = await fetchTextWithAuth(`${API.admin.notificationsExport}?${q}`, {}, token);
+    if (!res.ok) {
+      setError("CSV indirilemedi.");
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bildirimler_${channel || "all"}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const title =
+    channel === "sms" ? "SMS Raporu" : channel === "email" ? "E-posta Raporu" : "SMS / E-posta Raporu";
+
   return (
-    <AdminAppShell title="Bildirimler" description="Sistem tarafından gönderilen e-posta ve SMS hareketleri">
+    <AdminAppShell title={title} description="Operasyonel bildirim logları — şablon, alıcı, durum">
       {error ? <FormAlert title="Hata" message={error} /> : null}
 
+      <form
+        className="mb-4 flex flex-wrap items-end gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setPage(0);
+          setSearchQuery(searchText);
+        }}
+      >
+        <div className="relative min-w-[200px] flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input className="pl-9" placeholder="Alıcı, şablon, içerik…" value={searchText} onChange={(e) => setSearchText(e.target.value)} />
+        </div>
+        <select className="h-10 rounded-xl border px-3 text-sm" value={channel} onChange={(e) => { setPage(0); setChannel(e.target.value); }}>
+          <option value="">Tüm kanallar</option>
+          <option value="sms">SMS</option>
+          <option value="email">E-posta</option>
+        </select>
+        <select className="h-10 rounded-xl border px-3 text-sm" value={status} onChange={(e) => { setPage(0); setStatus(e.target.value); }}>
+          <option value="">Tüm durumlar</option>
+          <option value="sent">Gönderildi</option>
+          <option value="failed">Başarısız</option>
+          <option value="pending">Bekliyor</option>
+        </select>
+        <CustomDatePicker id="nStart" label="Başlangıç" value={startDate} onChange={(v) => { setPage(0); setStartDate(v); }} />
+        <CustomDatePicker id="nEnd" label="Bitiş" value={endDate} onChange={(v) => { setPage(0); setEndDate(v); }} />
+        <Button type="submit">Ara</Button>
+        <Button type="button" variant="outline" className="gap-1.5" onClick={() => void exportCSV()}>
+          <Download className="h-4 w-4" /> CSV
+        </Button>
+      </form>
+
       {loading ? (
-        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-40 rounded-2xl" />
       ) : items.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-10 text-center">
-            <CardHeader className="p-0">
-              <CardTitle>Kayıt yok</CardTitle>
-              <CardDescription>Gönderilen bildirimler burada listelenir.</CardDescription>
-            </CardHeader>
-          </CardContent>
-        </Card>
+        <Card className="rounded-2xl"><CardContent className="py-12 text-center text-sm text-muted-foreground">Kayıt yok.</CardContent></Card>
       ) : (
-        <Card className=" ">
-          <CardContent className="pt-6">
+        <Card className="rounded-2xl overflow-hidden">
+          <CardContent className="p-0 overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -113,37 +177,26 @@ export default function AdminNotificationsPage() {
                   <TableHead>Şablon</TableHead>
                   <TableHead>Durum</TableHead>
                   <TableHead>Tarih</TableHead>
-                  <TableHead className="text-right">İşlem</TableHead>
+                  <TableHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {items.map((n) => (
                   <TableRow key={n.id}>
+                    <TableCell className="uppercase text-xs font-bold">{n.channel}</TableCell>
+                    <TableCell className="font-mono text-xs">{n.recipient}</TableCell>
+                    <TableCell className="text-xs">{n.templateKey || "—"}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="uppercase font-mono text-[10px]">
-                        {n.channel}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-medium text-xs">{n.recipient}</TableCell>
-                    <TableCell className="font-mono text-xs">{n.templateKey}</TableCell>
-                    <TableCell>
-                      <Badge variant={n.status === "sent" || n.status === "delivered" ? "default" : "destructive"}>
+                      <Badge variant={n.status === "sent" ? "default" : n.status === "failed" ? "destructive" : "secondary"}>
                         {n.status}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-xs font-mono">
+                    <TableCell className="font-mono text-xs">
                       {n.createdAt ? new Date(n.createdAt).toLocaleString("tr-TR") : "—"}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewDetail(n.id)}
-                        disabled={loadingDetail}
-                        className="text-xs hover:text-primary gap-1.5"
-                      >
-                        <Eye className="h-3.5 w-3.5" />
-                        Görüntüle
+                      <Button variant="ghost" size="sm" onClick={() => void openDetail(n.id)}>
+                        <Eye className="h-4 w-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -151,98 +204,37 @@ export default function AdminNotificationsPage() {
               </TableBody>
             </Table>
           </CardContent>
+          <div className="flex items-center justify-between border-t px-4 py-3 text-xs">
+            <span>Toplam {total}</span>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>Önceki</Button>
+              <Button size="sm" variant="outline" disabled={(page + 1) * pageSize >= total} onClick={() => setPage((p) => p + 1)}>Sonraki</Button>
+            </div>
+          </div>
         </Card>
       )}
 
-      {/* Notification Preview Modal */}
-      {selectedNotif && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
-            
-            {/* Modal Header */}
-            <div className="flex justify-between items-center p-4 border-b bg-muted">
-              <span className="text-sm font-semibold text-foreground">Bildirim Detayları ve Önizleme</span>
-              <Button onClick={() => setSelectedNotif(null)} variant="ghost" size="sm" className="p-1">
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6 overflow-y-auto flex flex-col gap-4">
-              
-              {/* Meta Grid */}
-              <div className="grid grid-cols-2 gap-4 text-xs border rounded-lg p-3 bg-muted/40">
-                <div>
-                  <span className="text-muted-foreground block">Gönderim Kanalı</span>
-                  <span className="font-semibold capitalize text-foreground">{selectedNotif.channel}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block">Alıcı</span>
-                  <span className="font-semibold text-foreground font-mono">{selectedNotif.recipient}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block">Şablon (Template)</span>
-                  <span className="font-semibold text-foreground font-mono">{selectedNotif.templateKey || "—"}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block">Durum</span>
-                  <Badge variant={selectedNotif.status === "sent" || selectedNotif.status === "delivered" ? "default" : "destructive"} className="mt-0.5">
-                    {selectedNotif.status}
-                  </Badge>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block">Oluşturulma</span>
-                  <span className="text-foreground">{new Date(selectedNotif.createdAt).toLocaleString("tr-TR")}</span>
-                </div>
-                <div>
-                  <span className="text-muted-foreground block">Gönderilme</span>
-                  <span className="text-foreground">{selectedNotif.sentAt ? new Date(selectedNotif.sentAt).toLocaleString("tr-TR") : "—"}</span>
-                </div>
-              </div>
-
-              {/* Subject */}
-              {!!selectedNotif.subject && (
-                <div>
-                  <span className="text-xs text-muted-foreground block mb-0.5">Konu / Başlık</span>
-                  <div className="border rounded-md px-3 py-2 bg-muted font-medium text-sm text-foreground">
-                    {selectedNotif.subject}
-                  </div>
-                </div>
-              )}
-
-              {/* Message Body Content */}
+      {detail ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <CardHeader className="flex flex-row items-start justify-between">
               <div>
-                <span className="text-xs text-muted-foreground block mb-1">Mesaj İçeriği</span>
-                <div 
-                  className="border rounded-lg p-4 bg-muted text-sm overflow-x-auto min-h-[120px] max-h-[300px] font-sans text-foreground whitespace-pre-wrap"
-                  style={{ wordBreak: "break-all" }}
-                >
-                  {selectedNotif.body || "İçerik bulunamadı."}
-                </div>
+                <CardTitle className="text-base">Bildirim detayı</CardTitle>
+                <CardDescription className="font-mono text-xs">{detail.id}</CardDescription>
               </div>
-
-              {/* Provider raw Response */}
-              {!!selectedNotif.providerResponse && (
-                <div>
-                  <span className="text-xs text-muted-foreground block mb-1">Sağlayıcı Yanıtı (Raw API Log)</span>
-                  <pre className="text-[11px] font-mono border rounded-lg p-3 bg-foreground text-muted-foreground overflow-x-auto max-h-[150px]">
-                    {JSON.stringify(selectedNotif.providerResponse, null, 2)}
-                  </pre>
-                </div>
-              )}
-
-            </div>
-            
-            {/* Footer */}
-            <div className="p-4 border-t bg-muted flex justify-end">
-              <Button onClick={() => setSelectedNotif(null)} size="sm">
-                Kapat
-              </Button>
-            </div>
-
-          </div>
+              <Button variant="ghost" size="sm" onClick={() => setDetail(null)}><X className="h-4 w-4" /></Button>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <p><span className="text-muted-foreground">Kanal:</span> {detail.channel}</p>
+              <p><span className="text-muted-foreground">Alıcı:</span> {detail.recipient}</p>
+              <p><span className="text-muted-foreground">Durum:</span> {detail.status}</p>
+              {detail.subject ? <p><span className="text-muted-foreground">Konu:</span> {detail.subject}</p> : null}
+              {detail.templateKey ? <p><span className="text-muted-foreground">Şablon:</span> {detail.templateKey}</p> : null}
+              <pre className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">{detail.body || "—"}</pre>
+            </CardContent>
+          </Card>
         </div>
-      )}
+      ) : null}
     </AdminAppShell>
   );
 }
