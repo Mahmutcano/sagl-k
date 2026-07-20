@@ -1,10 +1,10 @@
 "use client";
 
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
-export default function VerifyPage({ params }: { params: { id: string } }) {
+function VerifyContent({ id }: { id: string }) {
   const searchParams = useSearchParams();
   const code = searchParams.get("code") || "";
   const [mounted, setMounted] = useState(false);
@@ -15,7 +15,7 @@ export default function VerifyPage({ params }: { params: { id: string } }) {
 
   if (!mounted) return null;
 
-  const apiURL = `/api/v1/public/applications/${params.id}/verify?code=${code}`;
+  const apiURL = `/api/v1/public/applications/${id}/verify?code=${code}`;
 
   return (
     <div className="w-full min-h-screen bg-muted flex flex-col items-center justify-center p-4 sm:p-8">
@@ -44,5 +44,13 @@ export default function VerifyPage({ params }: { params: { id: string } }) {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function VerifyPage({ params }: { params: { id: string } }) {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Yükleniyor...</div>}>
+      <VerifyContent id={params.id} />
+    </Suspense>
   );
 }

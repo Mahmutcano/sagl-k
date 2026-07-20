@@ -1,7 +1,7 @@
 "use client";
 
 import { ROUTES } from "@/lib/routes";
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ApiError, api, clearAuth, getToken, getUser, isAdminRole, fetchTextWithAuth } from "@/lib/api";
 import { API } from "@/lib/endpoints";
@@ -40,7 +40,7 @@ type NotificationDetail = {
   sentAt?: string;
 };
 
-export default function AdminNotificationsPage() {
+function AdminNotificationsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [error, setError] = useState("");
@@ -236,5 +236,13 @@ export default function AdminNotificationsPage() {
         </div>
       ) : null}
     </AdminAppShell>
+  );
+}
+
+export default function AdminNotificationsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Yükleniyor...</div>}>
+      <AdminNotificationsContent />
+    </Suspense>
   );
 }
