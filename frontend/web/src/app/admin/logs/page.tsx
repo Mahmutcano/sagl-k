@@ -1,18 +1,26 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useCallback, useEffect, useMemo, useState, Fragment, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AdminAppShell } from "@/components/AdminAppShell";
 import { ApiError, api } from "@/lib/api";
-import { requireSession } from "@/lib/auth";
+import { requireSession, roleLabel } from "@/lib/auth";
 import { ROUTES } from "@/lib/routes";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { FormAlert, FormSelect } from "@/components/FormField";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Search, RotateCw, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, RotateCw, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type AuditLogItem = {
@@ -28,6 +36,109 @@ type AuditLogItem = {
   userRole?: string;
 };
 
+const ACTION_OPTIONS = [
+  { value: "user_login", label: "Kullanıcı Girişi" },
+  { value: "update_profile", label: "Profil Güncelleme" },
+  { value: "change_phone", label: "Telefon Doğrulama" },
+  { value: "start_application", label: "Başvuru Başlatma" },
+  { value: "update_application", label: "Başvuru Güncelleme" },
+  { value: "cancel_application", label: "Başvuru İptali" },
+  { value: "delete_application", label: "Başvuru Silme" },
+] as const;
+
+const ACTION_LABELS: Record<string, string> = Object.fromEntries(
+  ACTION_OPTIONS.map((o) => [o.value, o.label])
+);
+
+const ENTITY_LABELS: Record<string, string> = {
+  users: "Kullanıcı",
+  applications: "Başvuru",
+  hospitals: "Hastane",
+  titles: "Unvan",
+  payments: "Ödeme",
+  http_request: "HTTP İstek",
+};
+
+function formatDateTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString("tr-TR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function shortenPath(path: string): string {
+  return path
+    .replace(/^\/api\/v1\//, "")
+    .replace(/\/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, "/…");
+}
+
+function getActionLabel(action: string): string {
+  if (ACTION_LABELS[action]) return ACTION_LABELS[action];
+  const http = action.match(/^(GET|POST|PUT|PATCH|DELETE)\s+(.+)$/i);
+  if (http) {
+    return `${http[1].toUpperCase()} · ${shortenPath(http[2])}`;
+  }
+  if (action.startsWith("admin_")) {
+    return action
+      .replace(/^admin_/, "")
+      .split("_")
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  }
+  return action;
+}
+
+function getActionTone(action: string, statusCode?: number): string {
+  if (statusCode != null && statusCode >= 400) {
+    return "border-rose-200 bg-rose-50 text-rose-800";
+  }
+  if (
+    action === "cancel_application" ||
+    action === "delete_application" ||
+    action.startsWith("DELETE ")
+  ) {
+    return "border-rose-200 bg-rose-50 text-rose-800";
+  }
+  if (action === "user_login") {
+    return "border-sky-200 bg-sky-50 text-sky-800";
+  }
+  if (action === "change_phone" || action === "update_profile") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
+  if (action.startsWith("POST ") || action === "start_application") {
+    return "border-violet-200 bg-violet-50 text-violet-800";
+  }
+  return "border-border bg-muted/60 text-foreground";
+}
+
+function payloadNumber(payload: Record<string, unknown> | null, key: string): number | undefined {
+  if (!payload || payload[key] == null) return undefined;
+  const n = Number(payload[key]);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function payloadString(payload: Record<string, unknown> | null, key: string): string {
+  if (!payload || payload[key] == null) return "";
+  return String(payload[key]);
+}
+
+function DetailRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid gap-0.5 sm:grid-cols-[9rem_1fr] sm:gap-3">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 break-words font-medium text-foreground">{children}</dd>
+    </div>
+  );
+}
+
 export default function AdminLogsPage() {
   const router = useRouter();
   const [logs, setLogs] = useState<AuditLogItem[]>([]);
@@ -35,13 +146,16 @@ export default function AdminLogsPage() {
   const [error, setError] = useState("");
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
-  // Pagination & Filtering
   const [page, setPage] = useState(0);
-  const [pageSize] = useState(15);
+  const pageSize = 20;
   const [totalCount, setTotalCount] = useState(0);
   const [searchText, setSearchText] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [actionFilter, setActionFilter] = useState("");
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+  const rangeStart = totalCount === 0 ? 0 : page * pageSize + 1;
+  const rangeEnd = Math.min((page + 1) * pageSize, totalCount);
 
   const load = useCallback(() => {
     const session = requireSession("admin");
@@ -57,9 +171,13 @@ export default function AdminLogsPage() {
       pageSize: String(pageSize),
       search: searchQuery.trim(),
       action: actionFilter,
-    }).toString();
+    });
 
-    api<{ items: AuditLogItem[]; totalCount: number }>(`/api/v1/admin/audit-logs?${query}`, {}, session.token)
+    api<{ items: AuditLogItem[]; totalCount: number }>(
+      `/api/v1/admin/audit-logs?${query}`,
+      {},
+      session.token
+    )
       .then((res) => {
         setLogs(res?.items ?? []);
         setTotalCount(res?.totalCount ?? 0);
@@ -68,302 +186,341 @@ export default function AdminLogsPage() {
         setError(err instanceof ApiError ? err.message : "Sistem logları yüklenemedi.");
       })
       .finally(() => setLoading(false));
-  }, [router, page, pageSize, searchQuery, actionFilter]);
+  }, [router, page, searchQuery, actionFilter]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
+  const hasFilters = Boolean(searchQuery.trim() || actionFilter);
+
+  const pageButtons = useMemo(() => {
+    const start = Math.max(0, page - 2);
+    const end = Math.min(totalPages - 1, page + 2);
+    const pages: number[] = [];
+    for (let i = start; i <= end; i++) pages.push(i);
+    return pages;
+  }, [page, totalPages]);
+
+  function handleSearchSubmit(e: FormEvent) {
     e.preventDefault();
     setPage(0);
-    setSearchQuery(searchText);
-  };
+    setSearchQuery(searchText.trim());
+  }
 
-  const handleClearFilters = () => {
+  function handleClearFilters() {
     setSearchText("");
     setSearchQuery("");
     setActionFilter("");
     setPage(0);
-  };
-
-  function getActionLabel(action: string): string {
-    if (action.startsWith("POST ") || action.startsWith("PUT ") || action.startsWith("PATCH ") || action.startsWith("DELETE ")) {
-      return action;
-    }
-    switch (action) {
-      case "user_login":
-        return "Kullanıcı Girişi";
-      case "update_profile":
-        return "Profil Güncelleme";
-      case "change_phone":
-        return "Telefon Doğrulama";
-      case "start_application":
-        return "Başvuru Başlatma";
-      case "update_application":
-        return "Başvuru Güncelleme";
-      case "cancel_application":
-        return "Başvuru İptali";
-      case "delete_application":
-        return "Başvuru Silme";
-      default:
-        return action;
-    }
-  }
-
-  function getActionColorClass(action: string): string {
-    if (action.startsWith("admin_")) {
-      return "bg-amber-100 text-amber-800 border-amber-200";
-    }
-    switch (action) {
-      case "user_login":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "change_phone":
-        return "bg-emerald-100 text-emerald-800 border-emerald-200";
-      case "cancel_application":
-      case "delete_application":
-        return "bg-rose-100 text-rose-800 border-rose-200";
-      default:
-        return "bg-muted text-foreground ";
-    }
-  }
-
-  function formatDateTime(iso: string): string {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleString("tr-TR", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-    } catch {
-      return iso;
-    }
   }
 
   return (
     <AdminAppShell
       title="Sistem Aktivite Logları"
-      description="Hasta ve doktor işlemleri. Endpoint, durum kodu ve isim bilgisi veri detayında görünür. Admin işlemleri listelenmez."
+      description="Hasta ve doktor işlemlerinin özeti. Admin operasyonları bu listede yer almaz."
     >
       {error ? <FormAlert title="Hata" message={error} /> : null}
 
-      {/* Premium Filter Bar */}
-      <div className="mb-4 flex min-w-0 flex-col justify-between gap-3 print:hidden md:mb-6 md:flex-row md:items-end">
-        <form onSubmit={handleSearchSubmit} className="admin-filter-bar min-w-0 flex-grow rounded-xl border /80 bg-white p-3 sm:rounded-2xl sm:p-5">
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="search" className="text-xs font-bold text-foreground tracking-wide">Arama</label>
-            <div className="relative">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="search"
-                className="pl-10 h-10 focus-visible:ring-primary/20 focus-visible:border-primary bg-white rounded-xl "
-                placeholder="İsim, e-posta veya IP yazın..."
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-              />
+      <Card className="mb-4">
+        <CardHeader className="pb-3">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <CardTitle className="text-base">Filtreler</CardTitle>
+              <CardDescription>İsim, e-posta, IP veya eylem tipine göre daraltın.</CardDescription>
             </div>
+            <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={load}>
+              <RotateCw className="h-4 w-4" />
+              Yenile
+            </Button>
           </div>
-          <div>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSearchSubmit} className="grid gap-3 md:grid-cols-[1fr_14rem_auto] md:items-end">
+            <div className="space-y-1.5">
+              <label htmlFor="log-search" className="text-sm font-medium">
+                Arama
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="log-search"
+                  className="pl-9"
+                  placeholder="İsim, e-posta, IP veya endpoint…"
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                />
+              </div>
+            </div>
             <FormSelect
               id="action-filter"
-              label="Eylem Tipi Filtresi"
+              label="Eylem"
               value={actionFilter}
-              onChange={(e) => { setPage(0); setActionFilter(e.target.value); }}
-              placeholder="Tüm Eylemler"
-              options={[
-                { value: "user_login", label: "Kullanıcı Girişi" },
-                { value: "update_profile", label: "Profil Güncelleme" },
-                { value: "change_phone", label: "Telefon Doğrulama" },
-                { value: "start_application", label: "Başvuru Başlatma" },
-                { value: "update_application", label: "Başvuru Güncelleme" },
-                { value: "cancel_application", label: "Başvuru İptali" },
-                { value: "delete_application", label: "Başvuru Silme" },
-              ]}
+              onChange={(e) => {
+                setPage(0);
+                setActionFilter(e.target.value);
+              }}
+              placeholder="Tüm eylemler"
+              options={[...ACTION_OPTIONS]}
             />
-          </div>
-          <div className="flex gap-2.5 justify-end mt-1">
-            <Button type="button" variant="ghost" size="sm" onClick={handleClearFilters} className="h-9 font-bold hover:bg-muted rounded-xl">
-              Temizle
-            </Button>
-            <Button type="submit" size="sm" className="h-9 gap-1.5 font-bold shadow-primary/10 rounded-xl px-5">
-              <Search className="h-4 w-4" />
-              Ara
-            </Button>
-          </div>
-        </form>
-
-        <Button variant="outline" onClick={load} className="gap-2 h-10 self-end font-bold rounded-xl hover:bg-muted shadow-sm">
-          <RotateCw className="h-4 w-4" />
-          Yenile
-        </Button>
-      </div>
+            <div className="flex gap-2">
+              {hasFilters ? (
+                <Button type="button" variant="ghost" onClick={handleClearFilters} className="gap-1.5">
+                  <X className="h-4 w-4" />
+                  Temizle
+                </Button>
+              ) : null}
+              <Button type="submit" className="gap-1.5">
+                <Search className="h-4 w-4" />
+                Ara
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
 
       {loading ? (
-        <div className="space-y-3">
-          <Skeleton className="h-12 w-full rounded-xl" />
-          <Skeleton className="h-12 w-full rounded-xl" />
-          <Skeleton className="h-12 w-full rounded-xl" />
+        <div className="space-y-2">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
         </div>
       ) : logs.length === 0 ? (
-        <Card className="p-12 text-center text-muted-foreground font-medium italic border border-dashed rounded-2xl bg-white shadow-sm">
-          Kriterlere uygun herhangi bir aktivite logu kaydı bulunamadı.
+        <Card className="border-dashed">
+          <CardContent className="py-12 text-center text-muted-foreground">
+            {hasFilters
+              ? "Filtrelere uygun kayıt bulunamadı."
+              : "Henüz listelenecek aktivite kaydı yok."}
+          </CardContent>
         </Card>
       ) : (
-        <div className="flex flex-col gap-4">
-          <div className="text-xs text-muted-foreground font-semibold px-2">
-            Toplam {totalCount} log kaydı bulundu.
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1 text-sm text-muted-foreground">
+            <p>
+              <span className="font-semibold text-foreground">{totalCount}</span> kayıt ·{" "}
+              {rangeStart}–{rangeEnd} gösteriliyor
+            </p>
           </div>
 
-          <div className="admin-table-scroll overflow-hidden rounded-xl border bg-white sm:rounded-2xl">
-            <table className="w-full min-w-[640px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b bg-muted/40 font-bold text-muted-foreground text-xs">
-                  <th className="p-4 uppercase tracking-wider">Tarih</th>
-                  <th className="p-4 uppercase tracking-wider">Kullanıcı</th>
-                  <th className="p-4 uppercase tracking-wider">İşlem / Eylem</th>
-                  <th className="p-4 uppercase tracking-wider">IP Adresi</th>
-                  <th className="p-4 text-right uppercase tracking-wider">Detay</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {logs.map((log) => {
-                  const isExpanded = expandedLogId === log.id;
-                  return (
-                    <caption key={log.id} className="table-row-group text-left text-foreground">
-                      <tr className="hover:bg-muted/30 transition-colors">
-                        <td className="p-4 text-xs font-mono text-muted-foreground">
-                          {formatDateTime(log.createdAt)}
-                        </td>
-                        <td className="p-4">
-                          <span className="font-semibold text-foreground block text-xs">{log.userName || "Misafir"}</span>
-                          <span className="text-[10px] text-muted-foreground block font-mono mt-0.5">{log.userEmail || "—"}</span>
-                          {log.userRole ? (
-                            <span className="mt-0.5 block text-[10px] font-medium text-primary">{log.userRole}</span>
-                          ) : null}
-                        </td>
-                        <td className="p-4">
-                          <Badge variant="outline" className={`text-[10px] font-bold border ${getActionColorClass(log.action)}`}>
-                            {getActionLabel(log.action)}
-                          </Badge>
-                        </td>
-                        <td className="p-4 font-mono text-xs text-muted-foreground">{log.ipAddress || "—"}</td>
-                        <td className="p-4 text-right">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                            className="text-xs font-semibold"
-                          >
-                            {isExpanded ? "Gizle" : "Göster"}
-                          </Button>
-                        </td>
-                      </tr>
-                      {isExpanded && (
-                        <tr>
-                          <td colSpan={5} className="p-4 bg-muted/30 border-t border-b">
-                            <div className="text-xs space-y-3">
-                              <p className="font-semibold text-foreground">İşlem özeti</p>
-                              {log.payload ? (
-                                <div className="grid gap-2 sm:grid-cols-2">
-                                  {"userName" in log.payload && log.payload.userName ? (
-                                    <p><span className="text-muted-foreground">Hasta/Doktor:</span> <strong>{String(log.payload.userName)}</strong></p>
-                                  ) : null}
-                                  {"endpoint" in log.payload && log.payload.endpoint ? (
-                                    <p><span className="text-muted-foreground">Endpoint:</span> <code className="font-mono">{String(log.payload.method || "")} {String(log.payload.endpoint)}</code></p>
-                                  ) : null}
-                                  {"statusCode" in log.payload && log.payload.statusCode != null ? (
-                                    <p>
-                                      <span className="text-muted-foreground">HTTP:</span>{" "}
-                                      <strong className={Number(log.payload.statusCode) >= 400 ? "text-destructive" : ""}>
-                                        {String(log.payload.statusCode)}
-                                      </strong>
-                                      {log.payload.error ? " (hata)" : ""}
-                                    </p>
-                                  ) : null}
-                                  {"userRole" in log.payload && log.payload.userRole ? (
-                                    <p><span className="text-muted-foreground">Rol:</span> {String(log.payload.userRole)}</p>
-                                  ) : null}
-                                </div>
+          <Card className="overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableHead className="w-[11rem]">Tarih</TableHead>
+                    <TableHead>Kullanıcı</TableHead>
+                    <TableHead>Eylem</TableHead>
+                    <TableHead className="w-[8rem]">Durum</TableHead>
+                    <TableHead className="w-[8rem]">IP</TableHead>
+                    <TableHead className="w-[5.5rem] text-right">Detay</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {logs.map((log) => {
+                    const expanded = expandedLogId === log.id;
+                    const statusCode = payloadNumber(log.payload, "statusCode");
+                    const endpoint = payloadString(log.payload, "endpoint");
+                    const method = payloadString(log.payload, "method");
+
+                    return (
+                      <Fragment key={log.id}>
+                        <TableRow
+                          className={cn(expanded && "bg-muted/20", "align-top")}
+                        >
+                          <TableCell className="whitespace-nowrap font-mono text-xs text-muted-foreground">
+                            {formatDateTime(log.createdAt)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="min-w-[10rem] space-y-0.5">
+                              <p className="font-medium leading-snug">
+                                {log.userName?.trim() || "Misafir"}
+                              </p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {log.userEmail || "—"}
+                              </p>
+                              {log.userRole ? (
+                                <Badge variant="secondary" className="mt-1 font-normal">
+                                  {roleLabel(log.userRole)}
+                                </Badge>
                               ) : null}
-                              {log.payload ? (
-                                <pre className="bg-foreground text-muted-foreground p-4 rounded-xl overflow-x-auto font-mono text-[11px] leading-relaxed max-w-full shadow-inner max-h-72">
-                                  {JSON.stringify(log.payload, null, 2)}
-                                </pre>
-                              ) : (
-                                <p className="text-muted-foreground italic">Veri detayı bulunmuyor.</p>
-                              )}
-                              {log.entityId && (
-                                <p className="text-muted-foreground font-mono text-[10px]">
-                                  Etkilenen Nesne (Entity): {log.entityType} ({log.entityId})
-                                </p>
-                              )}
                             </div>
-                          </td>
-                        </tr>
-                      )}
-                    </caption>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="max-w-[22rem] space-y-1">
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "whitespace-normal text-left font-medium",
+                                  getActionTone(log.action, statusCode)
+                                )}
+                              >
+                                {getActionLabel(log.action)}
+                              </Badge>
+                              {endpoint ? (
+                                <p className="truncate font-mono text-[11px] text-muted-foreground">
+                                  {method ? `${method} ` : ""}
+                                  {shortenPath(endpoint)}
+                                </p>
+                              ) : null}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {statusCode != null ? (
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  "font-mono",
+                                  statusCode >= 400
+                                    ? "border-rose-200 bg-rose-50 text-rose-800"
+                                    : statusCode >= 300
+                                      ? "border-amber-200 bg-amber-50 text-amber-900"
+                                      : "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                )}
+                              >
+                                {statusCode}
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="font-mono text-xs text-muted-foreground">
+                            {log.ipAddress || "—"}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="gap-1"
+                              onClick={() => setExpandedLogId(expanded ? null : log.id)}
+                              aria-expanded={expanded}
+                            >
+                              {expanded ? (
+                                <>
+                                  Gizle <ChevronUp className="h-3.5 w-3.5" />
+                                </>
+                              ) : (
+                                <>
+                                  Aç <ChevronDown className="h-3.5 w-3.5" />
+                                </>
+                              )}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                        {expanded ? (
+                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                            <TableCell colSpan={6} className="p-4">
+                              <div className="space-y-4 rounded-lg border bg-background p-4">
+                                <div>
+                                  <p className="mb-2 text-sm font-semibold">İşlem Özeti</p>
+                                  <dl className="grid gap-2 text-sm">
+                                    <DetailRow label="Eylem">{getActionLabel(log.action)}</DetailRow>
+                                    <DetailRow label="Ham kod">
+                                      <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+                                        {log.action}
+                                      </code>
+                                    </DetailRow>
+                                    {log.entityType ? (
+                                      <DetailRow label="Nesne">
+                                        {ENTITY_LABELS[log.entityType] ?? log.entityType}
+                                        {log.entityId ? (
+                                          <span className="ml-1 font-mono text-xs text-muted-foreground">
+                                            ({log.entityId})
+                                          </span>
+                                        ) : null}
+                                      </DetailRow>
+                                    ) : null}
+                                    {method || endpoint ? (
+                                      <DetailRow label="Endpoint">
+                                        <code className="font-mono text-xs">
+                                          {method} {endpoint}
+                                        </code>
+                                      </DetailRow>
+                                    ) : null}
+                                    {statusCode != null ? (
+                                      <DetailRow label="HTTP Durumu">{statusCode}</DetailRow>
+                                    ) : null}
+                                    {payloadString(log.payload, "userName") ? (
+                                      <DetailRow label="İşlemi Yapan">
+                                        {payloadString(log.payload, "userName")}
+                                      </DetailRow>
+                                    ) : null}
+                                    {payloadString(log.payload, "userRole") ? (
+                                      <DetailRow label="Rol">
+                                        {roleLabel(payloadString(log.payload, "userRole"))}
+                                      </DetailRow>
+                                    ) : null}
+                                    {payloadString(log.payload, "query") ? (
+                                      <DetailRow label="Sorgu">
+                                        <code className="font-mono text-xs">
+                                          {payloadString(log.payload, "query")}
+                                        </code>
+                                      </DetailRow>
+                                    ) : null}
+                                  </dl>
+                                </div>
 
-          {/* Premium Pagination */}
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-muted/40 border /50 rounded-2xl px-6 py-4 mt-2 shadow-sm">
-            <div className="text-xs font-semibold text-muted-foreground tracking-wide font-sans">
-              Toplam <span className="text-primary font-bold">{totalCount}</span> logtan {page * pageSize + 1} - {Math.min((page + 1) * pageSize, totalCount)} arası listeleniyor
+                                {log.payload ? (
+                                  <details className="rounded-md border bg-muted/20">
+                                    <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
+                                      Ham JSON verisi
+                                    </summary>
+                                    <pre className="max-h-64 overflow-auto border-t bg-foreground/95 p-3 font-mono text-[11px] leading-relaxed text-muted">
+                                      {JSON.stringify(log.payload, null, 2)}
+                                    </pre>
+                                  </details>
+                                ) : (
+                                  <p className="text-sm italic text-muted-foreground">
+                                    Ek veri detayı yok.
+                                  </p>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
-            <div className="flex items-center gap-1.5">
+          </Card>
+
+          <div className="flex flex-col items-center justify-between gap-3 rounded-lg border bg-card px-4 py-3 sm:flex-row">
+            <p className="text-sm text-muted-foreground">
+              Sayfa <span className="font-semibold text-foreground">{page + 1}</span> / {totalPages}
+            </p>
+            <div className="flex items-center gap-1">
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
+                className="h-8 w-8 p-0"
                 disabled={page === 0}
-                onClick={() => setPage((p) => p - 1)}
-                className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-40 transition-all duration-150"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              
-              <div className="flex items-center gap-1">
-                {(() => {
-                  const totalPages = Math.ceil(totalCount / pageSize);
-                  const pages = [];
-                  const startPage = Math.max(0, page - 1);
-                  const endPage = Math.min(totalPages - 1, page + 1);
-
-                  for (let i = startPage; i <= endPage; i++) {
-                    const active = i === page;
-                    pages.push(
-                      <Button
-                        key={i}
-                        variant={active ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setPage(i)}
-                        className={cn(
-                          "h-8 min-w-[32px] px-2 text-xs font-bold rounded-lg transition-all duration-150",
-                          active 
-                            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/10" 
-                            : " text-muted-foreground hover:bg-muted hover:text-foreground"
-                        )}
-                      >
-                        {i + 1}
-                      </Button>
-                    );
-                  }
-                  return pages;
-                })()}
-              </div>
-
+              {pageButtons.map((i) => (
+                <Button
+                  key={i}
+                  type="button"
+                  variant={i === page ? "default" : "outline"}
+                  size="sm"
+                  className="h-8 min-w-8 px-2"
+                  onClick={() => setPage(i)}
+                >
+                  {i + 1}
+                </Button>
+              ))}
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
-                disabled={(page + 1) * pageSize >= totalCount}
+                className="h-8 w-8 p-0"
+                disabled={page + 1 >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
-                className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-40 transition-all duration-150"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
